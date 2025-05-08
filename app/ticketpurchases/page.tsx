@@ -82,6 +82,7 @@ interface ConsolidatedTicketPurchase {
 interface TicketSubType {
   id: string;
   type_name: string;
+  multiplication_factor: number;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -500,174 +501,243 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
   };
 
   const handlePrint = (purchase: ConsolidatedTicketPurchase) => {
+    const totalAmount = purchase.items.reduce((sum, item) => sum + item.amount, 0);
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
-            <title>พิมพ์บิล ${purchase.ticket_set_number}</title>
+            <title>ใบเสร็จหวย ${purchase.ticket_set_number}</title>
             <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
             <style>
               body {
-                font-family: 'Noto Sans Thai', Arial, sans-serif;
-                margin: 40px;
+                font-family: 'Noto Sans Thai', sans-serif;
+                margin: 0;
                 padding: 0;
                 background: #fff;
-                color: #2d3748;
-                line-height: 1.5;
+                color: #333;
+                line-height: 1.4;
+                font-size: 12px;
               }
               .container {
-                max-width: 800px;
-                margin: 0 auto;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 20px;
+                width: 80mm;
+                margin: 10mm auto;
+                border: 1px solid #ddd;
+                padding: 5mm;
                 position: relative;
                 background: #fff;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
               }
-              /* Watermark */
-              .container::before {
-                content: 'หวยไทย ออนไลน์';
+              .watermark {
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                transform: translate(-50%, -50%) rotate(-35deg);
-                font-size: 80px;
+                transform: translate(-50%, -50%) rotate(-45deg);
+                font-size: 24px;
+                color: rgba(0, 0, 0, 0.1);
                 font-weight: 700;
-                color: rgba(0, 0, 0, 0.05);
-                opacity: 1;
                 z-index: 0;
+                pointer-events: none;
               }
               .header {
                 text-align: center;
-                border-bottom: 2px solid #2b6cb0;
-                padding-bottom: 10px;
-                margin-bottom: 20px;
+                border-bottom: 1px dashed #000;
+                padding-bottom: 3mm;
+                margin-bottom: 3mm;
+                position: relative;
+                z-index: 1;
               }
               .header h1 {
-                font-size: 28px;
+                font-size: 14px;
                 font-weight: 700;
-                color: #2b6cb0;
                 margin: 0;
+                color: #d32f2f;
               }
-              .header .logo {
-                font-size: 18px;
-                color: #4a5568;
-                margin: 5px 0;
+              .header .draw-date {
+                font-size: 12px;
+                color: #555;
+                margin-top: 2px;
               }
               .ticket-info {
                 display: flex;
                 justify-content: space-between;
-                margin-bottom: 20px;
-                font-size: 14px;
-                color: #4a5568;
+                font-size: 11px;
+                color: #555;
+                margin-bottom: 3mm;
+                position: relative;
+                z-index: 1;
               }
-              .ticket-info i {
-                margin-right: 8px;
-                color: #2b6cb0;
+              .ticket-number-barcode {
+                text-align: center;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 16px;
+                letter-spacing: 2px;
+                background: #f5f5f5;
+                padding: 2mm;
+                border-radius: 3px;
+                margin-bottom: 3mm;
+                position: relative;
+                z-index: 1;
               }
-              .section-title {
-                font-size: 18px;
-                font-weight: 500;
-                color: #2d3748;
-                background: #edf2f7;
-                padding: 8px 12px;
-                border-radius: 4px;
-                margin: 10px 0 5px;
+              .items-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 3mm;
+                position: relative;
+                z-index: 1;
               }
-              .item {
+              .items-table th,
+              .items-table td {
+                padding: 1mm 2mm;
+                text-align: left;
+                font-size: 11px;
+              }
+              .items-table tr {
+                border-bottom: 1px solid #ddd;
+                }
+              .items-table th {
+                background: #f5f5f5;
+                font-weight: 600;
+                color: #333;
+              }
+              .ticket-numbers {
                 display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 8px 0;
-                border-bottom: 1px dashed #e2e8f0;
+                flex-wrap: wrap;
+                gap: 5px;
               }
-              .item:last-child {
-                border-bottom: none;
+              .ticket-numbers .number-group {
+                display: inline-flex;
+                gap: 2px;
               }
-              .item-index {
-                width: 30px;
-                font-weight: 500;
-                color: #4a5568;
-              }
-              .ticket-number span {
+              .ticket-numbers .number-group span {
                 display: inline-block;
-                width: 24px;
-                height: 24px;
-                line-height: 24px;
+                width: 14px;
+                height: 14px;
+                line-height: 14px;
                 text-align: center;
                 background: #e0f2fe;
-                color: #2b6cb0;
-                border-radius: 50%;
-                margin-right: 4px;
+                color: #1976d2;
+                border-radius: 2px;
                 font-weight: 500;
+                font-size: 10px;
               }
-              .amount {
-                font-weight: 500;
-                color: #2d3748;
+              .total {
+                text-align: right;
+                font-size: 12px;
+                font-weight: 700;
+                margin-top: 3mm;
+                padding-top: 2mm;
+                border-top: 1px dashed #000;
+                position: relative;
+                z-index: 1;
               }
               .footer {
                 text-align: center;
-                margin-top: 20px;
-                padding-top: 10px;
-                border-top: 1px solid #e2e8f0;
-                font-size: 12px;
-                color: #718096;
+                margin-top: 5mm;
+                font-size: 10px;
+                color: #777;
+                border-top: 1px dashed #000;
+                padding-top: 3mm;
+                position: relative;
+                z-index: 1;
               }
               .footer p {
-                margin: 5px 0;
+                margin: 1mm 0;
               }
               @media print {
                 body {
                   margin: 0;
                 }
                 .container {
-                  border: none;
                   box-shadow: none;
+                  border: none;
+                  margin: 0 auto;
+                }
+                @page {
+                  size: 80mm auto;
+                  margin: 0;
                 }
               }
             </style>
           </head>
           <body>
             <div class="container">
+              <div class="watermark">หวยไทย ออนไลน์</div>
               <div class="header">
-                <h1><i class="fas fa-clock"></i> งวด${formattedDrawDate}</h1>
-                  <h1><i class="fas fa-ticket-alt"></i> บิล: ${purchase.ticket_set_number}</h1>
-                <div class="logo"><i class="fas fa-user"></i>ผู้ซื้อ:${purchase.ticket_set_name || "ไม่มีชื่อ"}</div>
+                <h1>ใบเสร็จหวย</h1>
+                <div class="draw-date">งวด ${formattedDrawDate}</div>
               </div>
               <div class="ticket-info">
-                <p><i class="fas fa-calendar-alt"></i>วันที่ซื้อ: ${new Date(purchase.purchase_date).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</p>
-                <p><i class="fas fa-user"></i>ออกบิลโดย: ${user?.user_metadata?.name || "Guest"}</p>
-              
+                <span>วันที่ซื้อ: ${new Date(purchase.purchase_date).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</span>
+                <span>บิล: ${purchase.ticket_set_number}</span>
               </div>
-              ${Object.entries(groupedPurchaseItems(purchase.items))
-                .map(
-                  ([groupName, groupItems]) => `
-                    <div class="section-title"><i class="fas fa-list"></i> ${groupName}</div>
-                    ${groupItems
-                      .map(
-                        (item, index) => `
-                          <div class="item">
-                            <span class="item-index">${index + 1}.</span>
-                            <div class="ticket-number">
-                              ${item.ticket_number
-                                .split("")
-                                .map((digit) => `<span>${digit}</span>`)
-                                .join("")}
-                            </div>
-                            <span class="amount"><i class="fas fa-money-bill-wave"></i> ${item.amount.toFixed(0)} ฿</span>
-                          </div>
-                        `
-                      )
-                      .join("")}
-                  `
-                )
-                .join("")}
+              <div class="ticket-info">
+                <span>ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
+                <span>ออกโดย: ${user?.user_metadata?.name || "Guest"}</span>
+              </div>
+              <div class="ticket-number-barcode">${purchase.ticket_set_number}</div>
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>ประเภท</th>
+                    <th>เลข</th>
+                    <th>จำนวน (บาท)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${Object.entries(groupedPurchaseItems(purchase.items))
+                    .map(([groupName, groupedItems], groupIndex) => {
+                      let rowIndex = groupIndex > 0 ? Object.entries(groupedPurchaseItems(purchase.items)).slice(0, groupIndex).reduce((sum, [, items]) => sum + items.length, 0) : 0;
+                      return groupedItems
+                        .reduce((acc, group) => {
+                          const lastGroup = acc[acc.length - 1];
+                          if (lastGroup && lastGroup.amount === group.amount) {
+                            lastGroup.ticket_numbers.push(...group.ticket_numbers);
+                          } else {
+                            acc.push({ ...group });
+                          }
+                          return acc;
+                        }, [] as { ticket_numbers: string[]; amount: number }[])
+                        .map((group, index) => {
+                          rowIndex++;
+                          return `
+                            <tr>
+                              <td>${rowIndex}.</td>
+                              <td>${groupName}x${
+                                (() => {
+                                  const subType = ticketSubTypes.find(type => type.type_name === groupName);
+                                  return subType ? subType.multiplication_factor : "";
+                                })()
+                              }</td>
+                              <td class="ticket-numbers">
+                                ${group.ticket_numbers
+                                  .map((number: string) => `
+                                    <div class="number-group">
+                                      ${number
+                                        .split(" ")
+                                        .map((digit: string) => `<span>${digit}</span>`)
+                                        .join("")}
+                                    </div>
+                                  `)
+                                  .join(" ")}
+                              </td>
+                              <td>x${group.amount.toFixed(0)} ฿</td>
+                            </tr>
+                          `;
+                        })
+                        .join("");
+                    })
+                    .join("")}
+                </tbody>
+              </table>
+              <div class="total">
+                ยอดรวม: ${totalAmount.toFixed(0)} ฿
+              </div>
               <div class="footer">
                 <p>ออกโดย: บริษัท หวยไทย จำกัด</p>
                 <p>ติดต่อ: support@huaythai.com | โทร: 02-123-4567</p>
-                <p>ขอบคุณที่ใช้บริการของเรา</p>
+                <p>****ขอบคุณที่อุดหนุน เฮงๆ รวยๆ ค่ะ****</p>
               </div>
             </div>
           </body>
@@ -687,15 +757,33 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
   };
 
   const groupedPurchaseItems = (items: TicketPurchaseItem[]) => {
-    return items.reduce(
-      (acc, item) => {
-        const group = item.sub_type_name || "ไม่ทราบประเภท";
-        if (!acc[group]) acc[group] = [];
-        acc[group].push(item);
-        return acc;
-      },
-      {} as Record<string, TicketPurchaseItem[]>
-    );
+    // Step 1: Group by sub_type_name
+    const groupedByType = items.reduce((acc, item) => {
+      const group = item.sub_type_name || "ไม่ทราบประเภท";
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(item);
+      return acc;
+    }, {} as Record<string, TicketPurchaseItem[]>);
+
+    // Step 2: Within each group, group ticket_numbers by amount
+    const finalGrouped = Object.entries(groupedByType).reduce((acc, [groupName, groupItems]) => {
+      const groupedByAmount: { ticket_numbers: string[], amount: number }[] = [];
+      groupItems.forEach(item => {
+        const existingGroup = groupedByAmount.find(g => g.amount === item.amount);
+        if (existingGroup) {
+          existingGroup.ticket_numbers.push(item.ticket_number);
+        } else {
+          groupedByAmount.push({
+            ticket_numbers: [item.ticket_number],
+            amount: item.amount,
+          });
+        }
+      });
+      acc[groupName] = groupedByAmount;
+      return acc;
+    }, {} as Record<string, { ticket_numbers: string[], amount: number }[]>);
+
+    return finalGrouped;
   };
 
   return (
@@ -845,7 +933,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
               </div>
             </motion.div>
 
-            {/*      {/* Toggle Deleted */}
+            {/* Toggle Deleted */}
             <motion.div variants={fadeSlideIn} className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
               <Button
                 variant="outline"
@@ -882,124 +970,146 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                       {showDeleted ? "ไม่พบรายการที่ลบใน 30 วัน" : `ไม่พบรายการซื้อสำหรับวันที่ ${selectedDate ? format(selectedDate, "dd MMM yyyy", { locale: th }) : "ที่เลือก"}`}
                     </div>
                   ) : (
-                    purchases.map((purchase) => {
-                      const groupedItems = groupedPurchaseItems(purchase.items);
-                      const isDeleted = purchase.deleted_at !== null;
-                      const daysRemaining = isDeleted ? getDaysRemaining(purchase.deleted_at!) : null;
+                    <>
+                      {purchases.map((purchase) => {
+                        const groupedItems = groupedPurchaseItems(purchase.items);
+                        const isDeleted = purchase.deleted_at !== null;
+                        const daysRemaining = isDeleted ? getDaysRemaining(purchase.deleted_at!) : null;
+                        const totalAmount = purchase.items.reduce((sum, item) => sum + item.amount, 0);
 
-                      return (
-                        <motion.div key={purchase.id} variants={fadeSlideIn}>
-                          <Card className={`border ${isDeleted ? "border-red-200 bg-red-50" : "border-gray-200"} rounded-xl`}>
-                            <div
-                              className={`flex justify-between items-center p-4 cursor-pointer ${
-                                isDeleted ? "bg-red-100" : "bg-blue-50"
-                              }  `}
-                              onClick={() => toggleExpand(purchase.id)}
-                            >
-                              <div className="flex items-center gap-3">
-                                <h2 className={`text-sm font-semibold ${isDeleted ? "text-red-800" : "text-blue-800"}`}>
-                                  {purchase.ticket_set_name || "ไม่มีชื่อ"} ({purchase.ticket_set_number})
-                                </h2>
-                                {isDeleted && daysRemaining !== null && (
-                                  <Badge variant="secondary" className="bg-red-200 text-red-800 flex items-center gap-1">
-                                    <Clock className="w-3 h-3" /> {daysRemaining} วัน
-                                  </Badge>
-                                )}
+                        return (
+                          <motion.div key={purchase.id} variants={fadeSlideIn}>
+                            <Card className={`border ${isDeleted ? "border-red-200 bg-red-50" : "border-gray-200"} rounded-xl`}>
+                              <div
+                                className={`flex justify-between items-center p-4 cursor-pointer ${
+                                  isDeleted ? "bg-red-100" : "bg-blue-50"
+                                }  `}
+                                onClick={() => toggleExpand(purchase.id)}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <h2 className={`text-sm font-semibold ${isDeleted ? "text-red-800" : "text-blue-800"}`}>
+                                    {purchase.ticket_set_name || "ไม่มีชื่อ"} ({purchase.ticket_set_number})
+                                  </h2>
+                                  {isDeleted && daysRemaining !== null && (
+                                    <Badge variant="secondary" className="bg-red-200 text-red-800 flex items-center gap-1">
+                                      <Clock className="w-3 h-3" /> {daysRemaining} วัน
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-gray-600">
+                                    {new Date(purchase.purchase_date).toLocaleDateString("th-TH")}
+                                  </span>
+                                  {expandedPurchases.has(purchase.id) ? (
+                                    <ChevronUp className={`w-5 h-5 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
+                                  ) : (
+                                    <ChevronDown className={`w-5 h-5 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-600">
-                                  {new Date(purchase.purchase_date).toLocaleDateString("th-TH")}
-                                </span>
-                                {expandedPurchases.has(purchase.id) ? (
-                                  <ChevronUp className={`w-5 h-5 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
-                                ) : (
-                                  <ChevronDown className={`w-5 h-5 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
-                                )}
-                              </div>
-                            </div>
-                            <AnimatePresence>
-                              {expandedPurchases.has(purchase.id) && (
-                                <motion.div initial="hidden" animate="visible" exit="exit" variants={fadeSlideIn}>
-                                  <div className="p-4">
-                                    {Object.entries(groupedItems).map(([groupName, groupItems]) => (
-                                      <div key={groupName} className="mb-4">
-                                        <div className={`font-medium p-2 rounded-lg ${isDeleted ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"}`}>
-                                          {groupName}
-                                        </div>
-                                        <div className="space-y-2 mt-2">
-                                          {groupItems.map((item, index) => (
-                                            <div
-                                              key={item.id}
-                                              className={`flex items-center p-2 rounded-lg ${isDeleted ? "hover:bg-red-100" : "hover:bg-blue-50"}`}
-                                            >
-                                              <span className="w-6 text-gray-500">{index + 1}.</span>
-                                              <div className="flex gap-1 mr-2">
-                                                {item.ticket_number.split("").map((digit, i) => (
-                                                  <span
-                                                    key={i}
-                                                    className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-semibold ${
-                                                      isDeleted ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"
-                                                    }`}
-                                                  >
-                                                    {digit}
-                                                  </span>
-                                                ))}
+                              <AnimatePresence>
+                                {expandedPurchases.has(purchase.id) && (
+                                  <motion.div initial="hidden" animate="visible" exit="exit" variants={fadeSlideIn}>
+                                    <div className="p-4">
+                                      {Object.entries(groupedItems).map(([groupName, groupedItems]) => (
+                                        <div key={groupName} className="mb-4">
+                                          <div className={`font-medium p-2 rounded-lg ${isDeleted ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"}`}>
+                                            {groupName}
+                                            {(() => {
+                                              const subType = ticketSubTypes.find(
+                                                (type) => type.type_name === groupName
+                                              );
+                                              return subType ? ` x ${subType.multiplication_factor}` : "";
+                                            })()}
+                                          </div>
+                                          <div className="space-y-2 mt-2">
+                                            {groupedItems.map((group, index) => (
+                                              <div
+                                                key={index}
+                                                className={`flex items-center p-2 rounded-lg ${isDeleted ? "hover:bg-red-100" : "hover:bg-blue-50"}`}
+                                              >
+                                                <div className="flex gap-2 mr-2">
+                                                  {group.ticket_numbers.map((number: string, numberIndex: number) => (
+                                                    <div key={numberIndex} className="flex gap-1">
+                                                      {number.split(" ").map((digit: string, i: number) => (
+                                                        <span
+                                                          key={i}
+                                                          className={`flex items-center justify-center text-sm font-semibold ${
+                                                            isDeleted ? " text-red-800" : " text-blue-800"
+                                                          }`}
+                                                        >
+                                                          {digit}
+                                                        </span>
+                                                      ))}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                <span className="flex-1" />
+                                                <span className="text-sm text-gray-600">x{group.amount.toFixed(0)} ฿</span>
                                               </div>
-                                              <span className="flex-1" />
-                                              <span className="text-sm text-gray-600">{item.amount.toFixed(0)} ฿</span>
-                                            </div>
-                                          ))}
+                                            ))}
+                                          </div>
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="p-4 bg-gray-50 flex justify-end gap-2 rounded-b-xl">
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handlePrint(purchase)}
-                                            className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                                          >
-                                            <Printer className="w-4 h-4 mr-2" />
-                                            พิมพ์
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>พิมพ์รายการบิลนี้</TooltipContent>
-                                      </Tooltip>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => isDeleted ? handleRestorePurchase(purchase.id) : openDeleteDialog(purchase.id)}
-                                            className={isDeleted ? "border-red-500 text-red-600 hover:bg-red-50" : "border-blue-500 text-blue-600 hover:bg-blue-50"}
-                                          >
-                                            {isDeleted ? <RotateCcw className="w-4 h-4 mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-                                            {isDeleted ? "คืนค่า" : "ลบ"}
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{isDeleted ? "คืนค่ารายการนี้" : "ลบรายการนี้"}</TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                          </Card>
-                        </motion.div>
-                      );
-                    })
-                  )}
-                  {isLoading && purchases.length > 0 && (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                    </div>
-                  )}
-                  {!isLoading && !hasMore && purchases.length > 0 && (
-                    <div className="text-center py-4 text-gray-500">ไม่มีข้อมูลเพิ่มเติม</div>
+                                      ))}
+                                    </div>
+                                    <div className="p-4 bg-gray-50 flex justify-between items-center gap-2 rounded-b-xl">
+                                      <span className="text-sm font-medium text-gray-700">ยอดรวม: {totalAmount.toFixed(0)} ฿</span>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => handlePrint(purchase)}
+                                              className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                                            >
+                                              <Printer className="w-4 h-4 mr-2" />
+                                              พิมพ์
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>พิมพ์รายการบิลนี้</TooltipContent>
+                                        </Tooltip>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => (isDeleted ? handleRestorePurchase(purchase.id) : openDeleteDialog(purchase.id))}
+                                              className={`${isDeleted ? "border-red-500 text-red-600 hover:bg-red-50" : "border-blue-500 text-blue-600 hover:bg-blue-50"}`}
+                                            >
+                                              {isDeleted ? (
+                                                <>
+                                                  <RotateCcw className="w-4 h-4 mr-2" />
+                                                  คืนค่า
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Trash2 className="w-4 h-4 mr-2" />
+                                                  ลบ
+                                                </>
+                                              )}
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>{isDeleted ? "คืนค่ารายการนี้" : "ลบรายการนี้"}</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </Card>
+                          </motion.div>
+                        );
+                      })}
+                      {isLoading && purchases.length > 0 && (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                        </div>
+                      )}
+                      {!isLoading && !hasMore && purchases.length > 0 && (
+                        <div className="text-center py-4 text-gray-500">ไม่มีข้อมูลเพิ่มเติม</div>
+                      )}
+                    </>
                   )}
                 </div>
               </ScrollArea>

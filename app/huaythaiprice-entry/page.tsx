@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -11,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Trash2, ArrowLeft, Plus, Minus, Bitcoin } from 'lucide-react'
+import { Trash2, ArrowLeft, Plus, Minus, Bitcoin } from "lucide-react"
 import type { Ticket, TicketSubType } from "@/types/types"
 import {
   Dialog,
@@ -29,18 +31,18 @@ import { th } from "date-fns/locale"
 
 // Define interfaces for the parsed JSON data
 interface NumberSetsState {
-  selectedNumbers: string[];
-  selectedType: TicketSubType;
-  useReverseNumbers: boolean;
-  activeFilter: number | null;
+  selectedNumbers: string[]
+  selectedType: TicketSubType
+  useReverseNumbers: boolean
+  activeFilter: number | null
 }
 
 interface TicketResult {
-  id: string;
-  result_date: string;
-  ticket_sub_type_id: string;
-  user_id: string;
-  created_at: string;
+  id: string
+  result_date: string
+  ticket_sub_type_id: string
+  user_id: string
+  created_at: string
 }
 
 // Animation variants
@@ -108,7 +110,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
   } else if (
     (isAfter(thailandTime, day16Evening) && isBefore(thailandTime, addMonths(day1Cutoff, 1))) ||
     (day === 16 && hours >= 17) ||
-    (day > 16) ||
+    day > 16 ||
     (day === 1 && hours < 15)
   ) {
     // Purchase is for the 1st of the next month
@@ -141,9 +143,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
   }
 
   // If no draw date is found, insert the calculated draw date
-  const { error: insertError } = await supabase
-    .from("lottery_draw_dates")
-    .insert({ draw_date: formattedDrawDate })
+  const { error: insertError } = await supabase.from("lottery_draw_dates").insert({ draw_date: formattedDrawDate })
 
   if (insertError) {
     throw new Error(`Error inserting draw date: ${insertError.message}`)
@@ -161,13 +161,9 @@ export default function PriceEntryPage() {
   const numberSetsStateParam = searchParams.get("numberSetsState")
 
   // Update the JSON parsing with type assertions and validation
-  const allTickets = allTicketsParam 
-    ? (JSON.parse(allTicketsParam) as Ticket[]) 
-    : [];
+  const allTickets = allTicketsParam ? (JSON.parse(allTicketsParam) as Ticket[]) : []
 
-  const numberSetsState = numberSetsStateParam 
-    ? (JSON.parse(numberSetsStateParam) as NumberSetsState)
-    : undefined;
+  const numberSetsState = numberSetsStateParam ? (JSON.parse(numberSetsStateParam) as NumberSetsState) : undefined
 
   const [user, setUser] = useState<any>(null)
   const [balance, setBalance] = useState<number>(0)
@@ -193,21 +189,19 @@ export default function PriceEntryPage() {
   const [ticketNumber, setTicketNumber] = useState<string>("")
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([])
   useEffect(() => {
-    setSelectedNumbers(numberSetsState?.selectedNumbers || [])
-  }, [numberSetsState?.selectedNumbers])
+    if (numberSetsState?.selectedNumbers) {
+      setSelectedNumbers(numberSetsState.selectedNumbers)
+    }
+  }, []) // Empty dependency array to run only once
   const [selectedType, setSelectedType] = useState<TicketSubType>(
     numberSetsState?.selectedType || {
       id: "",
       type_name: "สามตัวบน",
       multiplication_factor: 900,
-    }
+    },
   )
-  const [useReverseNumbers, setUseReverseNumbers] = useState<boolean>(
-    numberSetsState?.useReverseNumbers ?? false
-  )
-  const [activeFilter, setActiveFilter] = useState<number | null>(
-    numberSetsState?.activeFilter ?? null
-  )
+  const [useReverseNumbers, setUseReverseNumbers] = useState<boolean>(numberSetsState?.useReverseNumbers ?? false)
+  const [activeFilter, setActiveFilter] = useState<number | null>(numberSetsState?.activeFilter ?? null)
   const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([])
   const [formattedDrawDate, setFormattedDrawDate] = useState<string>("")
 
@@ -257,12 +251,12 @@ export default function PriceEntryPage() {
 
         if (error) throw error
         if (data) {
-          const typedData = data.map(item => ({
-            id: String(item.id || ''),
-            type_name: String(item.type_name || ''),
+          const typedData = data.map((item) => ({
+            id: String(item.id || ""),
+            type_name: String(item.type_name || ""),
             multiplication_factor: Number(item.multiplication_factor || 0),
             created_at: item.created_at ? String(item.created_at) : undefined,
-            updated_at: item.updated_at ? String(item.updated_at) : undefined
+            updated_at: item.updated_at ? String(item.updated_at) : undefined,
           }))
           setTicketSubTypes(typedData)
         }
@@ -274,42 +268,55 @@ export default function PriceEntryPage() {
   }, [supabase])
 
   // Controlled function to update ticket info
-  const updateTicketInfo = useCallback((newName: string, newNumber: string) => {
-    setTicketName(newName)
-    setTicketNumber(newNumber)
-    setTickets((prev) =>
-      prev.map((t) => ({
-        ...t,
-        name: newName || t.name || "Unnamed Ticket",
-        ticketNumber: newNumber || t.ticketNumber,
-      }))
-    )
-  }, [])
+  const updateTicketInfo = useCallback(
+    (newName: string, newNumber: string) => {
+      if (newName !== ticketName) {
+        setTicketName(newName)
+      }
+      if (newNumber !== ticketNumber) {
+        setTicketNumber(newNumber)
+      }
+      setTickets((prev) =>
+        prev.map((t) => ({
+          ...t,
+          name: newName || t.name || "Unnamed Ticket",
+          ticketNumber: newNumber || t.ticketNumber,
+        })),
+      )
+    },
+    [ticketName, ticketNumber],
+  )
 
   // Debounce ticket name updates to prevent rapid state changes
   const debouncedUpdateTicketInfo = useCallback(
     debounce((newName: string, newNumber: string) => {
       updateTicketInfo(newName, newNumber)
     }, 300),
-    [updateTicketInfo]
+    [updateTicketInfo],
   )
 
   // Handle ticket name change with debouncing
-  const handleTicketNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newName = e.target.value
-    setTicketName(newName)
-    debouncedUpdateTicketInfo(newName, ticketNumber)
-  }, [debouncedUpdateTicketInfo, ticketNumber])
+  const handleTicketNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newName = e.target.value
+      setTicketName(newName)
+      debouncedUpdateTicketInfo(newName, ticketNumber)
+    },
+    [debouncedUpdateTicketInfo, ticketNumber],
+  )
 
   // Memoize the grouped tickets calculation
   const groupedTickets = useMemo(() => {
-    return ticketSubTypes.reduce((acc, subType) => {
-      const filtered = tickets.filter((t) => t.type_id === subType.id)
-      if (filtered.length > 0) {
-        acc[subType.type_name] = filtered
-      }
-      return acc
-    }, {} as Record<string, Ticket[]>)
+    return ticketSubTypes.reduce(
+      (acc, subType) => {
+        const filtered = tickets.filter((t) => t.type_id === subType.id)
+        if (filtered.length > 0) {
+          acc[subType.type_name] = filtered
+        }
+        return acc
+      },
+      {} as Record<string, Ticket[]>,
+    )
   }, [tickets, ticketSubTypes])
 
   const total = useMemo(() => {
@@ -374,10 +381,10 @@ export default function PriceEntryPage() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload: any) => {
-          if (payload.new && typeof payload.new.balance === 'number') {
+          if (payload.new && typeof payload.new.balance === "number") {
             setBalance(payload.new.balance)
           }
-        }
+        },
       )
       .subscribe()
 
@@ -449,55 +456,64 @@ export default function PriceEntryPage() {
     }))
   }, [])
 
-  const handleQuickAmount = useCallback((amount: number) => {
-    if (applyToAll) {
+  const handleQuickAmount = useCallback(
+    (amount: number) => {
+      if (applyToAll) {
+        setAmounts((prev) => {
+          const newAmounts = { ...prev }
+          tickets.forEach((ticket) => {
+            newAmounts[ticket.id] = amount
+          })
+          return newAmounts
+        })
+      } else if (selectedTicketId) {
+        setAmounts((prev) => ({
+          ...prev,
+          [selectedTicketId]: amount,
+        }))
+        setSelectedTicketId(null)
+      }
+    },
+    [applyToAll, selectedTicketId, tickets],
+  )
+
+  const handleCustomAmountChange = useCallback(
+    (value: string) => {
+      setCustomAmount(value)
+      const amount = Number(value)
+      if (!isNaN(amount) && amount >= 0 && applyToAll) {
+        setAmounts((prev) => {
+          const newAmounts = { ...prev }
+          tickets.forEach((ticket) => {
+            newAmounts[ticket.id] = amount
+          })
+          return newAmounts
+        })
+      }
+    },
+    [applyToAll, tickets],
+  )
+
+  const handleDelete = useCallback(
+    (ticketId: string) => {
       setAmounts((prev) => {
         const newAmounts = { ...prev }
-        tickets.forEach((ticket) => {
-          newAmounts[ticket.id] = amount
-        })
+        delete newAmounts[ticketId]
         return newAmounts
       })
-    } else if (selectedTicketId) {
-      setAmounts((prev) => ({
-        ...prev,
-        [selectedTicketId]: amount,
-      }))
-      setSelectedTicketId(null)
-    }
-  }, [applyToAll, selectedTicketId, tickets])
 
-  const handleCustomAmountChange = useCallback((value: string) => {
-    setCustomAmount(value)
-    const amount = Number(value)
-    if (!isNaN(amount) && amount >= 0 && applyToAll) {
-      setAmounts((prev) => {
-        const newAmounts = { ...prev }
-        tickets.forEach((ticket) => {
-          newAmounts[ticket.id] = amount
-        })
-        return newAmounts
-      })
-    }
-  }, [applyToAll, tickets])
+      const remainingTickets = tickets.filter((ticket) => ticket.id !== ticketId)
+      setTickets(remainingTickets)
 
-  const handleDelete = useCallback((ticketId: string) => {
-    setAmounts((prev) => {
-      const newAmounts = { ...prev }
-      delete newAmounts[ticketId]
-      return newAmounts
-    })
-
-    const remainingTickets = tickets.filter((ticket) => ticket.id !== ticketId)
-    setTickets(remainingTickets)
-
-    if (remainingTickets.length === 0) {
-      const params = new URLSearchParams()
-      params.set("allTickets", JSON.stringify([]))
-      params.set("numberSetsState", JSON.stringify(numberSetsState))
-      router.push(`/huaythai?${params.toString()}`)
-    }
-  }, [tickets, numberSetsState, router])
+      if (remainingTickets.length === 0) {
+        const params = new URLSearchParams()
+        params.set("allTickets", JSON.stringify([]))
+        params.set("numberSetsState", JSON.stringify(numberSetsState))
+        router.push(`/huaythai?${params.toString()}`)
+      }
+    },
+    [tickets, numberSetsState, router],
+  )
 
   const handleConfirm = useCallback(() => {
     if (!user) return
@@ -537,7 +553,7 @@ export default function PriceEntryPage() {
           .single()
 
         if (resultError && resultError.code === "PGRST116") {
-          const { data: newResult, error: insertError } = await supabase
+          const { data: newResult, error: insertError } = (await supabase
             .from("ticket_results")
             .insert({
               result_date: drawDate,
@@ -546,12 +562,12 @@ export default function PriceEntryPage() {
               created_at: thailandTime.toISOString(),
             })
             .select("id")
-            .single() as { data: TicketResult | null, error: any }
+            .single()) as { data: TicketResult | null; error: any }
 
           if (insertError || !newResult?.id) {
             throw new Error("Failed to create ticket result")
           }
-          
+
           ticketResultIds[typeId] = newResult.id
         } else if (resultError) {
           throw resultError
@@ -669,7 +685,11 @@ export default function PriceEntryPage() {
   }, [user, tickets, amounts, balance, ticketName, ticketNumber, total, supabase, router])
 
   const handleBack = useCallback(() => {
-    updateTicketInfo(ticketName, ticketNumber)
+    // Only update if there are actual changes
+    if (ticketName !== tickets[0]?.name || ticketNumber !== tickets[0]?.ticketNumber) {
+      updateTicketInfo(ticketName, ticketNumber)
+    }
+
     const params = new URLSearchParams()
     params.set("allTickets", JSON.stringify(tickets))
     params.set(
@@ -682,7 +702,17 @@ export default function PriceEntryPage() {
       }),
     )
     router.push(`/huaythai?${params.toString()}`)
-  }, [router, tickets, selectedNumbers, selectedType, useReverseNumbers, activeFilter, ticketName, ticketNumber, updateTicketInfo])
+  }, [
+    router,
+    tickets,
+    selectedNumbers,
+    selectedType,
+    useReverseNumbers,
+    activeFilter,
+    ticketName,
+    ticketNumber,
+    updateTicketInfo,
+  ])
 
   const activeTicketTypes = Object.keys(groupedTickets)
 

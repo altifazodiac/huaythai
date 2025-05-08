@@ -276,7 +276,7 @@ export default function LotteryPage() {
                 </div>
               </div>
             </div>
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex h-[60px]">
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex h-[40px]">
               <button
                 onClick={() => setActiveView("numberpad")}
                 className={`flex-1 py-3 text-sm font-medium ${
