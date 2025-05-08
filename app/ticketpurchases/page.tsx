@@ -1035,10 +1035,10 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                                 <div className="flex flex-wrap gap-1 sm:gap-0.5 mr-1 sm:mr-0.5">
                                                   {group.ticket_numbers.map((number: string, numberIndex: number) => (
                                                     <div key={numberIndex} className="flex gap-0.5 sm:gap-0.2">
-                                                      {number.split(" ").map((digit: string, i: number) => (
+                                                      {number.split("  ").map((digit: string, i: number) => (
                                                         <span
                                                           key={i}
-                                                          className={`flex items-center justify-center text-sm sm:text-xs font-semibold w-5 sm:w-4 h-5 sm:h-4 rounded-sm ${
+                                                          className={`flex items-center justify-center text-sm sm:text-xs font-semibold w-8 sm:w-6 h-6 sm:h-4 rounded-sm ${
                                                             isDeleted ? "text-red-800 bg-red-100" : "text-blue-800 bg-blue-100"
                                                           }`}
                                                         >
