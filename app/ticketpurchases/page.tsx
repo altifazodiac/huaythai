@@ -1010,10 +1010,12 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                               <AnimatePresence>
                                 {expandedPurchases.has(purchase.id) && (
                                   <motion.div initial="hidden" animate="visible" exit="exit" variants={fadeSlideIn}>
-                                    <div className="p-4">
+                                    <div className="p-4 sm:p-3">
                                       {Object.entries(groupedItems).map(([groupName, groupedItems]) => (
-                                        <div key={groupName} className="mb-4">
-                                          <div className={`font-medium p-2 rounded-lg ${isDeleted ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"}`}>
+                                        <div key={groupName} className="mb-3">
+                                          <div className={`font-medium p-2 rounded-lg text-sm sm:text-xs ${
+                                            isDeleted ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"
+                                          }`}>
                                             {groupName}
                                             {(() => {
                                               const subType = ticketSubTypes.find(
@@ -1022,20 +1024,22 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                               return subType ? ` x ${subType.multiplication_factor}` : "";
                                             })()}
                                           </div>
-                                          <div className="space-y-2 mt-2">
+                                          <div className="space-y-1 mt-1">
                                             {groupedItems.map((group, index) => (
                                               <div
                                                 key={index}
-                                                className={`flex items-center p-2 rounded-lg ${isDeleted ? "hover:bg-red-100" : "hover:bg-blue-50"}`}
+                                                className={`flex flex-wrap items-center p-2 rounded-lg gap-2 sm:gap-1 ${
+                                                  isDeleted ? "hover:bg-red-100" : "hover:bg-blue-50"
+                                                }`}
                                               >
-                                                <div className="flex gap-2 mr-2">
+                                                <div className="flex flex-wrap gap-1 sm:gap-0.5 mr-1 sm:mr-0.5">
                                                   {group.ticket_numbers.map((number: string, numberIndex: number) => (
-                                                    <div key={numberIndex} className="flex gap-1">
+                                                    <div key={numberIndex} className="flex gap-0.5 sm:gap-0.2">
                                                       {number.split(" ").map((digit: string, i: number) => (
                                                         <span
                                                           key={i}
-                                                          className={`flex items-center justify-center text-sm font-semibold ${
-                                                            isDeleted ? " text-red-800" : " text-blue-800"
+                                                          className={`flex items-center justify-center text-sm sm:text-xs font-semibold w-5 sm:w-4 h-5 sm:h-4 rounded-sm ${
+                                                            isDeleted ? "text-red-800 bg-red-100" : "text-blue-800 bg-blue-100"
                                                           }`}
                                                         >
                                                           {digit}
@@ -1044,54 +1048,64 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                                     </div>
                                                   ))}
                                                 </div>
-                                                <span className="flex-1" />
-                                                <span className="text-sm text-gray-600">x{group.amount.toFixed(0)} ฿</span>
+                                                <span className="flex-1 min-w-[60px]" />
+                                                <span className="text-sm sm:text-xs text-gray-600 whitespace-nowrap">
+                                                  x{group.amount.toFixed(0)} ฿
+                                                </span>
                                               </div>
                                             ))}
                                           </div>
                                         </div>
                                       ))}
                                     </div>
-                                    <div className="p-4 bg-gray-50 flex justify-between items-center gap-2 rounded-b-xl">
-                                      <span className="text-sm font-medium text-gray-700">ยอดรวม: {totalAmount.toFixed(0)} ฿</span>
+                                    <div className="p-4 sm:p-3 bg-gray-50 flex flex-wrap justify-between items-center gap-2 rounded-b-xl">
+                                      <span className="text-sm sm:text-xs font-medium text-gray-700">
+                                        ยอดรวม: {totalAmount.toFixed(0)} ฿
+                                      </span>
                                       <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => handlePrint(purchase)}
-                                              className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                                            >
-                                              <Printer className="w-4 h-4 mr-2" />
-                                              พิมพ์
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>พิมพ์รายการบิลนี้</TooltipContent>
-                                        </Tooltip>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() => (isDeleted ? handleRestorePurchase(purchase.id) : openDeleteDialog(purchase.id))}
-                                              className={`${isDeleted ? "border-red-500 text-red-600 hover:bg-red-50" : "border-blue-500 text-blue-600 hover:bg-blue-50"}`}
-                                            >
-                                              {isDeleted ? (
-                                                <>
-                                                  <RotateCcw className="w-4 h-4 mr-2" />
-                                                  คืนค่า
-                                                </>
-                                              ) : (
-                                                <>
-                                                  <Trash2 className="w-4 h-4 mr-2" />
-                                                  ลบ
-                                                </>
-                                              )}
-                                            </Button>
-                                          </TooltipTrigger>
-                                          <TooltipContent>{isDeleted ? "คืนค่ารายการนี้" : "ลบรายการนี้"}</TooltipContent>
-                                        </Tooltip>
+                                        <div className="flex flex-wrap gap-2">
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handlePrint(purchase)}
+                                                className="border-blue-500 text-blue-600 hover:bg-blue-50 text-sm sm:text-xs px-3 sm:px-2"
+                                              >
+                                                <Printer className="w-4 h-4 mr-1 sm:mr-0.5" />
+                                                พิมพ์
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>พิมพ์รายการบิลนี้</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => (isDeleted ? handleRestorePurchase(purchase.id) : openDeleteDialog(purchase.id))}
+                                                className={`${
+                                                  isDeleted
+                                                    ? "border-red-500 text-red-600 hover:bg-red-50"
+                                                    : "border-blue-500 text-blue-600 hover:bg-blue-50"
+                                                } text-sm sm:text-xs px-3 sm:px-2`}
+                                              >
+                                                {isDeleted ? (
+                                                  <>
+                                                    <RotateCcw className="w-4 h-4 mr-1 sm:mr-0.5" />
+                                                    คืนค่า
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Trash2 className="w-4 h-4 mr-1 sm:mr-0.5" />
+                                                    ลบ
+                                                  </>
+                                                )}
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>{isDeleted ? "คืนค่ารายการนี้" : "ลบรายการนี้"}</TooltipContent>
+                                          </Tooltip>
+                                        </div>
                                       </TooltipProvider>
                                     </div>
                                   </motion.div>
