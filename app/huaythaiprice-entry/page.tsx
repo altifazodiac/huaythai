@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { debounce } from "lodash"
-import { format, startOfDay, addMonths, isBefore, isAfter, set } from "date-fns"
+import { format, addMonths, isBefore, isAfter, set } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { th } from "date-fns/locale"
 
@@ -191,9 +191,10 @@ export default function PriceEntryPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [ticketName, setTicketName] = useState<string>("")
   const [ticketNumber, setTicketNumber] = useState<string>("")
-  const [selectedNumbers, setSelectedNumbers] = useState<string[]>(
-    numberSetsState?.selectedNumbers || []
-  )
+  const [selectedNumbers, setSelectedNumbers] = useState<string[]>([])
+  useEffect(() => {
+    setSelectedNumbers(numberSetsState?.selectedNumbers || [])
+  }, [numberSetsState?.selectedNumbers])
   const [selectedType, setSelectedType] = useState<TicketSubType>(
     numberSetsState?.selectedType || {
       id: "",
@@ -243,7 +244,7 @@ export default function PriceEntryPage() {
       }
     }
     fetchDrawDate()
-  }, [supabase])
+  }, [supabase, thailandTime])
 
   // Fetch ticket sub-types
   useEffect(() => {

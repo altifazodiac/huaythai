@@ -44,8 +44,7 @@ export default function CreditPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 10;
+ 
   
   // Fetch user data, balance, transactions, and set up real-time subscription
   useEffect(() => {

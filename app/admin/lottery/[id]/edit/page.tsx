@@ -1,18 +1,35 @@
 import { supabase } from "@/lib/supabase/supabaseClient"
 import { LotteryForm } from "@/components/lottery/lottery-form"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft } from 'lucide-react'
 import Link from "next/link"
 import { notFound } from "next/navigation"
+ 
+// Add the correct type for the params
+interface PageProps {
+  params: {
+    id: string;
+  };
+  searchParams?: Record<string, string | string[] | undefined>;
+}
 
-export default async function EditLotteryPage({ params }: { params: { id: string } }) {
-  const { data: result, error } = await supabase.from("lottery_results").select("*").eq("id", params.id).single()
+export default async function EditLotteryPage({
+  params,
+}: PageProps) {
+  const { data: result, error } = await supabase
+    .from("lottery_results")
+    .select("*")
+    .eq("id", params.id)
+    .single();
 
   if (error || !result) {
-    notFound()
+    notFound();
   }
 
-  const { data: numbers } = await supabase.from("lottery_numbers").select("*").eq("lottery_result_id", params.id)
+  const { data: numbers } = await supabase
+    .from("lottery_numbers")
+    .select("*")
+    .eq("lottery_result_id", params.id);
 
   return (
     <div className="container mx-auto py-10">

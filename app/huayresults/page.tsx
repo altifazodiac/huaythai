@@ -136,7 +136,7 @@ export default function TicketResultsPage() {
     const utcDate = new Date(utcDateString)
     return toZonedTime(utcDate, THAILAND_TZ)
   }
-
+ 
   useEffect(() => {
     console.log("groupedMatches:", groupedMatches)
   }, [groupedMatches])
@@ -362,7 +362,7 @@ export default function TicketResultsPage() {
       }))
     }
   }
-
+ 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true)

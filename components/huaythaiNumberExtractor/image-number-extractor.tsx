@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
 import { recognizeThaiText } from "@/lib/ocr-service"
+import Image from 'next/image';
 
 interface ImageNumberExtractorProps {
   onTextExtracted: (text: string) => void
@@ -108,7 +109,7 @@ const ImageNumberExtractor = ({ onTextExtracted }: ImageNumberExtractorProps) =>
       {preview && (
         <div className="mt-4">
           <h3 className="text-lg font-medium mb-2">ภาพตัวอย่าง</h3>
-          <img
+          <Image
             src={preview || "/placeholder.svg"}
             alt="Uploaded preview"
             className="max-w-full h-auto rounded-lg border border-gray-200 max-h-60 object-contain"

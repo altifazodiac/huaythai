@@ -3,9 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
     "build": "next build",
+    "dev": "next dev",
     "start": "next start",
+    "clean": "rm -rf .next && rm -rf node_modules/.cache",
+    
     "lint": "next lint"
   },
   "dependencies": {

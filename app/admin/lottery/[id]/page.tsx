@@ -8,6 +8,7 @@ import { notFound } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
+
 export default async function LotteryDetailPage({ params }: { params: { id: string } }) {
   const { data: result, error } = await supabase.from("lottery_results").select("*").eq("id", params.id).single()
 
