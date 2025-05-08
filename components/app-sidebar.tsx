@@ -11,8 +11,23 @@ import {
   Map,
   PieChart,
   Settings2,
+  ShieldCheck,
   SquareTerminal,
 } from "lucide-react"
+import { LucideIcon } from "lucide-react"
+
+interface NavItem {
+  title: string;
+  url: string;
+  icon?: LucideIcon;
+  isActive?: boolean;
+  items?: NavSubItem[];
+}
+
+interface NavSubItem {
+  title: string;
+  url: string;
+}
 
 import { NavMain } from "../components/nav-main"
 import { NavProjects } from "../components/nav-projects"
@@ -50,6 +65,35 @@ const data = {
       plan: "Free",
     },
   ],
+  mainNav: [
+    {
+      title: "Dashboard",
+      url: "/dashboard",
+    },
+    {
+      title: "ผู้ดูแลระบบ",
+      url: "/admin",
+      icon: ShieldCheck,
+      items: [
+        {
+          title: "แดชบอร์ด",
+          url: "/admin",
+        },
+        {
+          title: "จัดการผลสลาก",
+          url: "/admin/lottery",
+        },
+        {
+          title: "จัดการผู้ใช้",
+          url: "/admin/users",
+        },
+        {
+          title: "รายงาน",
+          url: "/admin/reports",
+        },
+      ],
+    },
+  ] as NavItem[],
   navMain: [
     {
       title: "หวยไทย",
@@ -70,7 +114,7 @@ const data = {
           url: "/huayresults",
         },
         {
-          title: "ผลสลากกินแบ่งล่าสุด",
+          title: "ผลสลากกินแบ่ง",
           url: "/huaylatestresults",
         },
         {
@@ -218,7 +262,7 @@ const data = {
         },
       ],
     },
-  ],
+  ] as NavItem[],
   projects: [
     {
       name: "Design Engineering",
@@ -245,11 +289,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={data.mainNav as NavItem[]} />
+        <NavMain items={data.navMain as NavItem[]} />
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
