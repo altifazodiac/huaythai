@@ -6,9 +6,9 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
-import { toast } from "react-toastify"
+import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardHeader, CardContent } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -45,11 +45,37 @@ interface TicketResult {
   created_at: string
 }
 
+interface PurchaseData {
+  id: string
+  transaction_id: string
+  user_id: string
+  ticket_set_name: string | null
+  ticket_set_number: string
+  created_at: string
+  purchase_date: string
+  ticket_result_id: string
+}
+
+interface BalanceData {
+  balance: number
+  user_id: string
+  updated_at: string
+}
+
+interface TransactionData {
+  id: string
+  user_id: string
+  amount: number
+  transaction_type: string
+  description: string
+  created_at: string
+}
+
 // Animation variants
 const fadeSlideIn = {
-  hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, x: 20, transition: { duration: 0.3 } },
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.3 } },
 }
 
 const staggerContainer = {
@@ -65,7 +91,7 @@ const staggerContainer = {
 
 const ticketItemVariants = {
   hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
   exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
 }
 
@@ -89,7 +115,7 @@ const getThailandTime = () => {
 const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<string> => {
   const day = thailandTime.getDate()
   const hours = thailandTime.getHours()
-  const minutes = thailandTime.getMinutes()
+  // const minutes = thailandTime.getMinutes() // Not used in logic, can be removed
 
   let drawDate: Date
 
@@ -123,7 +149,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     }
   }
 
-  const formattedDrawDate = format(drawDate, "yyyy-MM-dd")
+  const formattedDrawDateForQuery = format(drawDate, "yyyy-MM-dd")
 
   // Query the lottery_draw_dates table for the next draw date
   const { data: drawDates, error: drawError } = await supabase
@@ -135,6 +161,8 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     .single()
 
   if (drawError && drawError.code !== "PGRST116") {
+    // PGRST116 means "No rows found", which is handled below.
+    // Other errors should be thrown.
     throw new Error(`Error fetching draw date: ${drawError.message}`)
   }
 
@@ -143,13 +171,13 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
   }
 
   // If no draw date is found, insert the calculated draw date
-  const { error: insertError } = await supabase.from("lottery_draw_dates").insert({ draw_date: formattedDrawDate })
+  const { error: insertError } = await supabase.from("lottery_draw_dates").insert({ draw_date: formattedDrawDateForQuery })
 
   if (insertError) {
     throw new Error(`Error inserting draw date: ${insertError.message}`)
   }
 
-  return formattedDrawDate
+  return formattedDrawDateForQuery
 }
 
 export default function PriceEntryPage() {
@@ -157,26 +185,12 @@ export default function PriceEntryPage() {
   const searchParams = useSearchParams()
   const supabase = createClient()
 
-  const allTicketsParam = searchParams.get("allTickets")
-  const numberSetsStateParam = searchParams.get("numberSetsState")
-
-  // Update the JSON parsing with type assertions and validation
-  const allTickets = allTicketsParam ? (JSON.parse(allTicketsParam) as Ticket[]) : []
-
-  const numberSetsState = numberSetsStateParam ? (JSON.parse(numberSetsStateParam) as NumberSetsState) : undefined
+  const sessionId = searchParams.get("sessionId")
 
   const [user, setUser] = useState<any>(null)
   const [balance, setBalance] = useState<number>(0)
-  const [tickets, setTickets] = useState<Ticket[]>(allTickets)
-  const [amounts, setAmounts] = useState<{ [key: string]: number }>(
-    allTickets.reduce(
-      (acc: { [key: string]: number }, ticket: Ticket) => {
-        acc[ticket.id] = 1
-        return acc
-      },
-      {} as { [key: string]: number },
-    ),
-  )
+  const [tickets, setTickets] = useState<Ticket[]>([]) // This will hold the actual tickets being displayed and edited
+  const [amounts, setAmounts] = useState<{ [key: string]: number }>({})
   const [applyToAll, setApplyToAll] = useState<boolean>(false)
   const [customAmount, setCustomAmount] = useState<string>("")
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
@@ -188,22 +202,51 @@ export default function PriceEntryPage() {
   const [ticketName, setTicketName] = useState<string>("")
   const [ticketNumber, setTicketNumber] = useState<string>("")
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([])
-  useEffect(() => {
-    if (numberSetsState?.selectedNumbers) {
-      setSelectedNumbers(numberSetsState.selectedNumbers)
-    }
-  }, []) // Empty dependency array to run only once
-  const [selectedType, setSelectedType] = useState<TicketSubType>(
-    numberSetsState?.selectedType || {
-      id: "",
-      type_name: "สามตัวบน",
-      multiplication_factor: 900,
-    },
-  )
-  const [useReverseNumbers, setUseReverseNumbers] = useState<boolean>(numberSetsState?.useReverseNumbers ?? false)
-  const [activeFilter, setActiveFilter] = useState<number | null>(numberSetsState?.activeFilter ?? null)
+  const [selectedType, setSelectedType] = useState<TicketSubType>({
+    id: "",
+    type_name: "สามตัวบน",
+    type_number: 3,
+    multiplication_factor: 900,
+  })
+  const [useReverseNumbers, setUseReverseNumbers] = useState<boolean>(false)
+  const [activeFilter, setActiveFilter] = useState<number | null>(null)
   const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([])
   const [formattedDrawDate, setFormattedDrawDate] = useState<string>("")
+
+
+  // 1. Load data from localStorage on component mount
+  useEffect(() => {
+    if (sessionId && typeof window !== 'undefined') {
+      try {
+        const data = JSON.parse(localStorage.getItem(`priceEntry_${sessionId}`) || '{}');
+
+        if (data.tickets && data.tickets.length > 0) {
+          setTickets(data.tickets);
+          // Initialize amounts for each ticket, defaulting to 1 if not present
+          const initialAmounts = data.tickets.reduce((acc: { [key: string]: number }, ticket: Ticket) => {
+            acc[ticket.id] = 1; // Default amount
+            return acc;
+          }, {});
+          setAmounts(initialAmounts);
+        }
+
+        if (data.numberSetsState) {
+          const nsState = data.numberSetsState;
+          setSelectedNumbers(nsState.selectedNumbers || []);
+          setSelectedType(nsState.selectedType || { id: "", type_name: "สามตัวบน", type_number: 3, multiplication_factor: 900 });
+          setUseReverseNumbers(nsState.useReverseNumbers ?? false);
+          setActiveFilter(nsState.activeFilter ?? null);
+        }
+
+        // Clean up localStorage after retrieving data
+        localStorage.removeItem(`priceEntry_${sessionId}`);
+      } catch (e) {
+        console.error("Failed to parse data from localStorage", e);
+        toast.error("ไม่สามารถโหลดข้อมูลรายการได้");
+      }
+    }
+  }, [sessionId]); // Depend on sessionId so it only runs when sessionId is available
+
 
   // Generate ticket number on mount
   useEffect(() => {
@@ -224,7 +267,7 @@ export default function PriceEntryPage() {
 
   // Get purchase date and draw date in Thailand timezone
   const thailandTime = getThailandTime()
-  const purchaseDate = format(thailandTime, "yyyy-MM-dd", { locale: th })
+  // const purchaseDate = format(thailandTime, "yyyy-MM-dd", { locale: th }) // purchaseDate is not used outside of confirmPurchase, can be defined locally there if needed
 
   // Fetch draw date for display
   useEffect(() => {
@@ -234,7 +277,7 @@ export default function PriceEntryPage() {
         const formatted = format(new Date(drawDate), "วันที่ d MMMM yyyy", { locale: th })
         setFormattedDrawDate(formatted)
       } catch (err: any) {
-        toast.error("ไม่สามารถโหลดวันที่หวยออกได้: " + err.message)
+        toast.error("ไม่สามารถโหลลดวันที่หวยออกได้: " + err.message)
       }
     }
     fetchDrawDate()
@@ -255,6 +298,7 @@ export default function PriceEntryPage() {
             id: String(item.id || ""),
             type_name: String(item.type_name || ""),
             multiplication_factor: Number(item.multiplication_factor || 0),
+            type_number: Number(item.type_number || 0),
             created_at: item.created_at ? String(item.created_at) : undefined,
             updated_at: item.updated_at ? String(item.updated_at) : undefined,
           }))
@@ -270,39 +314,34 @@ export default function PriceEntryPage() {
   // Controlled function to update ticket info
   const updateTicketInfo = useCallback(
     (newName: string, newNumber: string) => {
-      if (newName !== ticketName) {
-        setTicketName(newName)
-      }
-      if (newNumber !== ticketNumber) {
-        setTicketNumber(newNumber)
-      }
-      setTickets((prev) =>
-        prev.map((t) => ({
-          ...t,
-          name: newName || t.name || "Unnamed Ticket",
-          ticketNumber: newNumber || t.ticketNumber,
-        })),
-      )
+      // This function should probably update something on the server or a global state,
+      // not internal `tickets` state which is derived from `allTickets` (now `tickets`).
+      // If it's meant to update only the name/number for display purposes, then `setTicketName` and `setTicketNumber` are sufficient.
+      // Re-evaluating this based on the original intent: if this is meant to update the *current batch* of tickets
+      // before going back to the previous page, then the logic within handleBack is probably what's needed.
+      // For now, it just sets the local state for name and number.
+      setTicketName(newName);
+      setTicketNumber(newNumber);
     },
-    [ticketName, ticketNumber],
-  )
+    [], // No dependencies as it just sets local state
+  );
 
   // Debounce ticket name updates to prevent rapid state changes
-  const debouncedUpdateTicketInfo = useCallback(
-    debounce((newName: string, newNumber: string) => {
-      updateTicketInfo(newName, newNumber)
+  const debouncedUpdateTicketName = useCallback(
+    debounce((newName: string) => {
+      setTicketName(newName);
     }, 300),
-    [updateTicketInfo],
-  )
+    [], // No dependencies as it just sets local state
+  );
 
   // Handle ticket name change with debouncing
   const handleTicketNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newName = e.target.value
-      setTicketName(newName)
-      debouncedUpdateTicketInfo(newName, ticketNumber)
+      setTicketName(newName) // Update immediately for responsive UI
+      debouncedUpdateTicketName(newName) // Debounced update for potential side effects if needed later
     },
-    [debouncedUpdateTicketInfo, ticketNumber],
+    [debouncedUpdateTicketName],
   )
 
   // Memoize the grouped tickets calculation
@@ -320,11 +359,12 @@ export default function PriceEntryPage() {
   }, [tickets, ticketSubTypes])
 
   const total = useMemo(() => {
+    // Calculate total based on amounts and ticket prices
     return tickets.reduce((sum, ticket) => {
-      const amount = amounts[ticket.id] || 0
-      return sum + amount
-    }, 0)
-  }, [amounts, tickets])
+      const amount = amounts[ticket.id] || 0;
+      return sum + amount ;
+    }, 0);
+  }, [amounts, tickets]);
 
   const quickAmounts = [5, 10, 20, 50, 100]
 
@@ -471,7 +511,7 @@ export default function PriceEntryPage() {
           ...prev,
           [selectedTicketId]: amount,
         }))
-        setSelectedTicketId(null)
+        setSelectedTicketId(null) // Deselect after applying quick amount to a single ticket
       }
     },
     [applyToAll, selectedTicketId, tickets],
@@ -506,17 +546,32 @@ export default function PriceEntryPage() {
       setTickets(remainingTickets)
 
       if (remainingTickets.length === 0) {
+        // If all tickets are deleted, navigate back with empty data
         const params = new URLSearchParams()
         params.set("allTickets", JSON.stringify([]))
-        params.set("numberSetsState", JSON.stringify(numberSetsState))
+        // Pass back the current numberSetsState so it doesn't reset on the previous page
+        params.set("numberSetsState", JSON.stringify({
+          selectedNumbers,
+          selectedType,
+          useReverseNumbers,
+          activeFilter,
+        }));
         router.push(`/huaythai?${params.toString()}`)
       }
     },
-    [tickets, numberSetsState, router],
+    [tickets, selectedNumbers, selectedType, useReverseNumbers, activeFilter, router],
   )
 
   const handleConfirm = useCallback(() => {
-    if (!user) return
+    if (!user) {
+      toast.error("กรุณาเข้าสู่ระบบก่อนทำรายการ")
+      return
+    }
+
+    if (tickets.length === 0) {
+      toast.error("ไม่มีรายการตั๋วให้ซื้อ")
+      return
+    }
 
     if (total <= 0) {
       toast.error("กรุณาระบุจำนวนเงินที่มากกว่า 0")
@@ -528,17 +583,27 @@ export default function PriceEntryPage() {
       return
     }
 
+    // Show confirmation modal
     setShowConfirmModal(true)
-  }, [user, total, balance])
+  }, [user, tickets.length, total, balance])
 
   const confirmPurchase = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      toast.error("กรุณาเข้าสู่ระบบก่อนทำรายการ")
+      return
+    }
 
     setIsLoading(true)
+    setShowConfirmModal(false)
+
     try {
       const thailandTime = getThailandTime()
       const purchaseDate = format(thailandTime, "yyyy-MM-dd", { locale: th })
       const drawDate = await getNextDrawDate(supabase, thailandTime)
+
+      if (total > balance) {
+        throw new Error("ยอดเงินไม่เพียงพอ")
+      }
 
       const uniqueTypeIds = [...new Set(tickets.map((ticket) => ticket.type_id))]
       const ticketResultIds: { [typeId: string]: string } = {}
@@ -553,7 +618,7 @@ export default function PriceEntryPage() {
           .single()
 
         if (resultError && resultError.code === "PGRST116") {
-          const { data: newResult, error: insertError } = (await supabase
+          const { data: newResult, error: insertError } = await supabase
             .from("ticket_results")
             .insert({
               result_date: drawDate,
@@ -562,20 +627,34 @@ export default function PriceEntryPage() {
               created_at: thailandTime.toISOString(),
             })
             .select("id")
-            .single()) as { data: TicketResult | null; error: any }
+            .single()
 
           if (insertError || !newResult?.id) {
-            throw new Error("Failed to create ticket result")
+            throw new Error(`Failed to create ticket result for type ID ${typeId}: ${insertError?.message || 'Unknown error'}`)
           }
-
-          ticketResultIds[typeId] = newResult.id
+          ticketResultIds[typeId] = String(newResult.id)
         } else if (resultError) {
-          throw resultError
-        } else if (resultData) {
+          throw new Error(`Error fetching existing ticket result for type ID ${typeId}: ${resultError.message}`)
+        } else if (resultData?.id) {
           ticketResultIds[typeId] = String(resultData.id)
-        } else {
-          throw new Error("No result data received")
         }
+      }
+
+      const { data: transactionData, error: transactionError } = await supabase
+        .from("credit_history")
+        .insert({
+          user_id: user.id,
+          user_name: user.user_metadata?.name || "Unknown",
+          amount: total,
+          transaction_type: "withdrawal",
+          description: `ซื้อตั๋วลอตเตอรี่ ${tickets.length} รายการ (${ticketName || "Unnamed Ticket"})`,
+          created_at: thailandTime.toISOString(),
+        })
+        .select("id")
+        .single()
+
+      if (transactionError || !transactionData?.id) {
+        throw new Error("Failed to create transaction record")
       }
 
       const { data: balanceData, error: upsertError } = await supabase
@@ -592,26 +671,7 @@ export default function PriceEntryPage() {
         .single()
 
       if (upsertError) {
-        console.error("Error updating balance:", upsertError)
-        throw upsertError
-      }
-
-      const { data: transactionData, error: transactionError } = await supabase
-        .from("credit_history")
-        .insert({
-          user_id: user.id,
-          user_name: user.user_metadata?.name || "Unknown",
-          amount: total,
-          transaction_type: "withdrawal",
-          description: `ซื้อตั๋วลอตเตอรี่ ${tickets.length} รายการ (${ticketName || "Unnamed Ticket"})`,
-          created_at: thailandTime.toISOString(),
-        })
-        .select("id")
-        .single()
-
-      if (transactionError) {
-        console.error("Error inserting transaction:", transactionError)
-        throw transactionError
+        throw new Error("Failed to update balance")
       }
 
       const purchaseIds: { [typeId: string]: string } = {}
@@ -619,7 +679,7 @@ export default function PriceEntryPage() {
         const { data: purchaseData, error: purchaseError } = await supabase
           .from("ticket_purchases")
           .insert({
-            transaction_id: transactionData?.id,
+            transaction_id: transactionData.id,
             user_id: user.id,
             ticket_set_name: ticketName || null,
             ticket_set_number: ticketNumber,
@@ -630,16 +690,10 @@ export default function PriceEntryPage() {
           .select("id")
           .single()
 
-        if (purchaseError) {
-          console.error("Error inserting ticket_purchase:", purchaseError)
-          throw purchaseError
+        if (purchaseError || !purchaseData?.id) {
+          throw new Error("Failed to create purchase record")
         }
-
-        if (purchaseData && typeof purchaseData.id === "string") {
-          purchaseIds[typeId] = purchaseData.id
-        } else {
-          throw new Error("Failed to get purchase ID")
-        }
+        purchaseIds[typeId] = String(purchaseData.id)
       }
 
       const ticketPurchaseItems = tickets.map((ticket) => ({
@@ -652,16 +706,18 @@ export default function PriceEntryPage() {
         created_at: thailandTime.toISOString(),
       }))
 
-      const { error: ticketItemError } = await supabase.from("ticket_purchase_items").insert(ticketPurchaseItems)
+      const { error: ticketItemError } = await supabase
+        .from("ticket_purchase_items")
+        .insert(ticketPurchaseItems)
 
       if (ticketItemError) {
-        console.error("Error inserting ticket_purchase_items:", ticketItemError)
-        throw ticketItemError
+        throw new Error("Failed to create purchase items")
       }
 
-      if (balanceData && typeof balanceData.balance === "number") {
+      if (balanceData && typeof balanceData.balance === 'number') {
         setBalance(balanceData.balance)
       }
+
       toast.success(`ซื้อตั๋ว ${total.toFixed(0)} บาทสำเร็จ!`)
 
       const params = new URLSearchParams()
@@ -674,34 +730,41 @@ export default function PriceEntryPage() {
           })),
         ),
       )
+      params.set(
+        "numberSetsState",
+        JSON.stringify({
+          selectedNumbers,
+          selectedType,
+          useReverseNumbers,
+          activeFilter,
+        }),
+      )
       router.push(`/huaythai?${params.toString()}`)
     } catch (err: any) {
       console.error("Error confirming purchase:", err)
       toast.error(err.message || "เกิดข้อผิดพลาดในการซื้อตั๋ว")
     } finally {
       setIsLoading(false)
-      setShowConfirmModal(false)
     }
-  }, [user, tickets, amounts, balance, ticketName, ticketNumber, total, supabase, router])
+  }, [user, tickets, amounts, balance, ticketName, ticketNumber, total, supabase, router, selectedNumbers, selectedType, useReverseNumbers, activeFilter])
 
   const handleBack = useCallback(() => {
-    // Only update if there are actual changes
-    if (ticketName !== tickets[0]?.name || ticketNumber !== tickets[0]?.ticketNumber) {
-      updateTicketInfo(ticketName, ticketNumber)
-    }
+    // Create URL parameters with all necessary data
+    const params = new URLSearchParams();
+    
+    // Pass back the current numberSetsState
+    params.set("numberSetsState", JSON.stringify({
+      selectedNumbers,
+      selectedType,
+      useReverseNumbers,
+      activeFilter,
+    }));
 
-    const params = new URLSearchParams()
-    params.set("allTickets", JSON.stringify(tickets))
-    params.set(
-      "numberSetsState",
-      JSON.stringify({
-        selectedNumbers,
-        selectedType,
-        useReverseNumbers,
-        activeFilter,
-      }),
-    )
-    router.push(`/huaythai?${params.toString()}`)
+    // Pass back the current tickets
+    params.set("tickets", JSON.stringify(tickets));
+
+    // Navigate back to huaythai page with all data in URL parameters
+    router.push(`/huaythai?${params.toString()}`);
   }, [
     router,
     tickets,
@@ -709,10 +772,7 @@ export default function PriceEntryPage() {
     selectedType,
     useReverseNumbers,
     activeFilter,
-    ticketName,
-    ticketNumber,
-    updateTicketInfo,
-  ])
+  ]);
 
   const activeTicketTypes = Object.keys(groupedTickets)
 
@@ -721,37 +781,41 @@ export default function PriceEntryPage() {
       initial="hidden"
       animate="visible"
       variants={staggerContainer}
-      className="flex flex-col h-screen bg-gray-50 font-sans"
+      className="flex flex-col min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 font-sans"
     >
       {/* Header */}
       <motion.div
         variants={fadeSlideIn}
-        className="flex justify-between items-center px-4 py-3 bg-blue-700 text-white shadow-md"
+        className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-600 via-blue-500 to-cyan-500 text-white shadow-md"
       >
-        <div className="flex flex-col">
-          <h1 className="text-lg font-semibold truncate">ระบุจำนวนเงิน</h1>
-          <span className="text-sm text-blue-200">งวด{formattedDrawDate}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col">
+            <h1 className="text-sm font-bold tracking-tight">ระบุจำนวนเงิน</h1>
+            <span className="text-sm text-blue-100/90">งวด{formattedDrawDate}</span>
+          </div>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-2">
           {isLoading ? (
-            <span className="text-sm text-blue-200 animate-pulse">กำลังโหลด...</span>
+            <span className="text-[10px] text-blue-100/90 animate-pulse">กำลังโหลด...</span>
           ) : (
-            <div className="flex flex-col items-end">
-              <span className="text-sm font-medium text-gray-100">{user?.user_metadata?.name || "Guest"}</span>
-              <span className="text-sm text-blue-200 flex items-center">
-                <Bitcoin className="w-4 h-4 mr-1 text-blue-300" />
-                {balance.toFixed(0)} บาท
-              </span>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col items-end">
+                <span className="text-sm font-medium text-white/90">{user?.user_metadata?.name || "Guest"}</span>
+                <span className="text-lg text-white flex items-center font-bold">
+                  <Bitcoin className="w-2.5 h-2.5 mr-0.5 text-white" />
+                  {balance.toFixed(0)} บาท
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTopUp(!showTopUp)}
+                className="h-6 px-2 text-[10px] text-white/90 border-blue-400/30 bg-blue-500/10 hover:bg-blue-400/20 hover:text-white transition-all duration-200 rounded-md"
+              >
+                เติมเงิน
+              </Button>
             </div>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowTopUp(!showTopUp)}
-            className="text-sm text-white border-blue-300 bg-blue-600 hover:bg-blue-300 hover:text-blue-800 transition-colors"
-          >
-            เติมเงิน
-          </Button>
         </div>
       </motion.div>
 
@@ -763,21 +827,21 @@ export default function PriceEntryPage() {
             animate="visible"
             exit="exit"
             variants={fadeSlideIn}
-            className="p-4 bg-gray-100 border-b border-gray-200"
+            className="p-2 bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 border-b border-blue-100/50"
           >
-            <div className="flex justify-center gap-3">
+            <div className="flex items-center gap-2 max-w-xs mx-auto">
               <Input
                 type="number"
                 value={topUpAmount}
                 onChange={(e) => setTopUpAmount(e.target.value)}
-                className="w-40 p-2 text-sm text-center bg-white border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="h-7 w-full text-xs text-center bg-white/80 border-blue-200/50 rounded-md shadow-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 placeholder="จำนวนเงิน (ขั้นต่ำ 10 บาท)"
                 min="10"
               />
               <Button
                 onClick={handleTopUp}
                 disabled={isLoading || topUpAmount === "" || isNaN(Number(topUpAmount)) || Number(topUpAmount) < 10}
-                className="text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                className="h-7 px-3 text-xs bg-gradient-to-r from-indigo-600 to-blue-500 text-white hover:from-indigo-700 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all duration-200 rounded-md"
               >
                 {isLoading ? "กำลังดำเนินการ..." : "เติม"}
               </Button>
@@ -787,10 +851,10 @@ export default function PriceEntryPage() {
       </AnimatePresence>
 
       {/* Ticket Name and Number Section */}
-      <motion.div variants={fadeSlideIn} className="p-4 bg-white border-b border-gray-200">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <Label htmlFor="ticket-name" className="text-sm font-medium text-blue-800">
+      <motion.div variants={fadeSlideIn} className="p-2 sm:p-3 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+        <div className="flex flex-row items-center gap-2 sm:gap-3 max-w-2xl mx-auto">
+          <div className="flex items-center gap-2 min-w-[120px]">
+            <Label htmlFor="ticket-name" className="text-xs font-medium text-gray-700 whitespace-nowrap">
               ชื่อรายการ
             </Label>
             <Input
@@ -799,13 +863,13 @@ export default function PriceEntryPage() {
               value={ticketName}
               required
               onChange={handleTicketNameChange}
-              className="w-full max-w-xs p-2 text-sm bg-white border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="กรอกชื่อรายการ(เช่น ชื่อผู้ซื้อ)"
+              className="w-full p-1 text-xs bg-white border-gray-200 rounded-lg shadow-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+              placeholder="ชื่อผู้ซื้อ"
             />
           </div>
-          <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium text-blue-800">เลขตั๋ว</Label>
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-sm font-medium">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">เลขตั๋ว</Label>
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-lg">
               {ticketNumber}
             </Badge>
           </div>
@@ -815,15 +879,15 @@ export default function PriceEntryPage() {
       {/* Ticket List */}
       <div className="flex-grow overflow-hidden">
         <ScrollArea className="h-full">
-          <motion.div variants={staggerContainer} className="flex flex-col space-y-4 p-4">
+          <motion.div variants={staggerContainer} className="flex flex-col space-y-2 sm:space-y-3 p-2 sm:p-3">
             {activeTicketTypes.length > 0 ? (
               activeTicketTypes.map((typeName) => (
                 <motion.div key={typeName} variants={fadeSlideIn}>
-                  <Card className="bg-white shadow-lg rounded-lg overflow-hidden border border-gray-100">
-                    <CardHeader className="bg-blue-100 p-3">
+                  <Card className="bg-white/80 backdrop-blur-sm shadow-sm rounded-lg overflow-hidden border border-gray-100">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/50 p-2">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-blue-800 text-base">{typeName}</h3>
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs font-medium">
+                        <h3 className="font-semibold text-blue-800 text-sm">{typeName}</h3>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">
                           {groupedTickets[typeName]?.length || 0} รายการ
                         </Badge>
                       </div>
@@ -835,71 +899,77 @@ export default function PriceEntryPage() {
                             <motion.div
                               key={ticket.id}
                               variants={ticketItemVariants}
-                              className={`flex items-center px-4 py-3 border-b border-gray-100 hover:bg-blue-50 transition-colors ${
+                              className={`flex items-center px-2 sm:px-3 py-1.5 border-b border-gray-100 hover:bg-blue-50/50 transition-all duration-200 ${
                                 selectedTicketId === ticket.id ? "bg-blue-50" : ""
                               }`}
                               onClick={() => setSelectedTicketId(ticket.id)}
                             >
-                              <span className="text-sm text-gray-600 w-8 font-medium">{index + 1}.</span>
-                              <div className="flex space-x-1 mr-3">
-                                {ticket.number.split("").map((digit, i) => (
-                                  <motion.span
-                                    key={i}
-                                    initial={{ scale: 0.9 }}
-                                    animate={{ scale: 1 }}
-                                    className="w-7 h-7 bg-blue-200 rounded-md flex items-center justify-center text-sm font-semibold text-blue-800 shadow-sm"
+                              <div className="flex items-center gap-1.5 min-w-[120px]">
+                                <span className="text-xs text-gray-500 w-4 font-medium">{index + 1}.</span>
+                                <div className="flex space-x-0.5">
+                                  {ticket.number.split("").map((digit, i) => (
+                                    <motion.span
+                                      key={i}
+                                      initial={{ scale: 0.9 }}
+                                      animate={{ scale: 1 }}
+                                      className="w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-b from-blue-100 to-blue-200 rounded flex items-center justify-center text-xs font-semibold text-blue-800 shadow-sm"
+                                    >
+                                      {digit}
+                                    </motion.span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-1 justify-end">
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-5 w-5 sm:h-6 sm:w-6 rounded-full border-gray-200 hover:bg-blue-100 transition-all duration-200"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleAmountChange(ticket.id, Math.max(0, amounts[ticket.id] - 1))
+                                    }}
                                   >
-                                    {digit}
-                                  </motion.span>
-                                ))}
+                                    <Minus className="h-2.5 w-2.5 text-blue-600" />
+                                  </Button>
+                                  <Input
+                                    type="number"
+                                    value={amounts[ticket.id] || ""}
+                                    onChange={(e) => handleAmountChange(ticket.id, Number(e.target.value))}
+                                    className="w-12 sm:w-14 h-5 sm:h-6 p-0 text-xs text-center bg-white border-gray-200 rounded shadow-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                                    placeholder="0"
+                                    min="0"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-5 w-5 sm:h-6 sm:w-6 rounded-full border-gray-200 hover:bg-blue-100 transition-all duration-200"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleAmountChange(ticket.id, amounts[ticket.id] + 1)
+                                    }}
+                                  >
+                                    <Plus className="h-2.5 w-2.5 text-blue-600" />
+                                  </Button>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-gray-500">x{ticket.price}</span>
+                                  <span className="text-xs font-semibold text-blue-700 min-w-[40px] text-right">
+                                    {((amounts[ticket.id] || 0) * ticket.price).toFixed(0)}฿
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleDelete(ticket.id)
+                                    }}
+                                    className="text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full p-0.5 transition-all duration-200"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-7 w-7 rounded-full border-gray-300 hover:bg-blue-100"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleAmountChange(ticket.id, Math.max(0, amounts[ticket.id] - 1))
-                                  }}
-                                >
-                                  <Minus className="h-4 w-4 text-blue-600" />
-                                </Button>
-                                <Input
-                                  type="number"
-                                  value={amounts[ticket.id] || ""}
-                                  onChange={(e) => handleAmountChange(ticket.id, Number(e.target.value))}
-                                  className="w-24 p-1 text-sm text-center bg-white border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                  placeholder="0"
-                                  min="0"
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-7 w-7 rounded-full border-gray-300 hover:bg-blue-100"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleAmountChange(ticket.id, amounts[ticket.id] + 1)
-                                  }}
-                                >
-                                  <Plus className="h-4 w-4 text-blue-600" />
-                                </Button>
-                              </div>
-                              <span className="text-sm text-gray-600 mx-2">x{ticket.price}</span>
-                              <span className="text-sm font-semibold text-blue-700">
-                                {((amounts[ticket.id] || 0) * ticket.price).toFixed(0)}฿
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDelete(ticket.id)
-                                }}
-                                className="ml-auto text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded-full p-1"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
                             </motion.div>
                           ))}
                         </AnimatePresence>
@@ -909,7 +979,7 @@ export default function PriceEntryPage() {
                 </motion.div>
               ))
             ) : (
-              <motion.div variants={fadeSlideIn} className="text-center text-gray-500 py-8 text-sm">
+              <motion.div variants={fadeSlideIn} className="text-center text-gray-500 py-4 text-xs">
                 ไม่มีรายการ
               </motion.div>
             )}
@@ -918,9 +988,9 @@ export default function PriceEntryPage() {
       </div>
 
       {/* Checkbox and Quick Amounts */}
-      <motion.div variants={fadeSlideIn} className="p-4 border-t bg-white shadow-sm">
-        <div className="flex items-center mb-4">
-          <div className="flex items-center space-x-2">
+      <motion.div variants={fadeSlideIn} className="p-2 border-t bg-white/80 backdrop-blur-sm shadow-sm">
+        <div className="flex items-center mb-1">
+          <div className="flex items-center space-x-1">
             <Checkbox
               id="apply-all"
               checked={applyToAll}
@@ -928,9 +998,9 @@ export default function PriceEntryPage() {
                 setApplyToAll(!applyToAll)
                 setCustomAmount("")
               }}
-              className="h-5 w-5 border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 rounded"
             />
-            <Label htmlFor="apply-all" className="text-sm font-medium text-blue-800 cursor-pointer">
+            <Label htmlFor="apply-all" className="text-xs font-medium text-gray-700 cursor-pointer">
               เลือกแก้ไขราคาทั้งหมด
             </Label>
           </div>
@@ -943,13 +1013,13 @@ export default function PriceEntryPage() {
               animate="visible"
               exit="exit"
               variants={fadeSlideIn}
-              className="flex justify-center mb-4"
+              className="flex justify-center mb-2"
             >
               <Input
                 type="number"
                 value={customAmount}
                 onChange={(e) => handleCustomAmountChange(e.target.value)}
-                className="w-28 p-2 text-sm text-center bg-white border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-24 p-1 text-xs text-center bg-white border-gray-200 rounded-lg shadow-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                 placeholder="จำนวน"
                 min="0"
               />
@@ -957,7 +1027,7 @@ export default function PriceEntryPage() {
           )}
         </AnimatePresence>
 
-        <motion.div variants={staggerContainer} className="flex justify-center flex-wrap gap-2">
+        <motion.div variants={staggerContainer} className="flex justify-center flex-wrap gap-1">
           {quickAmounts.map((amount) => (
             <motion.div key={amount} variants={fadeSlideIn}>
               <Button
@@ -965,7 +1035,7 @@ export default function PriceEntryPage() {
                 size="sm"
                 onClick={() => handleQuickAmount(amount)}
                 disabled={!applyToAll && !selectedTicketId}
-                className="text-sm px-4 py-1 border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="text-xs px-2 py-1 border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg transition-all duration-200"
               >
                 {amount}
               </Button>
@@ -975,59 +1045,74 @@ export default function PriceEntryPage() {
       </motion.div>
 
       {/* Footer */}
-      <motion.div variants={fadeSlideIn} className="flex justify-between items-center border-t p-4 bg-white shadow-sm">
+      <motion.div 
+        variants={fadeSlideIn} 
+        className="sticky bottom-0 left-0 right-0 flex flex-col sm:flex-row justify-between items-center border-t p-4 sm:p-6 bg-white/80 backdrop-blur-sm shadow-sm gap-4 sm:gap-0 z-50"
+        role="contentinfo"
+        aria-label="Footer with total amount and action buttons"
+      >
         <div className="flex items-center">
-          <span className="text-sm font-medium text-blue-800">รวมทั้งสิ้น</span>
+          <span className="text-sm font-medium text-gray-700">รวมทั้งสิ้น</span>
           <motion.span
             key={total}
             initial={{ scale: 0.9, opacity: 0.7 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="text-base font-semibold text-blue-600 ml-2"
+            className="text-lg sm:text-xl font-bold text-blue-600 ml-3"
+            aria-live="polite"
           >
             {total.toFixed(0)} บาท
           </motion.span>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 sm:gap-4 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={handleBack}
-            className="text-sm text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+            className="flex-1 sm:flex-none text-sm text-gray-700 border-gray-200 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 px-4 sm:px-6"
+            aria-label="ย้อนกลับ"
           >
-            <ArrowLeft className="w-4 h-4 mr-1" />
+            <ArrowLeft className="w-4 h-4 mr-2" aria-hidden="true" />
             ย้อนกลับ
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={isLoading || total <= 0}
-            className="text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 sm:flex-none text-sm bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-lg hover:from-indigo-700 hover:to-blue-600 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all duration-200 px-4 sm:px-8"
+            aria-label={isLoading ? "กำลังดำเนินการ" : "ยืนยัน"}
+            aria-busy={isLoading}
           >
-            {isLoading ? "กำลังดำเนินการ..." : "ยืนยัน"}
+            {isLoading ? (
+              <>
+                <span className="animate-spin mr-2">⟳</span>
+                กำลังดำเนินการ...
+              </>
+            ) : (
+              "ยืนยัน"
+            )}
           </Button>
         </div>
       </motion.div>
 
       {/* Confirm Modal */}
       <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent className="sm:max-w-md rounded-lg bg-white shadow-xl">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-white shadow-xl mx-4 sm:mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-blue-800">ยืนยันการซื้อ</DialogTitle>
-            <DialogDescription className="text-sm text-gray-600">
-              คุณต้องการซื้อ {tickets.length} รายการ ({ticketName || "ไม่ระบุชื่อผู้ซื้อ"}, {ticketNumber}) รวม {total.toFixed(2)}{" "}
-              บาท?
+            <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900">ยืนยันการซื้อ</DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 mt-2">
+              คุณต้องการซื้อ {tickets.length} รายการ ({ticketName || "ไม่ระบุชื่อผู้ซื้อ"}, {ticketNumber}) รวม {total.toFixed(2)} บาท?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
+          <DialogFooter className="flex flex-row justify-end gap-3 sm:justify-end mt-6">
             <Button
               variant="outline"
               onClick={() => setShowConfirmModal(false)}
-              className="text-sm text-gray-700 border-gray-300 hover:bg-gray-100 rounded-lg"
+              className="text-sm text-gray-700 border-gray-200 hover:bg-gray-50 rounded-xl transition-all duration-200"
             >
               ยกเลิก
             </Button>
             <Button
               onClick={confirmPurchase}
               disabled={isLoading}
-              className="text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300"
+              className="text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 transition-all duration-200 px-6"
             >
               {isLoading ? "กำลังดำเนินการ..." : "สั่งซื้อ"}
             </Button>
@@ -1037,18 +1122,18 @@ export default function PriceEntryPage() {
 
       {/* Insufficient Balance Modal */}
       <Dialog open={showInsufficientModal} onOpenChange={setShowInsufficientModal}>
-        <DialogContent className="sm:max-w-md rounded-lg bg-white shadow-xl">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-white shadow-xl mx-4 sm:mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-blue-800">เครดิตไม่เพียงพอ</DialogTitle>
-            <DialogDescription className="text-sm text-gray-600">
+            <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900">เครดิตไม่เพียงพอ</DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 mt-2">
               ยอดเครดิตของคุณ ({balance.toFixed(2)} บาท) ไม่เพียงพอสำหรับการซื้อ {total.toFixed(0)} บาท กรุณาเติมเครดิต
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2 sm:justify-end">
+          <DialogFooter className="flex flex-row justify-end gap-3 sm:justify-end mt-6">
             <Button
               variant="outline"
               onClick={() => setShowInsufficientModal(false)}
-              className="text-sm text-gray-700 border-gray-300 hover:bg-gray-100 rounded-lg"
+              className="text-sm text-gray-700 border-gray-200 hover:bg-gray-50 rounded-xl transition-all duration-200"
             >
               ยกเลิก
             </Button>
@@ -1057,7 +1142,7 @@ export default function PriceEntryPage() {
                 setShowInsufficientModal(false)
                 router.push("/ticketpurchases")
               }}
-              className="text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="text-sm bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-200 px-6"
             >
               ไปเติมเครดิต
             </Button>

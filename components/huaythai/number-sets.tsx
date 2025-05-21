@@ -5,7 +5,7 @@ import type React from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { v4 as uuidv4 } from "uuid"
-import { toast } from "react-toastify"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -13,18 +13,18 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { Ticket, TicketSubType } from "@/types/types"
+import { useTicketSubTypes } from "@/components/contexts/TicketSubTypeContext"
 
 interface NumberSetsProps {
   onSubmit?: (tickets: Ticket[]) => void
   selectedNumbers: Set<string>
   setSelectedNumbers: React.Dispatch<React.SetStateAction<Set<string>>>
-  selectedType: TicketSubType
-  setSelectedType: React.Dispatch<React.SetStateAction<TicketSubType>>
   useReverseNumbers: boolean
   setUseReverseNumbers: React.Dispatch<React.SetStateAction<boolean>>
   activeFilter: number | null
   setActiveFilter: React.Dispatch<React.SetStateAction<number | null>>
   userName?: string
+  tickets: Ticket[]
 }
 
 const containerVariants = {
@@ -44,25 +44,27 @@ const filterVariants = {
   hidden: { opacity: 0, y: -10 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
 }
+ 
 
-const VALID_TYPE_NAMES = ["สามตัวบน", "สามตัวโต๊ด", "สองตัวบน", "สองตัวล่าง"]
+type TicketType = "สามตัว" | "สองตัว" | "เลขวิ่ง"
 
 const NumberSets = ({
   onSubmit,
   selectedNumbers,
   setSelectedNumbers,
-  selectedType,
-  setSelectedType,
   useReverseNumbers,
   setUseReverseNumbers,
   activeFilter,
   setActiveFilter,
   userName = "Unknown User",
+  tickets,
 }: NumberSetsProps) => {
   const [visibleNumbers, setVisibleNumbers] = useState<string[]>([])
-  const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([])
+  const ticketSubTypes = useTicketSubTypes()
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedTypes, setSelectedTypes] = useState<Set<TicketSubType>>(new Set())
+  const [selectedTypeTab, setSelectedTypeTab] = useState<TicketType>("สามตัว")
   const scrollTimeout = useRef<number | null>(null)
   const supabase = createClient()
 
@@ -70,8 +72,21 @@ const NumberSets = ({
   const allTwoDigitNumbers = useMemo(() => Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, "0")), [])
   const allOneDigitNumbers = useMemo(() => Array.from({ length: 10 }, (_, i) => i.toString()), [])
 
+  const listboxItems: Record<TicketType, TicketSubType[]> = useMemo(
+    () => ({
+      สามตัว: ticketSubTypes.filter((t) => t.type_name.includes("สามตัว")),
+      สองตัว: ticketSubTypes.filter((t) => t.type_name.includes("สองตัว")),
+      เลขวิ่ง: ticketSubTypes.filter((t) => t.type_name.includes("วิ่ง")),
+    }),
+    [ticketSubTypes],
+  )
+
+  const currentMaxDigits = useMemo(() => {
+    return selectedTypeTab === "เลขวิ่ง" ? 1 : selectedTypeTab === "สองตัว" ? 2 : 3
+  }, [selectedTypeTab])
+
   const filteredNumbers = useMemo(() => {
-    if (selectedType.type_name.includes("สามตัว")) {
+    if (selectedTypeTab === "สามตัว") {
       return activeFilter !== null
         ? allThreeDigitNumbers.filter((num) => {
             const filterStr = activeFilter.toString().padStart(3, "0").substring(0, 1)
@@ -79,10 +94,10 @@ const NumberSets = ({
           })
         : allThreeDigitNumbers.slice(0, 100)
     }
-    if (selectedType.type_name.includes("สองตัว")) return allTwoDigitNumbers
-    if (selectedType.type_name.includes("วิ่ง")) return allOneDigitNumbers
+    if (selectedTypeTab === "สองตัว") return allTwoDigitNumbers
+    if (selectedTypeTab === "เลขวิ่ง") return allOneDigitNumbers
     return []
-  }, [selectedType, activeFilter, allThreeDigitNumbers, allTwoDigitNumbers, allOneDigitNumbers])
+  }, [selectedTypeTab, activeFilter, allThreeDigitNumbers, allTwoDigitNumbers, allOneDigitNumbers])
 
   useEffect(() => {
     if (!(selectedNumbers instanceof Set)) {
@@ -92,7 +107,7 @@ const NumberSets = ({
   }, [selectedNumbers, setSelectedNumbers])
 
   const updateSelectedNumbersWithReverse = useCallback(() => {
-    if (!selectedType.type_name.includes("สองตัว")) return
+    if (!selectedTypeTab.includes("สองตัว")) return
 
     setSelectedNumbers((prev) => {
       if (!(prev instanceof Set)) {
@@ -124,13 +139,13 @@ const NumberSets = ({
 
       return hasChanges ? updated : prev
     })
-  }, [useReverseNumbers, selectedType, setSelectedNumbers])
+  }, [useReverseNumbers, selectedTypeTab, setSelectedNumbers])
 
   useEffect(() => {
-    if (selectedType.type_name.includes("สองตัว")) {
+    if (selectedTypeTab.includes("สองตัว")) {
       updateSelectedNumbersWithReverse()
     }
-  }, [useReverseNumbers, selectedType, updateSelectedNumbersWithReverse])
+  }, [useReverseNumbers, selectedTypeTab, updateSelectedNumbersWithReverse])
 
   useEffect(() => {
     const fetchTicketSubTypes = async () => {
@@ -139,6 +154,7 @@ const NumberSets = ({
         const { data, error } = await supabase
           .from("ticket_sub_types")
           .select("*")
+          .order("type_number", { ascending: true })
           .order("type_name", { ascending: true })
 
         if (error) throw error
@@ -149,18 +165,14 @@ const NumberSets = ({
             id: String(item.id || ""),
             type_name: String(item.type_name || ""),
             multiplication_factor: Number(item.multiplication_factor || 0),
+            type_number: Number(item.type_number || 0),
             created_at: item.created_at ? String(item.created_at) : undefined,
             updated_at: item.updated_at ? String(item.updated_at) : undefined,
           }))
 
-          // Filter for valid types
-          const validTypes = typedData.filter((type) => VALID_TYPE_NAMES.includes(type.type_name))
-
-          setTicketSubTypes(validTypes)
-
-          if (validTypes.length > 0 && !selectedType.id) {
-            setSelectedType(validTypes[0])
-          }
+          // Filter for valid types based on type_number
+          // (No longer set selectedType or selectedTypes automatically)
+          // const validTypes = typedData.filter((type) => type.type_number >= 1 && type.type_number <= 3)
         }
       } catch (err: any) {
         toast.error("ไม่สามารถโหลดประเภทตั๋วได้: " + err.message)
@@ -169,7 +181,7 @@ const NumberSets = ({
       }
     }
     fetchTicketSubTypes()
-  }, [setSelectedType, selectedType.id, supabase])
+  }, [supabase])
 
   useEffect(() => {
     if (filteredNumbers.length > 0) {
@@ -188,7 +200,7 @@ const NumberSets = ({
         if (updated.has(number)) updated.delete(number)
         else updated.add(number)
 
-        if (selectedType.type_name.includes("สองตัว") && useReverseNumbers) {
+        if (selectedTypeTab.includes("สองตัว") && useReverseNumbers) {
           const reversed = number.split("").reverse().join("")
           if (updated.has(number)) updated.add(reversed)
           else updated.delete(reversed)
@@ -196,11 +208,38 @@ const NumberSets = ({
         return updated
       })
     },
-    [useReverseNumbers, selectedType, setSelectedNumbers],
+    [useReverseNumbers, selectedTypeTab, setSelectedNumbers],
   )
 
+  const handleTypeTabChange = (type: TicketType) => {
+    setSelectedTypeTab(type)
+    setSelectedNumbers(new Set())
+    setActiveFilter(null)
+    setUseReverseNumbers(false)
+    setSelectedTypes(new Set())
+  }
+
   const handleTypeSelect = (subType: TicketSubType) => {
-    setSelectedType(subType)
+    setSelectedTypes((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(subType)) {
+        newSet.delete(subType)
+      } else {
+        // Allow selecting multiple subtypes from the same category
+        const sameCategoryTypes = Array.from(newSet).filter(t => 
+          (t.type_number === 3 && subType.type_number === 3) || // สามตัว
+          (t.type_number === 2 && subType.type_number === 2) || // สองตัว
+          (t.type_number === 1 && subType.type_number === 1)    // เลขวิ่ง
+        )
+        
+        // If selecting a different category, clear previous selections
+        if (sameCategoryTypes.length === 0) {
+          newSet.clear()
+        }
+        newSet.add(subType)
+      }
+      return newSet
+    })
     setSelectedNumbers(new Set())
     setActiveFilter(null)
     setUseReverseNumbers(false)
@@ -211,21 +250,85 @@ const NumberSets = ({
   }
 
   const handleSubmit = async () => {
+    if (selectedTypes.size === 0) {
+      toast.error("กรุณาเลือกประเภทก่อนเพิ่มรายการ")
+      return
+    }
+
+    // Validate all numbers for all selected types
+    const invalidNumbers = Array.from(selectedTypes).flatMap(type =>
+      Array.from(selectedNumbers).filter(num => num.length !== (type.type_number === 3 ? 3 : type.type_number === 2 ? 2 : 1))
+    )
+    
+    if (invalidNumbers.length > 0) {
+      toast.error("กรุณาเลือกเลขให้ตรงกับจำนวนหลักของประเภทที่เลือก")
+      return
+    }
+
     if (selectedNumbers.size && onSubmit) {
       setIsSubmitting(true)
       try {
-        const tickets = Array.from(selectedNumbers).map((number) => ({
-          id: uuidv4(),
-          number,
-          type_id: selectedType.id,
-          price: selectedType.multiplication_factor,
-          amount: 1,
-          name: userName,
-          ticketNumber: number,
-        }))
-        onSubmit(tickets)
-        setSelectedNumbers(new Set())
-        toast.success(`เพิ่ม ${tickets.length} รายการสำเร็จ`)
+        const tickets: Ticket[] = []
+        const ticketSet = new Set<string>()
+        const duplicateNumbers = new Set<string>()
+        
+        // Create tickets for each selected number and type combination
+        Array.from(selectedTypes).forEach(type => {
+          Array.from(selectedNumbers).forEach(number => {
+            if (number.length === (type.type_number === 3 ? 3 : type.type_number === 2 ? 2 : 1)) {
+              // Check for duplicates
+              const key = `${number}-${type.id}`
+              if (ticketSet.has(key)) {
+                duplicateNumbers.add(number)
+                return
+              }
+              
+              // เลขปกติ
+              tickets.push({
+                id: uuidv4(),
+                number,
+                type_id: type.id,
+                price: type.multiplication_factor,
+                amount: 1,
+                name: userName,
+                ticketNumber: number,
+              })
+              ticketSet.add(key)
+
+              // เลขกลับ (ถ้าเลือกกลับเลข)
+              if (type.type_number === 2 && useReverseNumbers) {
+                const reversed = number.split("").reverse().join("")
+                const reversedKey = `${reversed}-${type.id}`
+                if (reversed !== number && !ticketSet.has(reversedKey)) {
+                  tickets.push({
+                    id: uuidv4(),
+                    number: reversed,
+                    type_id: type.id,
+                    price: type.multiplication_factor,
+                    amount: 1,
+                    name: userName,
+                    ticketNumber: reversed,
+                  })
+                  ticketSet.add(reversedKey)
+                }
+              }
+            }
+          })
+        })
+
+        if (duplicateNumbers.size > 0) {
+          toast.error(`ไม่สามารถเพิ่มเลขซ้ำได้: ${Array.from(duplicateNumbers).join(', ')}`)
+          return
+        }
+
+        if (tickets.length > 0) {
+          onSubmit(tickets)
+          setSelectedNumbers(new Set())
+          setSelectedTypes(new Set())
+          toast.success(`เพิ่ม ${tickets.length} รายการสำเร็จ`)
+        } else {
+          toast.error("ไม่สามารถเพิ่มรายการได้")
+        }
       } finally {
         setIsSubmitting(false)
       }
@@ -252,18 +355,39 @@ const NumberSets = ({
     [],
   )
 
+  useEffect(() => {
+    console.log("selectedType", selectedTypeTab);
+  }, [selectedTypeTab]);
+
   return (
     <div className="w-full flex flex-col gap-4 text-sm">
+      <motion.div className="flex border-b mb-3" variants={containerVariants} initial="hidden" animate="visible">
+        {(["สามตัว", "สองตัว", "เลขวิ่ง"] as TicketType[]).map((type) => (
+          <motion.div key={type} variants={itemVariants} className="flex-1">
+            <Button
+              variant={selectedTypeTab === type ? "default" : "ghost"}
+              onClick={() => handleTypeTabChange(type)}
+              className="w-full text-sm font-medium"
+            >
+              {type}
+            </Button>
+          </motion.div>
+        ))}
+      </motion.div>
+
       <motion.div className="flex flex-wrap gap-2" initial="hidden" animate="visible" variants={containerVariants}>
         {isLoading
           ? Array.from({ length: 4 }).map((_, idx) => (
               <div key={idx} className="w-16 h-8 bg-muted animate-pulse rounded" />
             ))
-          : ticketSubTypes.map((subType) => (
+          : listboxItems[selectedTypeTab].map((subType) => (
               <motion.div key={subType.id} variants={itemVariants}>
                 <Button
-                  variant={selectedType.id === subType.id ? "default" : "outline"}
-                  className="px-2 py-1 h-auto text-xs md:text-sm"
+                  variant={Array.from(selectedTypes).some(t => t.id === subType.id) ? "default" : "outline"}
+                  className={cn(
+                    "px-2 py-1 h-auto text-xs md:text-sm",
+                    Array.from(selectedTypes).some(t => t.id === subType.id) && "bg-primary text-primary-foreground"
+                  )}
                   onClick={() => handleTypeSelect(subType)}
                 >
                   {subType.type_name} x{subType.multiplication_factor}
@@ -273,7 +397,7 @@ const NumberSets = ({
       </motion.div>
 
       <AnimatePresence mode="wait">
-        {selectedType.type_name.includes("สามตัว") && (
+        {selectedTypeTab === "สามตัว" && (
           <motion.div
             key="filters"
             className="grid grid-cols-5 gap-2 mt-2"
@@ -308,7 +432,7 @@ const NumberSets = ({
           id="reverse-number"
           checked={useReverseNumbers}
           onCheckedChange={() => setUseReverseNumbers(!useReverseNumbers)}
-          disabled={!selectedType.type_name.includes("สองตัว")}
+          disabled={selectedTypeTab !== "สองตัว"}
         />
         <Label htmlFor="reverse-number" className="text-xs cursor-pointer md:text-sm">
           กลับเลข
@@ -322,23 +446,30 @@ const NumberSets = ({
           initial="hidden"
           animate="visible"
         >
-          {visibleNumbers.map((number) => (
-            <motion.div
-              key={number}
-              variants={itemVariants}
-              whileTap={{ scale: 0.95 }}
-              className={cn(
-                "border rounded-md p-1 text-center cursor-pointer transition-all relative text-xs md:text-sm",
-                selectedNumbers.has(number)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background hover:bg-muted/50",
-              )}
-              onClick={() => handleNumberToggle(number)}
-              layout
-            >
-              {number}
-            </motion.div>
-          ))}
+          {visibleNumbers.map((number) => {
+            // Disable if any selectedTypes already has this number
+            const isDuplicate = Array.from(selectedTypes).some(type =>
+              tickets.some(t => t.number === number && t.type_id === type.id)
+            )
+            return (
+              <motion.div
+                key={number}
+                variants={itemVariants}
+                whileTap={{ scale: 0.95 }}
+                className={cn(
+                  "border rounded-md p-1 text-center cursor-pointer transition-all relative text-xs md:text-sm",
+                  selectedNumbers.has(number)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background hover:bg-muted/50",
+                  isDuplicate && "opacity-50 pointer-events-none bg-yellow-100 border-yellow-400"
+                )}
+                onClick={() => !isDuplicate && handleNumberToggle(number)}
+                layout
+              >
+                {number}
+              </motion.div>
+            )
+          })}
         </motion.div>
       </ScrollArea>
 
@@ -358,7 +489,12 @@ const NumberSets = ({
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={!selectedNumbers.size || isLoading || isSubmitting}
+          disabled={
+            !selectedNumbers.size ||
+            isLoading ||
+            isSubmitting ||
+            selectedTypes.size === 0
+          }
           className="relative overflow-hidden px-2 py-1 text-xs md:text-sm"
         >
           <span>ยืนยัน ({selectedNumbers.size})</span>

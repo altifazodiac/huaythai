@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase/supabaseClient";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
+import { handlePrint } from "@/components/huaythai-print/ticket-print";
 
 // Animation variants
 const fadeSlideIn = {
@@ -85,26 +87,50 @@ interface TicketSubType {
   multiplication_factor: number;
 }
 
+interface MatchingTicket {
+  tod_number: string;
+  teng_number: string;
+  amount_display: string;
+}
+
+interface GroupedPurchaseItem {
+  ticket_numbers: string[];
+  amount: number;
+}
+
+interface GroupedItems {
+  [key: string]: GroupedPurchaseItem[];
+}
+
 const ITEMS_PER_PAGE = 10;
 const RETENTION_DAYS = 30;
 const THAILAND_TZ = "Asia/Bangkok";
 
-const TicketPurchasesPage: React.FC = () => {
+const TicketPurchasesPage = (): React.ReactElement => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [purchases, setPurchases] = useState<ConsolidatedTicketPurchase[]>([]);
   const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([]);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
   const [filters, setFilters] = useState<{
     purchaseDate: string;
     ticketSetNumber: string;
     ticketSubTypeId: string;
     ticketSetName: string;
+    dateRange: {
+      start: Date | undefined;
+      end: Date | undefined;
+    };
   }>({
     purchaseDate: "",
     ticketSetNumber: "",
     ticketSubTypeId: "",
     ticketSetName: "",
+    dateRange: {
+      start: undefined,
+      end: undefined,
+    },
   });
   const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
@@ -329,7 +355,12 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
           .order("created_at", { ascending: false })
           .range(from, to);
 
-        if (filters.purchaseDate) {
+        // Handle date range filter
+        if (filters.dateRange.start && filters.dateRange.end) {
+          const startDate = format(filters.dateRange.start, "yyyy-MM-dd");
+          const endDate = format(filters.dateRange.end, "yyyy-MM-dd");
+          query = query.gte("purchase_date", startDate).lte("purchase_date", endDate);
+        } else if (filters.purchaseDate) {
           const selectedPurchaseDate = startOfDay(new Date(filters.purchaseDate));
           const today = startOfDay(getThailandTime());
 
@@ -500,251 +531,18 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     }
   };
 
-  const handlePrint = (purchase: ConsolidatedTicketPurchase) => {
-    const totalAmount = purchase.items.reduce((sum, item) => sum + item.amount, 0);
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>ใบเสร็จหวย ${purchase.ticket_set_number}</title>
-            <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
-            <style>
-              body {
-                font-family: 'Noto Sans Thai', sans-serif;
-                margin: 0;
-                padding: 0;
-                background: #fff;
-                color: #333;
-                line-height: 1.4;
-                font-size: 12px;
-              }
-              .container {
-                width: 80mm;
-                margin: 10mm auto;
-                border: 1px solid #ddd;
-                padding: 5mm;
-                position: relative;
-                background: #fff;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-              }
-              .watermark {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 24px;
-                color: rgba(0, 0, 0, 0.1);
-                font-weight: 700;
-                z-index: 0;
-                pointer-events: none;
-              }
-              .header {
-                text-align: center;
-                border-bottom: 1px dashed #000;
-                padding-bottom: 3mm;
-                margin-bottom: 3mm;
-                position: relative;
-                z-index: 1;
-              }
-              .header h1 {
-                font-size: 14px;
-                font-weight: 700;
-                margin: 0;
-                color: #d32f2f;
-              }
-              .header .draw-date {
-                font-size: 12px;
-                color: #555;
-                margin-top: 2px;
-              }
-              .ticket-info {
-                display: flex;
-                justify-content: space-between;
-                font-size: 11px;
-                color: #555;
-                margin-bottom: 3mm;
-                position: relative;
-                z-index: 1;
-              }
-              .ticket-number-barcode {
-                text-align: center;
-                font-family: 'Courier New', Courier, monospace;
-                font-size: 16px;
-                letter-spacing: 2px;
-                background: #f5f5f5;
-                padding: 2mm;
-                border-radius: 3px;
-                margin-bottom: 3mm;
-                position: relative;
-                z-index: 1;
-              }
-              .items-table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 3mm;
-                position: relative;
-                z-index: 1;
-              }
-              .items-table th,
-              .items-table td {
-                padding: 1mm 2mm;
-                text-align: left;
-                font-size: 11px;
-              }
-              .items-table tr {
-                border-bottom: 1px solid #ddd;
-                }
-              .items-table th {
-                background: #f5f5f5;
-                font-weight: 600;
-                color: #333;
-              }
-              .ticket-numbers {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 5px;
-              }
-              .ticket-numbers .number-group {
-                display: inline-flex;
-                gap: 2px;
-              }
-              .ticket-numbers .number-group span {
-                display: inline-block;
-                width: 14px;
-                height: 14px;
-                line-height: 14px;
-                text-align: center;
-                background: #e0f2fe;
-                color: #1976d2;
-                border-radius: 2px;
-                font-weight: 500;
-                font-size: 10px;
-              }
-              .total {
-                text-align: right;
-                font-size: 12px;
-                font-weight: 700;
-                margin-top: 3mm;
-                padding-top: 2mm;
-                border-top: 1px dashed #000;
-                position: relative;
-                z-index: 1;
-              }
-              .footer {
-                text-align: center;
-                margin-top: 5mm;
-                font-size: 10px;
-                color: #777;
-                border-top: 1px dashed #000;
-                padding-top: 3mm;
-                position: relative;
-                z-index: 1;
-              }
-              .footer p {
-                margin: 1mm 0;
-              }
-              @media print {
-                body {
-                  margin: 0;
-                }
-                .container {
-                  box-shadow: none;
-                  border: none;
-                  margin: 0 auto;
-                }
-                @page {
-                  size: 80mm auto;
-                  margin: 0;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="watermark">หวยไทย ออนไลน์</div>
-              <div class="header">
-                <h1>ใบเสร็จหวย</h1>
-                <div class="draw-date">งวด ${formattedDrawDate}</div>
-              </div>
-              <div class="ticket-info">
-                <span>วันที่ซื้อ: ${new Date(purchase.purchase_date).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</span>
-                <span>บิล: ${purchase.ticket_set_number}</span>
-              </div>
-              <div class="ticket-info">
-                <span>ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
-                <span>ออกโดย: ${user?.user_metadata?.name || "Guest"}</span>
-              </div>
-              <div class="ticket-number-barcode">${purchase.ticket_set_number}</div>
-              <table class="items-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>ประเภท</th>
-                    <th>เลข</th>
-                    <th>จำนวน (บาท)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${Object.entries(groupedPurchaseItems(purchase.items))
-                    .map(([groupName, groupedItems], groupIndex) => {
-                      let rowIndex = groupIndex > 0 ? Object.entries(groupedPurchaseItems(purchase.items)).slice(0, groupIndex).reduce((sum, [, items]) => sum + items.length, 0) : 0;
-                      return groupedItems
-                        .reduce((acc, group) => {
-                          const lastGroup = acc[acc.length - 1];
-                          if (lastGroup && lastGroup.amount === group.amount) {
-                            lastGroup.ticket_numbers.push(...group.ticket_numbers);
-                          } else {
-                            acc.push({ ...group });
-                          }
-                          return acc;
-                        }, [] as { ticket_numbers: string[]; amount: number }[])
-                        .map((group, index) => {
-                          rowIndex++;
-                          return `
-                            <tr>
-                              <td>${rowIndex}.</td>
-                              <td>${groupName}x${
-                                (() => {
-                                  const subType = ticketSubTypes.find(type => type.type_name === groupName);
-                                  return subType ? subType.multiplication_factor : "";
-                                })()
-                              }</td>
-                              <td class="ticket-numbers">
-                                ${group.ticket_numbers
-                                  .map((number: string) => `
-                                    <div class="number-group">
-                                      ${number
-                                        .split(" ")
-                                        .map((digit: string) => `<span>${digit}</span>`)
-                                        .join("")}
-                                    </div>
-                                  `)
-                                  .join(" ")}
-                              </td>
-                              <td>x${group.amount.toFixed(0)} ฿</td>
-                            </tr>
-                          `;
-                        })
-                        .join("");
-                    })
-                    .join("")}
-                </tbody>
-              </table>
-              <div class="total">
-                ยอดรวม: ${totalAmount.toFixed(0)} ฿
-              </div>
-              <div class="footer">
-                <p>ออกโดย: บริษัท หวยไทย จำกัด</p>
-                <p>ติดต่อ: support@huaythai.com | โทร: 02-123-4567</p>
-                <p>****ขอบคุณที่อุดหนุน เฮงๆ รวยๆ ค่ะ****</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
+  const fetchMatchingTickets = async (ticketSetNumber: string): Promise<MatchingTicket[] | null> => {
+    try {
+      const { data, error } = await supabase.rpc('get_matching_tickets', {
+        p_ticket_set_number: ticketSetNumber
+      });
+
+      if (error) throw error;
+      return data as MatchingTicket[];
+    } catch (err: any) {
+      console.error('Error fetching matching tickets:', err);
+      toast.error('เกิดข้อผิดพลาดในการดึงข้อมูล: ' + err.message);
+      return null;
     }
   };
 
@@ -756,7 +554,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     return Math.max(0, differenceInDays(expiryDate, getThailandTime()));
   };
 
-  const groupedPurchaseItems = (items: TicketPurchaseItem[]) => {
+  const groupedPurchaseItems = (items: TicketPurchaseItem[]): GroupedItems => {
     // Step 1: Group by sub_type_name
     const groupedByType = items.reduce((acc, item) => {
       const group = item.sub_type_name || "ไม่ทราบประเภท";
@@ -767,7 +565,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
 
     // Step 2: Within each group, group ticket_numbers by amount
     const finalGrouped = Object.entries(groupedByType).reduce((acc, [groupName, groupItems]) => {
-      const groupedByAmount: { ticket_numbers: string[], amount: number }[] = [];
+      const groupedByAmount: GroupedPurchaseItem[] = [];
       groupItems.forEach(item => {
         const existingGroup = groupedByAmount.find(g => g.amount === item.amount);
         if (existingGroup) {
@@ -781,16 +579,53 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
       });
       acc[groupName] = groupedByAmount;
       return acc;
-    }, {} as Record<string, { ticket_numbers: string[], amount: number }[]>);
+    }, {} as GroupedItems);
 
     return finalGrouped;
+  };
+
+  const getDrawPeriodDates = () => {
+    const now = getThailandTime();
+    const day = now.getDate();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    let startDate: Date, endDate: Date;
+
+    if ((day === 16 && hours >= 17) || (day > 16) || (day === 1 && hours < 15)) {
+      // Period: 16th 17:00 to 1st 14:30
+      startDate = set(now, { date: 16, hours: 17, minutes: 0, seconds: 0, milliseconds: 0 });
+      endDate = set(addMonths(now, 1), { date: 1, hours: 14, minutes: 30, seconds: 0, milliseconds: 0 });
+    } else {
+      // Period: 1st 17:00 to 16th 14:30
+      startDate = set(now, { date: 1, hours: 17, minutes: 0, seconds: 0, milliseconds: 0 });
+      endDate = set(now, { date: 16, hours: 14, minutes: 30, seconds: 0, milliseconds: 0 });
+    }
+
+    return { startDate, endDate };
+  };
+
+  const handleSearch = () => {
+    setPage(0);
+    setPurchases([]);
+    debouncedFetchPurchases(0);
+  };
+
+  const handleDateRangeSelect = () => {
+    const { startDate, endDate } = getDrawPeriodDates();
+    setFilters(prev => ({
+      ...prev,
+      dateRange: {
+        start: startDate,
+        end: endDate
+      }
+    }));
   };
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 bg-white shadow-sm">
+        <header className="flex h-14 shrink-0 items-center gap-2 bg-white shadow-sm">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Breadcrumb>
@@ -810,163 +645,224 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
           initial="hidden"
           animate="visible"
           variants={fadeSlideIn}
-          className="min-h-screen bg-gray-50 p-6"
+          className="min-h-screen bg-gray-50 p-4"
         >
-          <div className="max-w-6xl mx-auto space-y-6">
+          <div className="max-w-5xl mx-auto space-y-4">
             {/* Header */}
             <motion.div
               variants={fadeSlideIn}
-              className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
+              className="bg-white p-4 rounded-xl shadow-sm border border-gray-100"
             >
               <div className="flex justify-between items-center">
-                <h1 className="text-md font-semibold text-gray-900">ประวัติการซื้อบิล</h1>
-                <div className="text-md text-gray-500 flex items-center gap-2">
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      กำลังโหลด...
-                    </>
-                  ) : (
-                    user?.user_metadata?.name || "Guest"
-                  )}
+                <h1 className="text-sm font-semibold text-gray-900">ประวัติการซื้อบิล</h1>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="text-xs"
+                  >
+                    {showFilters ? "ซ่อนตัวกรอง" : "แสดงตัวกรอง"}
+                  </Button>
+                  <div className="text-sm text-gray-500 flex items-center gap-2">
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        กำลังโหลด...
+                      </>
+                    ) : (
+                      user?.user_metadata?.name || "Guest"
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
 
             {/* Filter Form */}
-            <motion.div variants={fadeSlideIn} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <Label htmlFor="purchase-date" className="text-sm font-medium text-gray-700">วันที่ซื้อ</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full mt-1 bg-white hover:bg-gray-50 text-gray-900 border-gray-200 rounded-lg"
-                      >
-                        {selectedDate ? format(selectedDate, "dd MMM yyyy", { locale: th }) : "เลือกวันที่"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => {
-                          const today = startOfDay(getThailandTime());
-                          if (date && isAfter(date, today)) {
-                            setSelectedDate(today);
-                            setFilters((prev) => ({ ...prev, purchaseDate: format(today, "yyyy-MM-dd") }));
-                            if (!hasWarnedFutureDate) {
-                              toast.warn("ไม่สามารถเลือกวันที่ในอนาคตได้", { position: "top-center" });
-                              setHasWarnedFutureDate(true);
-                            }
-                          } else {
-                            setSelectedDate(date);
-                            handleFilterChange("purchaseDate", date ? format(date, "yyyy-MM-dd") : "");
-                            setHasWarnedFutureDate(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <Label htmlFor="ticket-set-number" className="text-sm font-medium text-gray-700">เลขบิล</Label>
-                  <Input
-                    id="ticket-set-number"
-                    value={filters.ticketSetNumber}
-                    onChange={(e) => handleFilterChange("ticketSetNumber", e.target.value)}
-                    placeholder="ค้นหาเลขบิล"
-                    className="mt-1 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ticket-set-name" className="text-sm font-medium text-gray-700">ชื่อบิล</Label>
-                  <Input
-                    id="ticket-set-name"
-                    value={filters.ticketSetName}
-                    onChange={(e) => handleFilterChange("ticketSetName", e.target.value)}
-                    placeholder="ค้นหาชื่อบิล"
-                    className="mt-1 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="ticket-sub-type" className="text-sm font-medium text-gray-700">ประเภทบิล</Label>
-                  <Select
-                    value={filters.ticketSubTypeId}
-                    onValueChange={(value) => handleFilterChange("ticketSubTypeId", value)}
-                  >
-                    <SelectTrigger className="mt-1 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg">
-                      <SelectValue placeholder="เลือกประเภทบิล" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">ทั้งหมด</SelectItem>
-                      {ticketSubTypes.map((subType) => (
-                        <SelectItem key={subType.id} value={subType.id}>{subType.type_name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const today = startOfDay(getThailandTime());
-                    setFilters({
-                      purchaseDate: format(today, "yyyy-MM-dd"),
-                      ticketSetNumber: "",
-                      ticketSubTypeId: "",
-                      ticketSetName: "",
-                    });
-                    setSelectedDate(today);
-                    setShowDeleted(false);
-                    setPage(0);
-                    setPurchases([]);
-                    debouncedFetchPurchases(0);
-                  }}
-                  className="border-blue-500 text-blue-600 hover:bg-blue-50 rounded-lg"
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 overflow-hidden"
                 >
-                  รีเซ็ตตัวกรอง
-                </Button>
-              </div>
-            </motion.div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="date-range" className="text-xs font-medium text-gray-700">ช่วงวันที่</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-xs bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+                            >
+                              {filters.dateRange.start ? format(filters.dateRange.start, "dd MMM yyyy", { locale: th }) : "วันที่เริ่มต้น"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={filters.dateRange.start}
+                              onSelect={(date) => {
+                                setFilters(prev => ({
+                                  ...prev,
+                                  dateRange: { ...prev.dateRange, start: date }
+                                }));
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-xs bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
+                            >
+                              {filters.dateRange.end ? format(filters.dateRange.end, "dd MMM yyyy", { locale: th }) : "วันที่สิ้นสุด"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={filters.dateRange.end}
+                              onSelect={(date) => {
+                                setFilters(prev => ({
+                                  ...prev,
+                                  dateRange: { ...prev.dateRange, end: date }
+                                }));
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-set-number" className="text-xs font-medium text-gray-700">เลขบิล</Label>
+                      <Input
+                        id="ticket-set-number"
+                        value={filters.ticketSetNumber}
+                        onChange={(e) => handleFilterChange("ticketSetNumber", e.target.value)}
+                        placeholder="ค้นหาเลขบิล"
+                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-set-name" className="text-xs font-medium text-gray-700">ชื่อบิล</Label>
+                      <Input
+                        id="ticket-set-name"
+                        value={filters.ticketSetName}
+                        onChange={(e) => handleFilterChange("ticketSetName", e.target.value)}
+                        placeholder="ค้นหาชื่อบิล"
+                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-sub-type" className="text-xs font-medium text-gray-700">ประเภทบิล</Label>
+                      <Select
+                        value={filters.ticketSubTypeId}
+                        onValueChange={(value) => handleFilterChange("ticketSubTypeId", value)}
+                      >
+                        <SelectTrigger className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                          <SelectValue placeholder="เลือกประเภทบิล" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">ทั้งหมด</SelectItem>
+                          {ticketSubTypes.map((subType) => (
+                            <SelectItem key={subType.id} value={subType.id}>{subType.type_name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const today = startOfDay(getThailandTime());
+                        setFilters({
+                          purchaseDate: format(today, "yyyy-MM-dd"),
+                          ticketSetNumber: "",
+                          ticketSubTypeId: "",
+                          ticketSetName: "",
+                          dateRange: {
+                            start: undefined,
+                            end: undefined
+                          }
+                        });
+                        setSelectedDate(today);
+                        setShowDeleted(false);
+                        setPage(0);
+                        setPurchases([]);
+                        debouncedFetchPurchases(0);
+                      }}
+                      className="text-xs border-blue-500 text-blue-600 hover:bg-blue-50"
+                    >
+                      รีเซ็ตตัวกรอง
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleDateRangeSelect}
+                      className="text-xs bg-blue-600 hover:bg-blue-700"
+                    >
+                      เลือกช่วงวันที่ประกาศผล
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSearch}
+                      className="text-xs bg-green-600 hover:bg-green-700"
+                    >
+                      ค้นหา
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Toggle Deleted */}
-            <motion.div variants={fadeSlideIn} className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <motion.div 
+              variants={fadeSlideIn} 
+              className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100"
+            >
               <Button
                 variant="outline"
+                size="sm"
                 onClick={toggleShowDeleted}
-                className={`flex items-center gap-2 rounded-lg ${
+                className={cn(
+                  "flex items-center gap-2 text-xs",
                   showDeleted ? "bg-red-50 text-red-700 border-red-200" : "bg-white border-gray-200"
-                }`}
+                )}
               >
                 {showDeleted ? (
                   <>
-                    <RotateCcw className="w-4 h-4" /> แสดงรายการปกติ
+                    <RotateCcw className="w-3 h-3" /> แสดงรายการปกติ
                   </>
                 ) : (
                   <>
-                    <Trash2 className="w-4 h-4" /> แสดงรายการที่ลบ {deletedCount > 0 && `(${deletedCount})`}
+                    <Trash2 className="w-3 h-3" /> แสดงรายการที่ลบ {deletedCount > 0 && `(${deletedCount})`}
                   </>
                 )}
               </Button>
-              <span className="text-sm text-gray-500">
+              <span className="text-xs text-gray-500">
                 {showDeleted ? "กำลังแสดงรายการที่ลบ (เก็บ 30 วัน)" : "กำลังแสดงรายการปกติ"}
               </span>
             </motion.div>
 
             {/* Purchase List */}
-            <Card className="bg-white shadow-sm rounded-2xl overflow-hidden border border-gray-100">
+            <Card className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-100">
               <ScrollArea className="max-h-auto" onScroll={handleScroll}>
-                <div className="p-6 space-y-4">
+                <div className="p-4 space-y-3">
                   {isLoading && !purchases.length ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     </div>
                   ) : purchases.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
+                    <div className="text-center text-gray-500 py-6 text-sm">
                       {showDeleted ? "ไม่พบรายการที่ลบใน 30 วัน" : `ไม่พบรายการซื้อสำหรับวันที่ ${selectedDate ? format(selectedDate, "dd MMM yyyy", { locale: th }) : "ที่เลือก"}`}
                     </div>
                   ) : (
@@ -979,41 +875,41 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
 
                         return (
                           <motion.div key={purchase.id} variants={fadeSlideIn}>
-                            <Card className={`border ${isDeleted ? "border-red-200 bg-red-50" : "border-gray-200"} rounded-xl`}>
+                            <Card className={`border ${isDeleted ? "border-red-200 bg-red-50" : "border-gray-200"} rounded-lg`}>
                               <div
-                                className={`flex justify-between items-center p-4 cursor-pointer ${
+                                className={`flex justify-between items-center p-3 cursor-pointer ${
                                   isDeleted ? "bg-red-100" : "bg-blue-50"
-                                }  `}
+                                }`}
                                 onClick={() => toggleExpand(purchase.id)}
                               >
-                                <div className="flex items-center gap-3">
-                                  <h2 className={`text-sm font-semibold ${isDeleted ? "text-red-800" : "text-blue-800"}`}>
+                                <div className="flex items-center gap-2">
+                                  <h2 className={`text-xs font-semibold ${isDeleted ? "text-red-800" : "text-blue-800"}`}>
                                     {purchase.ticket_set_name || "ไม่มีชื่อ"} ({purchase.ticket_set_number})
                                   </h2>
                                   {isDeleted && daysRemaining !== null && (
-                                    <Badge variant="secondary" className="bg-red-200 text-red-800 flex items-center gap-1">
+                                    <Badge variant="secondary" className="bg-red-200 text-red-800 flex items-center gap-1 text-xs">
                                       <Clock className="w-3 h-3" /> {daysRemaining} วัน
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm text-gray-600">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-gray-600">
                                     {new Date(purchase.purchase_date).toLocaleDateString("th-TH")}
                                   </span>
                                   {expandedPurchases.has(purchase.id) ? (
-                                    <ChevronUp className={`w-5 h-5 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
+                                    <ChevronUp className={`w-4 h-4 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
                                   ) : (
-                                    <ChevronDown className={`w-5 h-5 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
+                                    <ChevronDown className={`w-4 h-4 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
                                   )}
                                 </div>
                               </div>
                               <AnimatePresence>
                                 {expandedPurchases.has(purchase.id) && (
                                   <motion.div initial="hidden" animate="visible" exit="exit" variants={fadeSlideIn}>
-                                    <div className="p-4 sm:p-3">
+                                    <div className="p-3">
                                       {Object.entries(groupedItems).map(([groupName, groupedItems]) => (
-                                        <div key={groupName} className="mb-3">
-                                          <div className={`font-medium p-2 rounded-lg text-sm sm:text-xs ${
+                                        <div key={groupName} className="mb-2">
+                                          <div className={`font-medium p-2 rounded-lg text-xs ${
                                             isDeleted ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"
                                           }`}>
                                             {groupName}
@@ -1028,17 +924,17 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                             {groupedItems.map((group, index) => (
                                               <div
                                                 key={index}
-                                                className={`flex flex-wrap items-center p-2 rounded-lg gap-2 sm:gap-1 ${
+                                                className={`flex flex-wrap items-center p-2 rounded-lg gap-1 ${
                                                   isDeleted ? "hover:bg-red-100" : "hover:bg-blue-50"
                                                 }`}
                                               >
-                                                <div className="flex flex-wrap gap-1 sm:gap-0.5 mr-1 sm:mr-0.5">
+                                                <div className="flex flex-wrap gap-0.5 mr-1">
                                                   {group.ticket_numbers.map((number: string, numberIndex: number) => (
-                                                    <div key={numberIndex} className="flex gap-0.5 sm:gap-0.2">
+                                                    <div key={numberIndex} className="flex gap-0.2">
                                                       {number.split("  ").map((digit: string, i: number) => (
                                                         <span
                                                           key={i}
-                                                          className={`flex items-center justify-center text-sm sm:text-xs font-semibold w-8 sm:w-6 h-6 sm:h-4 rounded-sm ${
+                                                          className={`flex items-center justify-center text-xs font-semibold w-6 h-4 rounded-sm ${
                                                             isDeleted ? "text-red-800 bg-red-100" : "text-blue-800 bg-blue-100"
                                                           }`}
                                                         >
@@ -1048,8 +944,8 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                                     </div>
                                                   ))}
                                                 </div>
-                                                <span className="flex-1 min-w-[60px]" />
-                                                <span className="text-sm sm:text-xs text-gray-600 whitespace-nowrap">
+                                                <span className="flex-1 min-w-[50px]" />
+                                                <span className="text-xs text-gray-600 whitespace-nowrap">
                                                   x{group.amount.toFixed(0)} ฿
                                                 </span>
                                               </div>
@@ -1058,8 +954,8 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                         </div>
                                       ))}
                                     </div>
-                                    <div className="p-4 sm:p-3 bg-gray-50 flex flex-wrap justify-between items-center gap-2 rounded-b-xl">
-                                      <span className="text-sm sm:text-xs font-medium text-gray-700">
+                                    <div className="p-3 bg-gray-50 flex flex-wrap justify-between items-center gap-2 rounded-b-lg">
+                                      <span className="text-xs font-medium text-gray-700">
                                         ยอดรวม: {totalAmount.toFixed(0)} ฿
                                       </span>
                                       <TooltipProvider>
@@ -1069,10 +965,10 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                               <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handlePrint(purchase)}
-                                                className="border-blue-500 text-blue-600 hover:bg-blue-50 text-sm sm:text-xs px-3 sm:px-2"
+                                                onClick={() => handlePrint({ purchase, ticketSubTypes, user })}
+                                                className="border-blue-500 text-blue-600 hover:bg-blue-50 text-xs px-2"
                                               >
-                                                <Printer className="w-4 h-4 mr-1 sm:mr-0.5" />
+                                                <Printer className="w-3 h-3 mr-1" />
                                                 พิมพ์
                                               </Button>
                                             </TooltipTrigger>
@@ -1088,16 +984,16 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                                   isDeleted
                                                     ? "border-red-500 text-red-600 hover:bg-red-50"
                                                     : "border-blue-500 text-blue-600 hover:bg-blue-50"
-                                                } text-sm sm:text-xs px-3 sm:px-2`}
+                                                } text-xs px-2`}
                                               >
                                                 {isDeleted ? (
                                                   <>
-                                                    <RotateCcw className="w-4 h-4 mr-1 sm:mr-0.5" />
+                                                    <RotateCcw className="w-3 h-3 mr-1" />
                                                     คืนค่า
                                                   </>
                                                 ) : (
                                                   <>
-                                                    <Trash2 className="w-4 h-4 mr-1 sm:mr-0.5" />
+                                                    <Trash2 className="w-3 h-3 mr-1" />
                                                     ลบ
                                                   </>
                                                 )}
@@ -1116,12 +1012,12 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                         );
                       })}
                       {isLoading && purchases.length > 0 && (
-                        <div className="flex justify-center py-4">
-                          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                        <div className="flex justify-center py-3">
+                          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                         </div>
                       )}
                       {!isLoading && !hasMore && purchases.length > 0 && (
-                        <div className="text-center py-4 text-gray-500">ไม่มีข้อมูลเพิ่มเติม</div>
+                        <div className="text-center py-3 text-xs text-gray-500">ไม่มีข้อมูลเพิ่มเติม</div>
                       )}
                     </>
                   )}
@@ -1133,14 +1029,15 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
             <motion.div variants={fadeSlideIn} className="flex justify-between items-center">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => router.push("/huaythai")}
-                className="border-blue-500 text-blue-600 hover:bg-blue-50 rounded-lg"
+                className="border-blue-500 text-blue-600 hover:bg-blue-50 text-xs"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="w-3 h-3 mr-1" />
                 ย้อนกลับ
               </Button>
               {showDeleted && (
-                <span className="text-sm text-gray-500">รายการที่ลบจะถูกเก็บไว้ 30 วัน</span>
+                <span className="text-xs text-gray-500">รายการที่ลบจะถูกเก็บไว้ 30 วัน</span>
               )}
             </motion.div>
 
@@ -1148,14 +1045,14 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>ยืนยันการลบ</AlertDialogTitle>
-                  <AlertDialogDescription>
+                  <AlertDialogTitle className="text-sm">ยืนยันการลบ</AlertDialogTitle>
+                  <AlertDialogDescription className="text-xs">
                     รายการที่ลบจะถูกเก็บไว้ 30 วัน หลังจากนั้นจะไม่สามารถกู้คืนได้
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeletePurchase} className="bg-red-600 hover:bg-red-700">
+                  <AlertDialogCancel className="text-xs">ยกเลิก</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeletePurchase} className="bg-red-600 hover:bg-red-700 text-xs">
                     ลบรายการ
                   </AlertDialogAction>
                 </AlertDialogFooter>

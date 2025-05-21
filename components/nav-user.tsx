@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/supabaseClient";
-import { toast } from "react-toastify";
+import { toast } from "sonner";
 
 import {
   Avatar,

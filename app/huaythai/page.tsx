@@ -35,14 +35,15 @@ export default function LotteryPage() {
 
   const [user, setUser] = useState<any>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [activeView, setActiveView] = useState<"numberpad" | "ticketlist">("numberpad");
+  const [activeView, setActiveView] = useState<"ticketlist" | "numberpad">("ticketlist");
   const [selectedNumbers, setSelectedNumbers] = useState<Set<string>>(new Set());
   const [selectedType, setSelectedType] = useState<TicketSubType>({
     id: "",
-    type_name: "",
-    multiplication_factor: 1,
+    type_name: "สามตัวบน",
+    type_number: 3,
+    multiplication_factor: 900,
   });
-  const [useReverseNumbers, setUseReverseNumbers] = useState(false);
+  const [useReverseNumbers, setUseReverseNumbers] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<number | null>(null);
 
   // Parse state from URL params
@@ -72,7 +73,12 @@ export default function LotteryPage() {
             .filter((ticket) => ticket.amount && ticket.amount > 0)
         );
         setSelectedNumbers(new Set());
-        setSelectedType({ id: "", type_name: "สามตัวบน", multiplication_factor: 900 });
+        setSelectedType({ 
+          id: "", 
+          type_name: "สามตัวบน", 
+          multiplication_factor: 900,
+          type_number: 1 
+        });
         setUseReverseNumbers(false);
         setActiveFilter(null);
         localStorage.removeItem("numberSetsState");
@@ -90,13 +96,12 @@ export default function LotteryPage() {
             const numberSetsState = JSON.parse(numberSetsStateParam);
             if (Array.isArray(numberSetsState.selectedNumbers)) {
               setSelectedNumbers(new Set(numberSetsState.selectedNumbers));
-              setSelectedType(
-                numberSetsState.selectedType || {
-                  id: "",
-                  type_name: "สามตัวบน",
-                  multiplication_factor: 900,
-                }
-              );
+              setSelectedType({ 
+                id: "", 
+                type_name: "สามตัวบน", 
+                multiplication_factor: 900,
+                type_number: 1 
+              });
               setUseReverseNumbers(numberSetsState.useReverseNumbers || false);
               setActiveFilter(numberSetsState.activeFilter || null);
             }
@@ -105,7 +110,12 @@ export default function LotteryPage() {
           }
         } else {
           setSelectedNumbers(new Set());
-          setSelectedType({ id: "", type_name: "สามตัวบน", multiplication_factor: 900 });
+          setSelectedType({ 
+            id: "", 
+            type_name: "สามตัวบน", 
+            multiplication_factor: 900,
+            type_number: 1 
+          });
           setUseReverseNumbers(false);
           setActiveFilter(null);
         }
@@ -116,6 +126,43 @@ export default function LotteryPage() {
       }
     }
   }, [searchParams, router]);
+
+  // Handle URL parameters for ticket data when returning from price entry
+  useEffect(() => {
+    const ticketsParam = searchParams.get('tickets');
+    const numberSetsStateParam = searchParams.get('numberSetsState');
+    
+    if (ticketsParam) {
+      try {
+        const parsedTickets = JSON.parse(ticketsParam);
+        if (Array.isArray(parsedTickets)) {
+          setTickets(parsedTickets);
+        }
+      } catch (error) {
+        console.error('Error parsing tickets from URL:', error);
+      }
+    }
+
+    if (numberSetsStateParam) {
+      try {
+        const parsedState = JSON.parse(numberSetsStateParam);
+        if (parsedState.selectedNumbers) {
+          setSelectedNumbers(new Set(parsedState.selectedNumbers));
+        }
+        if (parsedState.selectedType) {
+          setSelectedType(parsedState.selectedType);
+        }
+        if (typeof parsedState.useReverseNumbers === 'boolean') {
+          setUseReverseNumbers(parsedState.useReverseNumbers);
+        }
+        if (parsedState.activeFilter !== undefined) {
+          setActiveFilter(parsedState.activeFilter);
+        }
+      } catch (error) {
+        console.error('Error parsing numberSetsState from URL:', error);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -138,13 +185,23 @@ export default function LotteryPage() {
         const parsed = JSON.parse(savedState);
         const numbers = Array.isArray(parsed.selectedNumbers) ? parsed.selectedNumbers : [];
         setSelectedNumbers(new Set(numbers));
-        setSelectedType(parsed.selectedType || { id: "", type_name: "สามตัวบน", multiplication_factor: 900 });
+        setSelectedType({ 
+          id: "", 
+          type_name: "สามตัวบน", 
+          multiplication_factor: 900,
+          type_number: 1 
+        });
         setUseReverseNumbers(parsed.useReverseNumbers || false);
         setActiveFilter(parsed.activeFilter || null);
       } catch (error) {
         console.error("Failed to parse numberSetsState from localStorage:", error);
         setSelectedNumbers(new Set());
-        setSelectedType({ id: "", type_name: "สามตัวบน", multiplication_factor: 900 });
+        setSelectedType({ 
+          id: "", 
+          type_name: "สามตัวบน", 
+          multiplication_factor: 900,
+          type_number: 1 
+        });
         setUseReverseNumbers(false);
         setActiveFilter(null);
       }
@@ -184,18 +241,22 @@ export default function LotteryPage() {
 
   const handleNavigateToPriceEntry = (): void => {
     if (tickets.length > 0) {
-      const params = new URLSearchParams();
-      params.set("allTickets", JSON.stringify(tickets));
-      params.set(
-        "numberSetsState",
-        JSON.stringify({
+      // Generate a unique session ID
+      const sessionId = crypto.randomUUID();
+      
+      // Store data in localStorage
+      localStorage.setItem(`priceEntry_${sessionId}`, JSON.stringify({
+        tickets,
+        numberSetsState: {
           selectedNumbers: Array.from(selectedNumbers),
           selectedType,
           useReverseNumbers,
           activeFilter,
-        })
-      );
-      router.push(`/huaythaiprice-entry?${params.toString()}`);
+        }
+      }));
+
+      // Only pass the session ID in URL
+      router.push(`/huaythaiprice-entry?sessionId=${sessionId}`);
     }
   };
 
@@ -272,6 +333,7 @@ export default function LotteryPage() {
                     onSubmitMultiple={handleAddMultipleTickets}
                     onPriceEntry={handleNavigateToPriceEntry}
                     userName={user?.name || "Unknown User"}
+                    tickets={tickets}
                   />
                 </div>
               </div>

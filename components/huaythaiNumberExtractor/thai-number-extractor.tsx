@@ -3,8 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { toast } from "react-toastify"
-import type { ToastOptions } from "react-toastify"
+import { toast } from "sonner"
 import UserDataDisplay from "./user-data-display"
 import ImageNumberExtractor from "./image-number-extractor"
 
@@ -55,11 +54,6 @@ const ThaiNumberExtractor = () => {
   const [userData, setUserData] = useState<UserData>({})
   const [showImageUpload, setShowImageUpload] = useState(false)
 
-  const toastOptions: ToastOptions = {
-    position: "top-right",
-    autoClose: 3000,
-  }
-
   const extractUserData = (): void => {
     const newUserData: UserData = {}
     const lines: string[] = inputText.trim().split("\n")
@@ -81,7 +75,10 @@ const ThaiNumberExtractor = () => {
     }
 
     if (!username) {
-      toast.error("กรุณาระบุชื่อผู้ใช้ (ไม่ใช่ บน, ล่าง, เต็ง, โต๊ด)", toastOptions)
+      toast.error("กรุณาระบุชื่อผู้ใช้ (ไม่ใช่ บน, ล่าง, เต็ง, โต๊ด)", {
+        position: "top-right",
+        autoClose: 3000,
+      })
       setUserData({})
       return
     }
@@ -182,7 +179,10 @@ const ThaiNumberExtractor = () => {
       }
       return newData
     })
-    toast.success("ลบรายการสำเร็จ", toastOptions)
+    toast.success("ลบรายการสำเร็จ", {
+      position: "top-right",
+      autoClose: 3000,
+    })
   }
 
   useEffect(() => {

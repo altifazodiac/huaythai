@@ -2,6 +2,7 @@ export interface TicketSubType {
   id: string
   type_name: string
   multiplication_factor: number
+  type_number: number
   created_at?: string
   updated_at?: string
 }

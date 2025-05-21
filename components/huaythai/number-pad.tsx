@@ -13,7 +13,7 @@ import { ArrowLeft, RotateCcw, Home } from "lucide-react"
 import NumberSets from "./number-sets"
 import type { Ticket, TicketSubType } from "@/types/types"
 import { createClient } from "@/lib/supabase/client"
-import { toast } from "react-toastify"
+import { toast } from "sonner"
 
 interface NumberPadProps {
   maxDigits?: number
@@ -30,6 +30,7 @@ interface NumberPadProps {
   activeFilter: number | null
   setActiveFilter: React.Dispatch<React.SetStateAction<number | null>>
   userName?: string
+  tickets: Ticket[]
 }
 
 type TicketType = "สามตัว" | "สองตัว" | "เลขวิ่ง"
@@ -54,7 +55,8 @@ const SubTypeButton = ({
   subType,
   isSelected,
   onClick,
-}: { subType: TicketSubType; isSelected: boolean; onClick: () => void }) => (
+  disabled
+}: { subType: TicketSubType; isSelected: boolean; onClick: () => void; disabled?: boolean }) => (
   <motion.div variants={fadeInVariants} initial="hidden" animate="visible" exit="exit" transition={{ duration: 0.2 }}>
     <Button
       variant={isSelected ? "default" : "outline"}
@@ -63,6 +65,7 @@ const SubTypeButton = ({
         isSelected ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80",
       )}
       onClick={onClick}
+      disabled={disabled}
     >
       {subType.type_name} x{subType.multiplication_factor}
     </Button>
@@ -84,10 +87,11 @@ const NumberPad = ({
   activeFilter,
   setActiveFilter,
   userName,
+  tickets,
 }: NumberPadProps) => {
   const [digits, setDigits] = useState("")
   const [selectedTypeTab, setSelectedTypeTab] = useState<TicketType>("สามตัว")
-  const [selectedSubType, setSelectedSubType] = useState<TicketSubType | null>(null)
+  const [selectedSubTypes, setSelectedSubTypes] = useState<Set<TicketSubType>>(new Set())
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null)
   const [useRandomNumber, setUseRandomNumber] = useState(false)
   const [animateDigitIndex, setAnimateDigitIndex] = useState<number | null>(null)
@@ -108,6 +112,7 @@ const NumberPad = ({
         const { data, error } = await supabase
           .from("ticket_sub_types")
           .select("*")
+          .order("type_number", { ascending: true })
           .order("type_name", { ascending: true })
 
         if (error) throw error
@@ -118,15 +123,16 @@ const NumberPad = ({
             id: String(item.id || ""),
             type_name: String(item.type_name || ""),
             multiplication_factor: Number(item.multiplication_factor || 0),
+            type_number: Number(item.type_number || 0),
             created_at: item.created_at ? String(item.created_at) : undefined,
             updated_at: item.updated_at ? String(item.updated_at) : undefined,
           }))
 
           setTicketSubTypes(typedData)
 
-          if (typedData.length > 0 && !selectedType.id) {
-            setSelectedType(typedData[0])
-            setSelectedSubType(typedData[0])
+          if (typedData.length > 0) {
+           
+            
             setSelectedPrice(typedData[0].multiplication_factor)
           }
         }
@@ -135,13 +141,13 @@ const NumberPad = ({
       }
     }
     fetchTicketSubTypes()
-  }, [setSelectedType, selectedType.id, supabase])
+  }, [supabase])
 
   const listboxItems: Record<TicketType, TicketSubType[]> = useMemo(
     () => ({
-      สามตัว: ticketSubTypes.filter((t) => t.type_name.includes("สามตัว")),
-      สองตัว: ticketSubTypes.filter((t) => t.type_name.includes("สองตัว")),
-      เลขวิ่ง: ticketSubTypes.filter((t) => t.type_name.includes("วิ่ง")),
+      สามตัว: ticketSubTypes.filter((t) => t.type_number === 3),
+      สองตัว: ticketSubTypes.filter((t) => t.type_number === 2),
+      เลขวิ่ง: ticketSubTypes.filter((t) => t.type_number === 1),
     }),
     [ticketSubTypes],
   )
@@ -154,15 +160,15 @@ const NumberPad = ({
 
   useEffect(() => {
     setDigits("")
-    setSelectedSubType(null)
+    setSelectedSubTypes(new Set())
     setSelectedPrice(null)
   }, [maxDigits, selectedTypeTab])
 
   useEffect(() => {
-    if (digits.length === currentMaxDigits && selectedPrice && selectedSubType && onSubmit) {
+    if (digits.length === currentMaxDigits && selectedPrice && selectedSubTypes.size > 0 && onSubmit) {
       handleSubmit()
     }
-  }, [digits, selectedPrice, selectedSubType, currentMaxDigits])
+  }, [digits, selectedPrice, selectedSubTypes, currentMaxDigits])
 
   const handleDigit = (digit: string) => {
     if (digits.length < currentMaxDigits) {
@@ -176,19 +182,61 @@ const NumberPad = ({
   const handleClear = () => setDigits("")
 
   const handleSubmit = () => {
-    if (digits.length === currentMaxDigits && selectedPrice && selectedSubType && onSubmit) {
-      onSubmit({ number: digits, type: selectedSubType, price: selectedPrice })
+    if (
+      digits.length !== currentMaxDigits ||
+      !selectedPrice ||
+      selectedSubTypes.size === 0
+    ) {
+      toast.error("กรุณาเลือกประเภทและกรอกเลขให้ครบถ้วน");
+      return;
+    }
+    if (digits.length === currentMaxDigits && selectedPrice && selectedSubTypes.size > 0 && onSubmit) {
+      const isDuplicate = tickets.some(
+        t => t.number === digits && Array.from(selectedSubTypes).some(st => st.id === t.type_id)
+      )
+      if (isDuplicate) {
+        toast.error('เลขนี้ในประเภทนี้มีอยู่แล้ว');
+        return;
+      }
+      // Create tickets for each selected subtype
+      const newTickets: Ticket[] = Array.from(selectedSubTypes).map(subType => ({
+        id: crypto.randomUUID(),
+        number: digits,
+        type_id: subType.id,
+        price: subType.multiplication_factor,
+        name: userName || "Unnamed Ticket",
+        ticketNumber: digits
+      }))
 
+      if (onSubmitMultiple) {
+        onSubmitMultiple(newTickets)
+      } else {
+        // If not multi-select, only use the first selected subtype
+        const firstSubType = Array.from(selectedSubTypes)[0]
+        onSubmit({ number: digits, type: firstSubType, price: selectedPrice })
+      }
+
+      // Handle reverse numbers for two-digit tickets
       if (useRandomNumber && currentMaxDigits === 2) {
         const reversed = digits.split("").reverse().join("")
         if (reversed !== digits) {
-          onSubmit({ number: reversed, type: selectedSubType, price: selectedPrice })
+          const reversedTickets = Array.from(selectedSubTypes).map(subType => ({
+            id: crypto.randomUUID(),
+            number: reversed,
+            type_id: subType.id,
+            price: subType.multiplication_factor,
+            name: userName || "Unnamed Ticket",
+            ticketNumber: reversed
+          }))
+          if (onSubmitMultiple) {
+            onSubmitMultiple(reversedTickets)
+          }
         }
       }
 
       setDigits("")
       setSelectedPrice(null)
-      setSelectedSubType(null)
+      setSelectedSubTypes(new Set())
       setUseRandomNumber(false)
     }
   }
@@ -204,11 +252,23 @@ const NumberPad = ({
 
   const handleSubTypeSelect = useCallback(
     (subType: TicketSubType) => {
-      setSelectedSubType(subType)
+      setSelectedSubTypes((prev) => {
+        const newSet = new Set(prev)
+        if (newSet.has(subType)) {
+          newSet.delete(subType)
+        } else {
+          // If not multi-select, clear previous selections
+          if (!onSubmitMultiple) {
+            newSet.clear()
+          }
+          newSet.add(subType)
+        }
+        return newSet
+      })
       setSelectedPrice(subType.multiplication_factor)
-      setSelectedType(subType)
+     
     },
-    [setSelectedType],
+    [onSubmitMultiple],
   )
 
   const handleTypeChange = useCallback((type: TicketType) => {
@@ -266,14 +326,20 @@ const NumberPad = ({
           )}
 
           <motion.div className="grid grid-cols-2 gap-2" variants={staggerContainer} initial="hidden" animate="visible">
-            {subTypeList.map((subType) => (
-              <SubTypeButton
-                key={subType.id}
-                subType={subType}
-                isSelected={selectedSubType?.id === subType.id}
-                onClick={() => handleSubTypeSelect(subType)}
-              />
-            ))}
+            {subTypeList.map((subType) => {
+              const isDuplicate = digits.length === currentMaxDigits && tickets.some(
+                t => t.number === digits && t.type_id === subType.id
+              )
+              return (
+                <SubTypeButton
+                  key={subType.id}
+                  subType={subType}
+                  isSelected={Array.from(selectedSubTypes).some(st => st.id === subType.id)}
+                  onClick={() => handleSubTypeSelect(subType)}
+                  disabled={isDuplicate}
+                />
+              )
+            })}
           </motion.div>
 
           <motion.div
@@ -348,13 +414,12 @@ const NumberPad = ({
             onSubmit={handleMultipleSubmit}
             selectedNumbers={selectedNumbers}
             setSelectedNumbers={setSelectedNumbers}
-            selectedType={selectedType}
-            setSelectedType={setSelectedType}
             useReverseNumbers={useReverseNumbers}
             setUseReverseNumbers={setUseReverseNumbers}
             activeFilter={activeFilter}
             setActiveFilter={setActiveFilter}
             userName={userName}
+            tickets={tickets}
           />
         </TabsContent>
       </Tabs>

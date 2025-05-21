@@ -5,11 +5,13 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card, CardHeader, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { X, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from "framer-motion"
 import type { Ticket, TicketSubType } from "@/types/types"
 import { createClient } from "@/lib/supabase/client"
-import { toast } from "react-toastify"
+import { toast } from "sonner"
+import { useTicketSubTypes } from "@/components/contexts/TicketSubTypeContext"
+import { useSearchParams } from "next/navigation"
 
 // Custom scrollbar hiding styles
 const scrollbarHideStyles = `
@@ -28,6 +30,7 @@ interface TicketListProps {
   onDeleteAll: () => void
   onDeleteLast: () => void
   onPriceEntry: () => void
+  onTicketsUpdate?: (tickets: Ticket[]) => void
 }
 
 const fadeInVariants = {
@@ -36,10 +39,43 @@ const fadeInVariants = {
   exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
 }
 
-const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry }: TicketListProps) => {
-  const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([])
+const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry, onTicketsUpdate }: TicketListProps) => {
+  const ticketSubTypes = useTicketSubTypes()
   const [expandedTypes, setExpandedTypes] = useState<Record<string, boolean>>({})
+  const [duplicateNumbers, setDuplicateNumbers] = useState<Record<string, string[]>>({})
+  const [highlightId, setHighlightId] = useState<string | null>(null)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const lastItemRef = useRef<HTMLDivElement>(null)
+  const prevTicketCount = useRef(tickets.length)
+
+  const groupedTickets = useMemo(() => {
+    return ticketSubTypes.reduce((acc, subType) => {
+      const filtered = tickets.filter((t) => t.type_id === subType.id);
+      if (filtered.length > 0) {
+        acc[subType.type_name] = filtered;
+      }
+      return acc;
+    }, {} as Record<string, Ticket[]>);
+  }, [tickets, ticketSubTypes]);
+  
+  const activeTicketTypes = useMemo(() => Object.keys(groupedTickets), [groupedTickets]);
+
+  // Handle URL parameters for ticket data
+  useEffect(() => {
+    const ticketsParam = searchParams.get('tickets')
+    if (ticketsParam && onTicketsUpdate) {
+      try {
+        const parsedTickets = JSON.parse(ticketsParam)
+        if (Array.isArray(parsedTickets)) {
+          onTicketsUpdate(parsedTickets)
+        }
+      } catch (error) {
+        console.error('Error parsing tickets from URL:', error)
+      }
+    }
+  }, [searchParams, onTicketsUpdate])
 
   // Fetch ticket sub-types
   useEffect(() => {
@@ -52,21 +88,25 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
 
         if (error) throw error
         
-        // Properly map the data to ensure it conforms to TicketSubType interface
         if (data) {
           const typedData: TicketSubType[] = data.map((item) => ({
             id: String(item.id || ""),
             type_name: String(item.type_name || ""),
             multiplication_factor: Number(item.multiplication_factor || 0),
+            type_number: Number(item.type_number || 0),
             created_at: item.created_at ? String(item.created_at) : undefined,
             updated_at: item.updated_at ? String(item.updated_at) : undefined,
           }))
           
-          setTicketSubTypes(typedData)
-
-          // Initialize all types as expanded
+          const sortedTypes = typedData.sort((a, b) => {
+            if (a.type_number !== b.type_number) {
+              return a.type_number - b.type_number;
+            }
+            return a.type_name.localeCompare(b.type_name);
+          });
+          
           const initialExpanded: Record<string, boolean> = {}
-          typedData.forEach((type) => {
+          sortedTypes.forEach((type) => {
             if (type.type_name) {
               initialExpanded[type.type_name] = true
             }
@@ -80,11 +120,8 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
     }
     fetchTicketSubTypes()
   }, [supabase])
- const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const lastItemRef = useRef<HTMLDivElement>(null)
-  const prevTicketCount = useRef(tickets.length)
-  const [highlightId, setHighlightId] = useState<string | null>(null)
 
+  // Handle ticket changes and scrolling
   useEffect(() => {
     console.log("Tickets changed:", tickets.length, "Prev count:", prevTicketCount.current);
     if (tickets.length > prevTicketCount.current && lastItemRef.current) {
@@ -98,26 +135,6 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
     }
     prevTicketCount.current = tickets.length;
   }, [tickets, highlightId]);
-  const groupedTickets = useMemo(() => {
-    return ticketSubTypes.reduce((acc, subType) => {
-      const filtered = tickets.filter((t) => t.type_id === subType.id);
-      if (filtered.length > 0) {
-        acc[subType.type_name] = filtered;
-      }
-      return acc;
-    }, {} as Record<string, Ticket[]>);
-  }, [tickets, ticketSubTypes]);
-  
-  const activeTicketTypes = useMemo(() => Object.keys(groupedTickets), [groupedTickets]);
- 
-  const totalTickets = tickets.length
-
-  const toggleTypeExpansion = (typeName: string) => {
-    setExpandedTypes((prev) => ({
-      ...prev,
-      [typeName]: !prev[typeName],
-    }))
-  }
 
   // Add style tag to hide scrollbars
   useEffect(() => {
@@ -129,6 +146,36 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
       document.head.removeChild(styleTag)
     }
   }, [])
+
+  // Check for duplicate numbers within each type
+  useEffect(() => {
+    const duplicates: Record<string, string[]> = {}
+    
+    Object.entries(groupedTickets).forEach(([typeName, typeTickets]) => {
+      const numbers = typeTickets.map(t => t.number)
+      const uniqueNumbers = new Set(numbers)
+      
+      if (numbers.length !== uniqueNumbers.size) {
+        const duplicatesInType = numbers.filter((number, index) => 
+          numbers.indexOf(number) !== index
+        )
+        duplicates[typeName] = [...new Set(duplicatesInType)]
+      }
+    })
+    
+    setDuplicateNumbers(duplicates)
+  }, [groupedTickets])
+
+  const totalTickets = tickets.length
+
+  const toggleTypeExpansion = (typeName: string) => {
+    setExpandedTypes((prev) => ({
+      ...prev,
+      [typeName]: !prev[typeName],
+    }))
+  }
+
+  if (!ticketSubTypes.length) return <div>Loading...</div>;
 
   return (
     <motion.div
@@ -206,65 +253,88 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
             {activeTicketTypes.length > 0 ? (
               activeTicketTypes.map((typeName) => (
                 <motion.div key={typeName} variants={fadeInVariants}>
-                  <Card className="bg-white shadow-sm w-full">
+                  <Card className={`bg-white shadow-sm w-full ${
+                    duplicateNumbers[typeName]?.length > 0 ? 'border-2 border-yellow-400' : ''
+                  }`}>
                     <CardHeader
-                      className="bg-blue-100 p-2 cursor-pointer"
+                      className={`p-2 cursor-pointer ${
+                        duplicateNumbers[typeName]?.length > 0 ? 'bg-yellow-50' : 'bg-blue-100'
+                      }`}
                       onClick={() => toggleTypeExpansion(typeName)}
                     >
                       <div className="flex justify-between items-center">
                         <div className="flex items-center">
                           <h3 className="font-medium text-blue-800 text-sm">{typeName}</h3>
+                          {duplicateNumbers[typeName]?.length > 0 && (
+                            <AlertTriangle className="ml-2 w-4 h-4 text-yellow-500" />
+                          )}
                           <span className="ml-2 text-xs text-blue-600">
                             {expandedTypes[typeName] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </span>
                         </div>
-                        <Badge variant="secondary" className="bg-blue-200 text-blue-800 text-xs">
+                        <Badge variant="secondary" className={`${
+                          duplicateNumbers[typeName]?.length > 0 
+                            ? 'bg-yellow-200 text-yellow-800' 
+                            : 'bg-blue-200 text-blue-800'
+                        } text-xs`}>
                           {groupedTickets[typeName]?.length || 0} รายการ
                         </Badge>
                       </div>
                     </CardHeader>
                     {expandedTypes[typeName] && (
                       <CardContent className="p-0">
-                        <div className="max-h-[250px] overflow-y-auto scrollbar-hide">
-                          <AnimatePresence>
-                            {groupedTickets[typeName].map((ticket, index) => {
-                              const isLast = tickets[tickets.length - 1]?.id === ticket.id
-                              return (
-                                <motion.div
-                                  key={ticket.id}
-                                  variants={fadeInVariants}
-                                  initial="hidden"
-                                  animate="visible"
-                                  exit="exit"
-                                  ref={isLast ? lastItemRef : null}
-                                  className={`flex items-center px-3 py-2 border-b border-gray-100 transition-all ${
-                                    highlightId === ticket.id ? "bg-blue-50" : ""
-                                  } hover:bg-blue-50`}
+                        <div className="max-h-[280px] overflow-y-auto scrollbar-hide flex flex-wrap gap-2 p-2">
+                          <AnimatePresence initial={false}>
+                            {groupedTickets[typeName].map((ticket, index) => (
+                              <motion.div
+                                key={ticket.id}
+                                layout
+                                variants={fadeInVariants}
+                                custom={index}
+                                initial="hidden"
+                                animate="visible"
+                                exit="exit"
+                                className={`group relative shadow-md hover:shadow-lg rounded-lg transition-all duration-300 ease-in-out flex-shrink-0 min-w-[50px] ${
+                                  duplicateNumbers[typeName]?.includes(ticket.number)
+                                    ? 'bg-yellow-50 border-2 border-yellow-400'
+                                    : 'bg-white dark:bg-slate-800'
+                                }`}
+                              >
+                                <div className="p-2.5 flex items-center">
+                                  <span className={`text-sm font-medium ${
+                                    duplicateNumbers[typeName]?.includes(ticket.number)
+                                      ? 'text-yellow-800'
+                                      : 'text-slate-700 dark:text-slate-200'
+                                  } break-all`}>
+                                    {ticket.number}
+                                  </span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => onDelete(ticket.id)}
+                                  aria-label={`Delete ticket ${ticket.number}`}
+                                  className="absolute -top-2 -right-2 
+                                    text-slate-400 dark:text-slate-500 
+                                    hover:text-red-500 dark:hover:text-red-400 
+                                    opacity-0 group-hover:opacity-100 focus:opacity-100 
+                                    transition-all duration-200 
+                                    rounded-full p-1 
+                                    w-8 h-8 flex items-center justify-center 
+                                    hover:bg-red-100 dark:hover:bg-red-900/50
+                                    md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 
+                                    opacity-100"
                                 >
-                                  <span className="text-gray-500 mr-2 font-medium text-xs w-5">{index + 1}.</span>
-                                  <div className="flex space-x-1 mr-3">
-                                    {ticket.number.split("").map((digit, i) => (
-                                      <span
-                                        key={i}
-                                        className="w-6 h-6 bg-blue-200 rounded-md flex items-center justify-center text-xs font-semibold text-blue-800 shadow-sm"
-                                      >
-                                        {digit}
-                                      </span>
-                                    ))}
-                                  </div>
-                                  <span className="text-sm text-gray-600 flex-1">x{ticket.price}</span>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => onDelete(ticket.id)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full p-1"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                </motion.div>
-                              )
-                            })}
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </motion.div>
+                            ))}
                           </AnimatePresence>
+                          {tickets.length === 0 && (
+                            <div className="w-full text-center text-slate-500 dark:text-slate-400 py-8">
+                              ไม่มีตั๋วในรายการ
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     )}
