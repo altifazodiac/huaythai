@@ -115,7 +115,7 @@ const data = {
         },
         {
           title: "ผลสลากกินแบ่ง",
-          url: "/huaylatestresults",
+          url: "/lottery-results",
         },
         {
           title: "ผลหวยย้อนหลัง",

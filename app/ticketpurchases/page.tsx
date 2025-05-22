@@ -114,24 +114,33 @@ const TicketPurchasesPage = (): React.ReactElement => {
   const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([]);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [filters, setFilters] = useState<{
-    purchaseDate: string;
-    ticketSetNumber: string;
-    ticketSubTypeId: string;
-    ticketSetName: string;
     dateRange: {
       start: Date | undefined;
       end: Date | undefined;
     };
+    ticketSetNumber: string;
+    ticketSetName: string;
   }>({
-    purchaseDate: "",
-    ticketSetNumber: "",
-    ticketSubTypeId: "",
-    ticketSetName: "",
     dateRange: {
       start: undefined,
       end: undefined,
     },
+    ticketSetNumber: "",
+    ticketSetName: "",
   });
+
+  // Add debounced filter state
+  const [debouncedFilters, setDebouncedFilters] = useState(filters);
+
+  // Debounce filter updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilters(filters);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [filters]);
+
   const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -240,7 +249,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
         setTicketSubTypes(ticketData || []);
         const today = startOfDay(getThailandTime());
         setSelectedDate(today);
-        setFilters((prev) => ({ ...prev, purchaseDate: format(today, "yyyy-MM-dd") }));
+        setFilters((prev) => ({ ...prev, dateRange: { start: today, end: today } }));
       } catch (err: any) {
         toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message);
       } finally {
@@ -326,6 +335,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
         const from = pageIndex * ITEMS_PER_PAGE;
         const to = from + ITEMS_PER_PAGE - 1;
 
+        // Build the base query
         let query = supabase
           .from("ticket_purchases")
           .select(
@@ -348,39 +358,27 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
               created_at,
               ticket_sub_types (type_name)
             )
-          `
+          `,
+            { count: 'exact' }
           )
           .eq("user_id", user.id)
           .order("purchase_date", { ascending: false })
-          .order("created_at", { ascending: false })
-          .range(from, to);
+          .order("created_at", { ascending: false });
 
-        // Handle date range filter
-        if (filters.dateRange.start && filters.dateRange.end) {
-          const startDate = format(filters.dateRange.start, "yyyy-MM-dd");
-          const endDate = format(filters.dateRange.end, "yyyy-MM-dd");
+        // Apply date range filter if both start and end dates are selected
+        if (debouncedFilters.dateRange.start && debouncedFilters.dateRange.end) {
+          const startDate = format(debouncedFilters.dateRange.start, "yyyy-MM-dd");
+          const endDate = format(debouncedFilters.dateRange.end, "yyyy-MM-dd");
           query = query.gte("purchase_date", startDate).lte("purchase_date", endDate);
-        } else if (filters.purchaseDate) {
-          const selectedPurchaseDate = startOfDay(new Date(filters.purchaseDate));
-          const today = startOfDay(getThailandTime());
-
-          if (isAfter(selectedPurchaseDate, today)) {
-            if (!hasWarnedFutureDate) {
-              toast.warn("ไม่สามารถเลือกวันที่ในอนาคตได้", { position: "top-center" });
-              setHasWarnedFutureDate(true);
-            }
-            setFilters((prev) => ({ ...prev, purchaseDate: format(today, "yyyy-MM-dd") }));
-            setSelectedDate(today);
-            query = query.eq("purchase_date", format(today, "yyyy-MM-dd"));
-          } else {
-            query = query.eq("purchase_date", filters.purchaseDate);
-          }
         }
 
-        if (filters.ticketSetNumber) query = query.ilike("ticket_set_number", `%${filters.ticketSetNumber}%`);
-        if (filters.ticketSetName) query = query.ilike("ticket_set_name", `%${filters.ticketSetName}%`);
-        if (filters.ticketSubTypeId && filters.ticketSubTypeId !== "all") {
-          query = query.eq("ticket_purchase_items.ticket_sub_type_id", filters.ticketSubTypeId);
+        // Apply ticket set filters
+        if (debouncedFilters.ticketSetNumber) {
+          query = query.ilike("ticket_set_number", `%${debouncedFilters.ticketSetNumber}%`);
+        }
+        
+        if (debouncedFilters.ticketSetName) {
+          query = query.ilike("ticket_set_name", `%${debouncedFilters.ticketSetName}%`);
         }
 
         if (showDeleted) {
@@ -392,7 +390,11 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
           query = query.is("deleted_at", null);
         }
 
-        const { data, error } = await query;
+        // Apply pagination
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+
         if (error) {
           toast.error(`เกิดข้อผิดพลาด: ${error.message}. กรุณาลองใหม่`, { position: "top-center" });
           return;
@@ -423,9 +425,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
               items: purchase.items,
             };
           } else {
-            // Merge items, ensuring deleted_at consistency
             acc[key].items = [...acc[key].items, ...purchase.items];
-            // If any purchase in the group is not deleted, treat the group as not deleted
             if (!purchase.deleted_at) {
               acc[key].deleted_at = null;
             }
@@ -435,7 +435,10 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
 
         const consolidatedPurchases = Object.values(groupedPurchases);
 
-        setHasMore(consolidatedPurchases.length === ITEMS_PER_PAGE);
+        // Update hasMore based on total count
+        const totalPages = Math.ceil((count || 0) / ITEMS_PER_PAGE);
+        setHasMore(pageIndex < totalPages - 1);
+        
         setPurchases((prev) => (pageIndex === 0 ? consolidatedPurchases : [...prev, ...consolidatedPurchases]));
       } catch (err: any) {
         toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + (err.message || "ไม่สามารถดึงข้อมูลได้"), {
@@ -445,7 +448,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
         setIsLoading(false);
       }
     },
-    [user, filters, showDeleted, hasWarnedFutureDate]
+    [user, debouncedFilters, showDeleted]
   );
 
   const debouncedFetchPurchases = useCallback(debounce(fetchPurchases, 300), [fetchPurchases]);
@@ -455,12 +458,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     setPurchases([]);
     debouncedFetchPurchases(0);
     return () => debouncedFetchPurchases.cancel();
-  }, [user, filters, showDeleted, debouncedFetchPurchases]);
-
-  const handleFilterChange = (key: keyof typeof filters, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-    setHasWarnedFutureDate(false);
-  };
+  }, [user, debouncedFilters, showDeleted, debouncedFetchPurchases]);
 
   const toggleExpand = (purchaseId: string) => {
     setExpandedPurchases((prev) => {
@@ -687,7 +685,27 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                   exit={{ height: 0, opacity: 0 }}
                   className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 overflow-hidden"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-set-number" className="text-xs font-medium text-gray-700">เลขบิล</Label>
+                      <Input
+                        id="ticket-set-number"
+                        value={filters.ticketSetNumber}
+                        onChange={(e) => setFilters(prev => ({ ...prev, ticketSetNumber: e.target.value }))}
+                        placeholder="ค้นหาเลขบิล"
+                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ticket-set-name" className="text-xs font-medium text-gray-700">ชื่อบิล</Label>
+                      <Input
+                        id="ticket-set-name"
+                        value={filters.ticketSetName}
+                        onChange={(e) => setFilters(prev => ({ ...prev, ticketSetName: e.target.value }))}
+                        placeholder="ค้นหาชื่อบิล"
+                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="date-range" className="text-xs font-medium text-gray-700">ช่วงวันที่</Label>
                       <div className="grid grid-cols-2 gap-2">
@@ -741,61 +759,20 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                         </Popover>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket-set-number" className="text-xs font-medium text-gray-700">เลขบิล</Label>
-                      <Input
-                        id="ticket-set-number"
-                        value={filters.ticketSetNumber}
-                        onChange={(e) => handleFilterChange("ticketSetNumber", e.target.value)}
-                        placeholder="ค้นหาเลขบิล"
-                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket-set-name" className="text-xs font-medium text-gray-700">ชื่อบิล</Label>
-                      <Input
-                        id="ticket-set-name"
-                        value={filters.ticketSetName}
-                        onChange={(e) => handleFilterChange("ticketSetName", e.target.value)}
-                        placeholder="ค้นหาชื่อบิล"
-                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket-sub-type" className="text-xs font-medium text-gray-700">ประเภทบิล</Label>
-                      <Select
-                        value={filters.ticketSubTypeId}
-                        onValueChange={(value) => handleFilterChange("ticketSubTypeId", value)}
-                      >
-                        <SelectTrigger className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                          <SelectValue placeholder="เลือกประเภทบิล" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">ทั้งหมด</SelectItem>
-                          {ticketSubTypes.map((subType) => (
-                            <SelectItem key={subType.id} value={subType.id}>{subType.type_name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        const today = startOfDay(getThailandTime());
                         setFilters({
-                          purchaseDate: format(today, "yyyy-MM-dd"),
-                          ticketSetNumber: "",
-                          ticketSubTypeId: "",
-                          ticketSetName: "",
                           dateRange: {
                             start: undefined,
                             end: undefined
-                          }
+                          },
+                          ticketSetNumber: "",
+                          ticketSetName: ""
                         });
-                        setSelectedDate(today);
                         setShowDeleted(false);
                         setPage(0);
                         setPurchases([]);

@@ -380,24 +380,27 @@ export default function TicketResultsPage() {
 
         // ดึงข้อมูลผลสลากล่าสุดจาก Supabase แทนการใช้ API
         const { data: lotteryData, error: lotteryError } = await supabase
-          .from("lottery_results")
-          .select(`
-            *,
-            lottery_numbers (*)
-          `)
-          .order("lottery_date", { ascending: false })
-          .limit(1)
-          .single()
+  .from("lottery_results")
+  .select(`
+    *,
+    lottery_draws (id, draw_date),
+    ticket_sub_types (type_name)
+  `)
+  .order("draw_id", { ascending: false })
+  .limit(1)
+  .single()
 
-        if (lotteryError) {
-          throw new Error(`ไม่พบข้อมูลผลสลากล่าสุด: ${lotteryError.message}`)
-        }
+if (lotteryError) throw new Error(`ไม่พบข้อมูลผลสลากล่าสุด: ${lotteryError.message}`)
 
-        setLatestLottery(lotteryData)
+setLatestLottery({
+  ...lotteryData,
+  lottery_date: lotteryData.lottery_draws.draw_date,
+  lottery_numbers: [],
+} as LotteryResult)
 
-        const lotteryDate = new Date(lotteryData.lottery_date)
+        const lotteryDate = new Date(lotteryData.lottery_draws.draw_date)
         if (!isValid(lotteryDate)) {
-          throw new Error(`วันที่ไม่ถูกต้อง: ${lotteryData.lottery_date}`)
+          throw new Error(`วันที่ไม่ถูกต้อง: ${lotteryData.lottery_draws.draw_date}`)
         }
 
         // ดึงข้อมูลการซื้อตั๋ว
@@ -420,7 +423,7 @@ export default function TicketResultsPage() {
               price,
               total,
               created_at,
-              ticket_sub_types (type_name)
+              ticket_sub_types (type_name, id)
             )
           `)
           .eq("user_id", user.id)
@@ -437,6 +440,12 @@ export default function TicketResultsPage() {
           deleted_at: purchase.deleted_at ? convertUtcToThailandTime(purchase.deleted_at).toISOString() : null,
           items: purchase.ticket_purchase_items.map((item: any) => ({
             ...item,
+            id: item.id,
+            ticket_sub_type_id: item.ticket_sub_type_id,
+            ticket_number: item.ticket_number,
+            amount: item.amount,
+            price: item.price,
+            total: item.total,
             created_at: convertUtcToThailandTime(item.created_at).toISOString(),
             sub_type_name: item.ticket_sub_types?.type_name || "Unknown",
           })),
@@ -447,16 +456,31 @@ export default function TicketResultsPage() {
         // สร้าง mapping ของกลุ่มรางวัลและเลขที่ออก
         const groupMapping: { [key: string]: { group: string; numbers: string[] } } = {}
 
+        // ดึงข้อมูล lottery_numbers จาก lottery_results แทน
+        const { data: lotteryNumbersData, error: lotteryNumbersError } = await supabase
+          .from("lottery_results")
+          .select(`
+            id,
+            number,
+            sub_type_id,
+            ticket_sub_types (type_name)
+          `)
+          .eq("draw_id", lotteryData.lottery_draws.id)
+
+        if (lotteryNumbersError) {
+          throw new Error(`ไม่สามารถดึงข้อมูลหมายเลขสลาก: ${lotteryNumbersError.message}`)
+        }
+
         // จัดกลุ่มเลขรางวัลตามประเภท
-        lotteryData.lottery_numbers.forEach((lotteryNumber: LotteryNumber) => {
-          const groupName = lotteryNumber.group_name
-          if (!groupMapping[groupName]) {
-            groupMapping[groupName] = {
-              group: groupName,
+        lotteryNumbersData.forEach((lotteryNumber: any) => {
+          const subTypeName = lotteryNumber.ticket_sub_types?.type_name
+          if (!groupMapping[subTypeName]) {
+            groupMapping[subTypeName] = {
+              group: subTypeName,
               numbers: [],
             }
           }
-          groupMapping[groupName].numbers.push(lotteryNumber.lottery_number)
+          groupMapping[subTypeName].numbers.push(lotteryNumber.number)
         })
 
         const newMatches: Match[] = []
@@ -514,7 +538,7 @@ export default function TicketResultsPage() {
         // ตรวจสอบสถานะการบันทึกและการจ่ายเงิน
         for (const ticketSetNumber in grouped) {
           try {
-            const lotteryDate = format(new Date(lotteryData.lottery_date), "yyyy-MM-dd")
+            const lotteryDate = format(new Date(lotteryData.lottery_draws.draw_date), "yyyy-MM-dd")
             const exists = await checkIfTicketSetExists(ticketSetNumber, lotteryDate)
             if (exists) {
               grouped[ticketSetNumber].isSaved = true

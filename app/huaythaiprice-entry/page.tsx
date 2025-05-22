@@ -28,6 +28,7 @@ import { debounce } from "lodash"
 import { format, addMonths, isBefore, isAfter, set } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { th } from "date-fns/locale"
+import { handlePrint } from "@/components/huaythai-print/ticket-print"
 
 // Define interfaces for the parsed JSON data
 interface NumberSetsState {
@@ -720,6 +721,30 @@ export default function PriceEntryPage() {
 
       toast.success(`ซื้อตั๋ว ${total.toFixed(0)} บาทสำเร็จ!`)
 
+      // Create purchase object for printing
+      const purchaseForPrint = {
+        id: purchaseIds[Object.keys(purchaseIds)[0]], // Use the first purchase ID
+        ticket_set_name: ticketName || null,
+        ticket_set_number: ticketNumber,
+        purchase_date: purchaseDate,
+        items: ticketPurchaseItems.map(item => ({
+          ...item,
+          sub_type_name: ticketSubTypes.find(type => type.id === item.ticket_sub_type_id)?.type_name || "ไม่ทราบประเภท"
+        }))
+      };
+      // Call print function
+      await handlePrint({ 
+        purchase: {
+          ...purchaseForPrint,
+          items: purchaseForPrint.items.map(item => ({
+            id: item.ticket_purchase_id, // Add id field
+            ...item
+          }))
+        }, 
+        ticketSubTypes, 
+        user 
+      });
+
       const params = new URLSearchParams()
       params.set(
         "confirmedTickets",
@@ -746,7 +771,7 @@ export default function PriceEntryPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user, tickets, amounts, balance, ticketName, ticketNumber, total, supabase, router, selectedNumbers, selectedType, useReverseNumbers, activeFilter])
+  }, [user, tickets, amounts, balance, ticketName, ticketNumber, total, supabase, router, selectedNumbers, selectedType, useReverseNumbers, activeFilter, ticketSubTypes])
 
   const handleBack = useCallback(() => {
     // Create URL parameters with all necessary data
