@@ -4,13 +4,14 @@ import type { CheerioAPI } from "cheerio"
 import type { LottoDetailResponse, ApiErrorResponse } from "@/types/lottery"
 import { parse, format } from "date-fns"
 import { th } from "date-fns/locale"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase/supabaseClient"
 
-// สร้าง Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ""
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Interface for lottery result data
+interface LotteryResultInsert {
+  draw_id: string
+  sub_type_id: string
+  number: string
+}
 
 // ข้อมูล mapping ระหว่าง API response กับ ticket_sub_types
 const SUB_TYPE_MAPPING = {
@@ -55,7 +56,7 @@ const generateSwappedThreeDigits = (number: string): string[] => {
   return results
 }
 
-const getLatestLotteryId = async () => {
+const getLatestLotteryId = async (): Promise<string> => {
   try {
     const response = await fetch(`https://news.sanook.com/lotto/archive/page/1`)
     if (!response.ok) {
@@ -82,33 +83,28 @@ const getLatestLotteryId = async () => {
   }
 }
 
+// ตรวจสอบการเชื่อมต่อ Supabase
+const checkSupabaseConnection = async () => {
+  try {
+    const { error } = await supabase.from("lottery_draws").select("id", { count: "exact", head: true })
+
+    if (error) {
+      throw new Error(`Supabase connection failed: ${error.message}`)
+    }
+    return true
+  } catch (error) {
+    console.error("Supabase connection check failed:", error)
+    throw error
+  }
+}
+
 // บันทึกข้อมูลลงใน Supabase
 async function saveLotteryResultsToSupabase(date: string, endpoint: string, responseData: any) {
   try {
     console.log("Saving lottery results to Supabase...")
 
-    // ตรวจสอบว่าตาราง lottery_draws และ lottery_results มีอยู่หรือไม่
-    try {
-      const { error: tableCheckError } = await supabase
-        .from("lottery_draws")
-        .select("id", { count: "exact", head: true })
-
-      if (tableCheckError) {
-        console.error("Table check error:", tableCheckError)
-        return {
-          success: false,
-          error: "Tables do not exist. Please run setup first.",
-          details: tableCheckError.message,
-        }
-      }
-    } catch (tableError) {
-      console.error("Table check error:", tableError)
-      return {
-        success: false,
-        error: "Failed to check tables",
-        details: tableError instanceof Error ? tableError.message : String(tableError),
-      }
-    }
+    // ตรวจสอบการเชื่อมต่อ Supabase
+    await checkSupabaseConnection()
 
     // ตรวจสอบว่ามีข้อมูลงวดนี้อยู่แล้วหรือไม่
     const { data: existingDraw, error: checkError } = await supabase
@@ -119,158 +115,115 @@ async function saveLotteryResultsToSupabase(date: string, endpoint: string, resp
 
     if (checkError) {
       console.error("Error checking existing draw:", checkError)
-      return {
-        success: false,
-        error: "Failed to check existing draw",
-        details: checkError.message,
-      }
+      throw new Error(`Failed to check existing draw: ${checkError.message}`)
     }
 
     if (existingDraw) {
       console.log("Draw already exists, using existing draw ID:", existingDraw.id)
-      // ไม่ต้องลบ/insert ซ้ำ
-      return { success: true, drawId: existingDraw.id }
-    } else {
-      // 1. บันทึกข้อมูลงวด
-      const { data: drawData, error: drawError } = await supabase
-        .from("lottery_draws")
-        .insert({ draw_date: date, endpoint })
-        .select()
-        .single()
+      return { success: true, drawId: existingDraw.id, message: "Draw already exists" }
+    }
 
-      if (drawError) {
-        console.error("Error inserting draw:", drawError)
-        return {
-          success: false,
-          error: "Failed to insert draw",
-          details: drawError.message,
+    // 1. บันทึกข้อมูลงวด
+    const { data: drawData, error: drawError } = await supabase
+      .from("lottery_draws")
+      .insert({ draw_date: date, endpoint })
+      .select()
+      .single()
+
+    if (drawError) {
+      console.error("Error inserting draw:", drawError)
+      throw new Error(`Failed to insert draw: ${drawError.message}`)
+    }
+
+    const drawId = drawData.id
+    console.log("Created new draw with ID:", drawId)
+
+    // 2. เตรียมข้อมูลผลรางวัลสำหรับบันทึก
+    const resultsToInsert: LotteryResultInsert[] = []
+
+    // ดึงข้อมูลจาก specialNumbers
+    if (responseData.specialNumbers) {
+      const specialMappings = [
+        { data: responseData.specialNumbers.lastThreeDigits?.numbers, subTypeId: SUB_TYPE_MAPPING.lastThreeDigits },
+        {
+          data: responseData.specialNumbers.swappedThreeDigits?.numbers,
+          subTypeId: SUB_TYPE_MAPPING.swappedThreeDigits,
+        },
+        { data: responseData.specialNumbers.lastTwoDigits?.numbers, subTypeId: SUB_TYPE_MAPPING.lastTwoDigits },
+        {
+          data: responseData.specialNumbers.lastOneDigitPrizeFirst?.numbers,
+          subTypeId: SUB_TYPE_MAPPING.lastOneDigitPrizeFirst,
+        },
+        {
+          data: responseData.specialNumbers.lastOneDigitBackTwo?.numbers,
+          subTypeId: SUB_TYPE_MAPPING.lastOneDigitBackTwo,
+        },
+      ]
+
+      specialMappings.forEach(({ data, subTypeId }) => {
+        if (data && Array.isArray(data)) {
+          data.forEach((number: string | number) => {
+            resultsToInsert.push({
+              draw_id: drawId,
+              sub_type_id: subTypeId,
+              number: String(number),
+            })
+          })
         }
+      })
+    }
+
+    // ดึงข้อมูลจาก runningNumbers
+    if (responseData.runningNumbers && Array.isArray(responseData.runningNumbers)) {
+      const runningMappings = [
+        { id: "runningNumberFrontThree", subTypeId: SUB_TYPE_MAPPING.runningNumberFrontThree },
+        { id: "runningNumberBackThree", subTypeId: SUB_TYPE_MAPPING.runningNumberBackThree },
+        { id: "runningNumberBackTwo", subTypeId: SUB_TYPE_MAPPING.runningNumberBackTwo },
+      ]
+
+      responseData.runningNumbers.forEach((runningNumber: { id: string; number?: string[] }) => {
+        const mapping = runningMappings.find((m) => m.id === runningNumber.id)
+        if (mapping && runningNumber.number && Array.isArray(runningNumber.number)) {
+          runningNumber.number.forEach((number: string) => {
+            resultsToInsert.push({
+              draw_id: drawId,
+              sub_type_id: mapping.subTypeId,
+              number: String(number),
+            })
+          })
+        }
+      })
+    }
+
+    console.log(`Preparing to insert ${resultsToInsert.length} lottery results...`)
+
+    // บันทึกผลรางวัลทั้งหมด
+    if (resultsToInsert.length > 0) {
+      // แบ่งการบันทึกเป็นชุดๆ ละ 100 รายการ เพื่อป้องกันการเกิด error จากการบันทึกข้อมูลมากเกินไป
+      const chunkSize = 100
+      for (let i = 0; i < resultsToInsert.length; i += chunkSize) {
+        const chunk = resultsToInsert.slice(i, i + chunkSize)
+        const { error: resultsError } = await supabase.from("lottery_results").insert(chunk)
+
+        if (resultsError) {
+          console.error("Error inserting results chunk:", resultsError)
+          throw new Error(`Failed to insert results: ${resultsError.message}`)
+        }
+        console.log(`Inserted chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(resultsToInsert.length / chunkSize)}`)
       }
+    }
 
-      const drawId = drawData.id
-      console.log("Created new draw with ID:", drawId)
-
-      // 2. บันทึกผลรางวัลแต่ละประเภท
-      const resultsToInsert = []
-
-      // ดึงข้อมูลจาก specialNumbers
-      if (responseData.specialNumbers) {
-        // สามตัวบน
-        if (responseData.specialNumbers.lastThreeDigits?.numbers) {
-          for (const number of responseData.specialNumbers.lastThreeDigits.numbers) {
-            resultsToInsert.push({
-              draw_id: drawId,
-              sub_type_id: "4e9ab25a-57f4-4c80-af65-b3eef322a908", // สามตัวบน
-              number,
-            })
-          }
-        }
-
-        // สามตัวโต๊ด
-        if (responseData.specialNumbers.swappedThreeDigits?.numbers) {
-          for (const number of responseData.specialNumbers.swappedThreeDigits.numbers) {
-            resultsToInsert.push({
-              draw_id: drawId,
-              sub_type_id: "0638ce4b-cedb-41ff-ad18-b2c12a8b3a0c", // สามตัวโต๊ด
-              number,
-            })
-          }
-        }
-
-        // สองตัวบน
-        if (responseData.specialNumbers.lastTwoDigits?.numbers) {
-          for (const number of responseData.specialNumbers.lastTwoDigits.numbers) {
-            resultsToInsert.push({
-              draw_id: drawId,
-              sub_type_id: "d4a2746f-1cc6-4dba-a6f4-c852846df2c4", // สองตัวบน
-              number,
-            })
-          }
-        }
-
-        // วิ่งบน
-        if (responseData.specialNumbers.lastOneDigitPrizeFirst?.numbers) {
-          for (const number of responseData.specialNumbers.lastOneDigitPrizeFirst.numbers) {
-            resultsToInsert.push({
-              draw_id: drawId,
-              sub_type_id: "6b0540fd-cc70-457a-9457-7af8858ac9da", // วิ่งบน
-              number,
-            })
-          }
-        }
-
-        // วิ่งล่าง
-        if (responseData.specialNumbers.lastOneDigitBackTwo?.numbers) {
-          for (const number of responseData.specialNumbers.lastOneDigitBackTwo.numbers) {
-            resultsToInsert.push({
-              draw_id: drawId,
-              sub_type_id: "3374feb6-04b2-4990-85e5-b456ba9616e9", // วิ่งล่าง
-              number,
-            })
-          }
-        }
-      }
-
-      // ดึงข้อมูลจาก runningNumbers
-      if (responseData.runningNumbers) {
-        for (const runningNumber of responseData.runningNumbers) {
-          if (runningNumber.id === "runningNumberFrontThree" && runningNumber.number) {
-            for (const number of runningNumber.number) {
-              resultsToInsert.push({
-                draw_id: drawId,
-                sub_type_id: "8667f23d-d61d-41a7-8a30-6acd4d1b27cb", // สามตัวหน้า
-                number,
-              })
-            }
-          } else if (runningNumber.id === "runningNumberBackThree" && runningNumber.number) {
-            for (const number of runningNumber.number) {
-              resultsToInsert.push({
-                draw_id: drawId,
-                sub_type_id: "cbab55e1-4585-45d3-937e-f0fba24f52f9", // สามตัวหลัง
-                number,
-              })
-            }
-          } else if (runningNumber.id === "runningNumberBackTwo" && runningNumber.number) {
-            for (const number of runningNumber.number) {
-              resultsToInsert.push({
-                draw_id: drawId,
-                sub_type_id: "fca10de7-c4c4-451f-86d9-a3b78824c8f0", // สองตัวล่าง
-                number,
-              })
-            }
-          }
-        }
-      }
-
-      console.log(`Inserting ${resultsToInsert.length} lottery results...`)
-
-      // บันทึกผลรางวัลทั้งหมด
-      if (resultsToInsert.length > 0) {
-        // แบ่งการบันทึกเป็นชุดๆ ละ 100 รายการ เพื่อป้องกันการเกิด error จากการบันทึกข้อมูลมากเกินไป
-        const chunkSize = 100
-        for (let i = 0; i < resultsToInsert.length; i += chunkSize) {
-          const chunk = resultsToInsert.slice(i, i + chunkSize)
-          const { error: resultsError } = await supabase.from("lottery_results").insert(chunk)
-
-          if (resultsError) {
-            console.error("Error inserting results:", resultsError)
-            return {
-              success: false,
-              error: "Failed to insert results",
-              details: resultsError.message,
-            }
-          }
-        }
-      }
-
-      console.log("Successfully saved lottery results to Supabase")
-      return { success: true, drawId }
+    console.log("Successfully saved lottery results to Supabase")
+    return {
+      success: true,
+      drawId,
+      message: `Successfully saved ${resultsToInsert.length} lottery results`,
     }
   } catch (error) {
     console.error("Error saving to Supabase:", error)
     return {
       success: false,
-      error: "Unexpected error saving to Supabase",
+      error: "Failed to save to Supabase",
       details: error instanceof Error ? error.message : String(error),
     }
   }
@@ -278,15 +231,19 @@ async function saveLotteryResultsToSupabase(date: string, endpoint: string, resp
 
 export async function GET() {
   let response: LottoDetailResponse | ApiErrorResponse
+
   try {
     console.log("Fetching latest lottery results...")
 
-    // ตรวจสอบการเชื่อมต่อ Supabase
-    if (!supabaseUrl || !supabaseKey) {
-      console.error("Missing Supabase environment variables")
+    // ตรวจสอบการเชื่อมต่อ Supabase ก่อน
+    try {
+      await checkSupabaseConnection()
+    } catch (error) {
+      console.error("Supabase connection failed:", error)
       response = {
         status: "crash",
-        response: "Missing Supabase environment variables",
+        response: "Database connection failed",
+        details: error instanceof Error ? error.message : String(error),
       }
       return NextResponse.json(response, { status: 500 })
     }
@@ -334,10 +291,12 @@ export async function GET() {
       response = {
         status: "crash",
         response: "invalid date format",
+        details: `Could not parse date: ${rawDate}`,
       }
       return NextResponse.json(response, { status: 400 })
     }
 
+    // Scrape all lottery data
     const [
       prizeFirst,
       prizeFirstNear,
@@ -373,21 +332,17 @@ export async function GET() {
     ])
 
     console.log("Scraped data:", {
-      prizeFirst,
-      runningNumberFrontThree,
-      runningNumberBackThree,
-      runningNumberBackTwo,
+      prizeFirst: prizeFirst.length,
+      runningNumberFrontThree: runningNumberFrontThree.length,
+      runningNumberBackThree: runningNumberBackThree.length,
+      runningNumberBackTwo: runningNumberBackTwo.length,
     })
 
-    // Extract last three, two, and one digits from prizeFirst
+    // Extract special numbers from prizeFirst
     const lastThreeDigits = prizeFirst.map((num) => num.slice(-3))
     const lastTwoDigits = prizeFirst.map((num) => num.slice(-2))
     const lastOneDigitPrizeFirst = prizeFirst.map((num) => num.slice(-1))
-
-    // Extract last one digit from runningNumberBackTwo
     const lastOneDigitBackTwo = runningNumberBackTwo.map((num) => num.slice(-1))
-
-    // Generate swapped three-digit numbers
     const swappedThreeDigits = lastThreeDigits.flatMap((num) => generateSwappedThreeDigits(num))
 
     const responseData = {
@@ -497,18 +452,17 @@ export async function GET() {
       status: "success",
       response: responseData,
       dbSaved: saveResult.success,
-      dbDetails: saveResult.success ? undefined : saveResult.error,
+      dbDetails: saveResult.success ? saveResult.message : saveResult.error,
     }
 
     return NextResponse.json(response)
-  } catch (e) {
-    console.error("API error:", e)
+  } catch (error) {
+    console.error("API error:", error)
     response = {
       status: "crash",
       response: "api cannot fulfill your request at this time",
-      details: e instanceof Error ? e.message : String(e),
+      details: error instanceof Error ? error.message : String(error),
     }
     return NextResponse.json(response, { status: 500 })
   }
 }
-
