@@ -125,6 +125,10 @@ const data = {
           title: "การจ่ายรางวัล",
           url: "/huaythaigroup",
         },
+        {
+          title: "การจ่ายรางวัลย้อนหลัง",
+          url: "/winning-tickets",
+        },
       ],
     },
     {
