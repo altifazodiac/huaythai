@@ -1,12 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-
+@import url('https://fonts.googleapis.com/css2?family=Courgette&family=DM+Serif+Text:ital@0;1&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Niconne&family=Pattaya&family=Sriracha&display=swap');
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-kanit), var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -118,5 +118,64 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family:var(--font-kanit), sans-serif;
   }
+}
+@layer utilities {
+  .animate-fadein {
+    @apply opacity-100 translate-y-0;
+    animation: fadein 0.5s cubic-bezier(0.4,0,0.2,1) forwards;
+  }
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+@keyframes shootingStar {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(200%) translateY(200%) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+.shooting-star-bg {
+  position: relative;
+  overflow: hidden;  
+}
+
+.shooting-star-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;  
+  left: 0;  
+  width: 200px;  
+  height: 2px;  
+  background: linear-gradient(to right, transparent, rgba(173, 216, 230, 0.7), transparent);  
+  animation: shootingStar 6s linear infinite;  
+  animation-delay: 1s;  
+  z-index: 1;  
+}
+
+.modern-text-glow {
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.3), 0 0 10px rgba(173, 216, 230, 0.3);
+}
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  10% { transform: translateY(-10px); }
+  20% { transform: translateY(0); }
+  30% { transform: translateY(-6px); }
+  40% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+  60%, 100% { transform: translateY(0); }
+}
+
+.gentle-bounce {
+  animation: gentle-bounce 1.2s cubic-bezier(.45,1.6,.45,1) both;
 }

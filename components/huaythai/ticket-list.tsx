@@ -182,7 +182,7 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
       initial="hidden"
       animate="visible"
       variants={fadeInVariants}
-      className="bg-gray-50 h-full flex flex-col"
+      className="bg-gray-50 dark:bg-gray-900 h-full flex flex-col"
     >
       {/* Mobile action buttons */}
       <div className="flex justify-between items-center p-3 border-b bg-white md:hidden">
@@ -216,14 +216,14 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
       </div>
 
       {/* Desktop/Tablet action buttons - Top */}
-      <div className="hidden md:flex justify-between items-center p-3 border-b bg-white">
+      <div className="hidden md:flex justify-between items-center p-3 border-b bg-white dark:bg-gray-900">
         <div className="flex space-x-2">
           <Button
             variant="outline"
             size="sm"
             onClick={onDeleteAll}
             disabled={totalTickets === 0}
-            className="text-red-500 border-red-500 hover:bg-red-50 disabled:opacity-50"
+            className="text-red-500 border-red-500 hover:bg-red-50 dark:hover:bg-red-900 disabled:opacity-50"
           >
             ลบทั้งหมด [{totalTickets}]
           </Button>
@@ -232,7 +232,7 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
             size="sm"
             onClick={onDeleteLast}
             disabled={totalTickets === 0}
-            className="text-gray-500 border-gray-500 hover:bg-gray-50 disabled:opacity-50"
+            className="text-gray-500 border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
           >
             ลบล่าสุด [{totalTickets > 0 ? 1 : 0}]
           </Button>
@@ -241,7 +241,7 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
           onClick={onPriceEntry}
           disabled={totalTickets === 0}
           size="sm"
-          className="ml-auto bg-blue-600 hover:bg-blue-700 text-white md:hidden"
+          className="ml-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-800 dark:hover:bg-blue-900 text-white md:hidden"
         >
           ใส่ราคา
         </Button>
@@ -253,29 +253,29 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
             {activeTicketTypes.length > 0 ? (
               activeTicketTypes.map((typeName) => (
                 <motion.div key={typeName} variants={fadeInVariants}>
-                  <Card className={`bg-white shadow-sm w-full ${
-                    duplicateNumbers[typeName]?.length > 0 ? 'border-2 border-yellow-400' : ''
+                  <Card className={`bg-white dark:bg-gray-900 shadow-sm w-full ${
+                    duplicateNumbers[typeName]?.length > 0 ? 'border-2 border-yellow-400 dark:border-yellow-300' : ''
                   }`}>
                     <CardHeader
                       className={`p-2 cursor-pointer ${
-                        duplicateNumbers[typeName]?.length > 0 ? 'bg-yellow-50' : 'bg-blue-100'
+                        duplicateNumbers[typeName]?.length > 0 ? 'bg-yellow-50 dark:bg-yellow-900' : 'bg-blue-100 dark:bg-blue-900'
                       }`}
                       onClick={() => toggleTypeExpansion(typeName)}
                     >
                       <div className="flex justify-between items-center">
                         <div className="flex items-center">
-                          <h3 className="font-medium text-blue-800 text-sm">{typeName}</h3>
+                          <h3 className="font-medium text-blue-800 dark:text-blue-200 text-sm">{typeName}</h3>
                           {duplicateNumbers[typeName]?.length > 0 && (
-                            <AlertTriangle className="ml-2 w-4 h-4 text-yellow-500" />
+                            <AlertTriangle className="ml-2 w-4 h-4 text-yellow-500 dark:text-yellow-300" />
                           )}
-                          <span className="ml-2 text-xs text-blue-600">
+                          <span className="ml-2 text-xs text-blue-600 dark:text-blue-200">
                             {expandedTypes[typeName] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </span>
                         </div>
-                        <Badge variant="secondary" className={`${
+                        <Badge variant="secondary" className={`$${
                           duplicateNumbers[typeName]?.length > 0 
-                            ? 'bg-yellow-200 text-yellow-800' 
-                            : 'bg-blue-200 text-blue-800'
+                            ? 'bg-yellow-200 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' 
+                            : 'bg-blue-200 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                         } text-xs`}>
                           {groupedTickets[typeName]?.length || 0} รายการ
                         </Badge>
@@ -296,15 +296,15 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
                                 exit="exit"
                                 className={`group relative shadow-md hover:shadow-lg rounded-lg transition-all duration-300 ease-in-out flex-shrink-0 min-w-[50px] ${
                                   duplicateNumbers[typeName]?.includes(ticket.number)
-                                    ? 'bg-yellow-50 border-2 border-yellow-400'
-                                    : 'bg-white dark:bg-slate-800'
+                                    ? 'bg-yellow-50 dark:bg-yellow-900 border-2 border-yellow-400 dark:border-yellow-300'
+                                    : 'bg-white dark:bg-gray-800'
                                 }`}
                               >
                                 <div className="p-2.5 flex items-center">
                                   <span className={`text-sm font-medium ${
                                     duplicateNumbers[typeName]?.includes(ticket.number)
-                                      ? 'text-yellow-800'
-                                      : 'text-slate-700 dark:text-slate-200'
+                                      ? 'text-yellow-800 dark:text-yellow-200'
+                                      : 'text-gray-700 dark:text-gray-200'
                                   } break-all`}>
                                     {ticket.number}
                                   </span>
@@ -315,7 +315,7 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
                                   onClick={() => onDelete(ticket.id)}
                                   aria-label={`Delete ticket ${ticket.number}`}
                                   className="absolute -top-2 -right-2 
-                                    text-slate-400 dark:text-slate-500 
+                                    text-gray-400 dark:text-gray-500 
                                     hover:text-red-500 dark:hover:text-red-400 
                                     opacity-0 group-hover:opacity-100 focus:opacity-100 
                                     transition-all duration-200 
@@ -331,9 +331,7 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
                             ))}
                           </AnimatePresence>
                           {tickets.length === 0 && (
-                            <div className="w-full text-center text-slate-500 dark:text-slate-400 py-8">
-                              ไม่มีตั๋วในรายการ
-                            </div>
+                            <div className="w-full text-center text-gray-500 dark:text-gray-300 py-8 text-sm">ไม่มีรายการตั๋ว</div>
                           )}
                         </div>
                       </CardContent>
@@ -342,7 +340,7 @@ const TicketList = ({ tickets, onDelete, onDeleteAll, onDeleteLast, onPriceEntry
                 </motion.div>
               ))
             ) : (
-              <div className="text-center text-gray-500 py-8 text-sm">ไม่มีรายการตั๋ว</div>
+              <div className="text-center text-gray-500 dark:text-gray-300 py-8 text-sm">ไม่มีรายการตั๋ว</div>
             )}
           </div>
         </ScrollArea>
