@@ -21,11 +21,6 @@ import { Icon } from "@iconify/react";
  
 import { CardContent } from "@/components/ui/card";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 // Map country_origin to flag image file name
 const countryFlagImg = (country: string) => {
   // Normalize country name to file name (e.g. "ลาว" => "laos.jpg")
@@ -275,6 +270,14 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      // Optionally handle the error or show a message
+      return;
+    }
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
     (async () => {
       setIsLoading(true);
       const { data: typesData } = await supabase.from("lottery_types").select();
