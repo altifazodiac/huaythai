@@ -20,40 +20,10 @@ import {
 import { Icon } from "@iconify/react";
  
 import { CardContent } from "@/components/ui/card";
+import { countryFlagImg } from "@/lib/utils/flags";
 
 // Map country_origin to flag image file name
-const countryFlagImg = (country: string) => {
-  // Normalize country name to file name (e.g. "ลาว" => "laos.jpg")
-  const map: Record<string, string> = {
-    "ลาว": "Laos.jpg",
-    "เวียดนาม": "Vietnam.jpg",
-    "มาเลเซีย": "Malaysia.jpg",
-    "สิงคโปร์": "Singapore.jpg",
-    "เยอรมัน": "Germany.jpg",
-    "อังกฤษ": "England.jpg",
-    "ญี่ปุ่น": "Japan.jpg",
-    "เกาหลีใต้": "Korea.jpg",
-    "อินเดีย": "India.jpg",
-    "ไทย": "Thai.jpg",
-    "สหรัฐอเมริกา": "USA.jpg",
-    "ฮ่องกง": "HongKong.jpg",
-    "เยอรมนี": "Germany.jpg",
-    "ไต้หวัน": "Taiwan.jpg",
-    "สหราชอาณาจักร": "England.jpg",
-    "รัสเซีย": "Russia.jpg",
-    "สหรัฐอินเดีย": "India.jpg",
-    "อิตาลี": "Italy.jpg",
-    "สเปน": "Spain.jpg",
-    "คอสโทรีกา": "CostaRica.jpg",
-    "จีน": "China.jpg",
-    "อียิปต์": "Egypt.jpg",
-      
-    
-    
-  };
-  return map[country] || "Unknown.jpg";
-};
-
+ 
 const dayOfWeekTH = (days: string) => {
   if (!days) return "";
   const arr = days.split(",").map(d => d.trim());
@@ -397,7 +367,7 @@ export default function Page() {
                           
                           </div>
                           <img
-                            src={`/flags/${countryFlagImg(sub.country_origin)}`}
+                            src={countryFlagImg(sub.country_origin)}
                             alt={sub.country_origin}
                             className="w-full h-20 object-cover mb-1  "
                             loading="lazy"
