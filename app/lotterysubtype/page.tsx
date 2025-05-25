@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,12 +48,6 @@ import {
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { toast } from "sonner";
 
-// กำหนด ENV ตามโปรเจคจริง
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 interface LotteryType {
   lottery_type_id: number;
   type_name: string;
@@ -93,6 +87,20 @@ interface AnimalNumber {
 }
 
 export default function LotterySubTypePage() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (typeof window === "undefined") {
+      // On server, don't create client
+      return <div>Supabase config missing</div>;
+    }
+    throw new Error("Supabase config missing");
+  }
+  const supabase = React.useMemo(() =>
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ), []
+  );
+
   const [lotteryTypes, setLotteryTypes] = useState<LotteryType[]>([]);
   const [subTypes, setSubTypes] = useState<LotterySubType[]>([]);
   const [form, setForm] = useState<Partial<LotterySubType>>({});
@@ -514,7 +522,7 @@ export default function LotterySubTypePage() {
                         {expandedRow === item.lottery_sub_type_id && (
                           <tr>
                             <td colSpan={7} className="bg-zinc-50 dark:bg-zinc-800 p-4">
-                              <DrawingScheduleCollapse lottery_sub_type_id={item.lottery_sub_type_id} />
+                              <DrawingScheduleCollapse lottery_sub_type_id={item.lottery_sub_type_id} supabase={supabase} />
                             </td>
                           </tr>
                         )}
@@ -747,7 +755,7 @@ export default function LotterySubTypePage() {
 }
 
 // --- DrawingScheduleCollapse ---
-function DrawingScheduleCollapse({ lottery_sub_type_id }: { lottery_sub_type_id: number }) {
+function DrawingScheduleCollapse({ lottery_sub_type_id, supabase }: { lottery_sub_type_id: number; supabase: SupabaseClient<any, string, any> }) {
   const [schedules, setSchedules] = useState<DrawingSchedule[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -758,12 +766,12 @@ function DrawingScheduleCollapse({ lottery_sub_type_id }: { lottery_sub_type_id:
       .from("drawing_schedules")
       .select("*")
       .eq("lottery_sub_type_id", lottery_sub_type_id)
-      .then(({ data }) => {
-        if (!ignore) setSchedules(data || []);
+      .then((res) => {
+        if (!ignore) setSchedules((res.data as DrawingSchedule[]) || []);
         setLoading(false);
       });
     return () => { ignore = true; };
-  }, [lottery_sub_type_id]);
+  }, [lottery_sub_type_id, supabase]);
 
   if (loading) return <div className="py-4 text-center">กำลังโหลด...</div>;
   if (!schedules.length) return <div className="py-4 text-center text-muted-foreground">ไม่มีตารางเวลา</div>;
