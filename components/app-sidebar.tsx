@@ -63,9 +63,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
     teams: [
       {
-        name: "Acme Inc",
+        name: "หวยออนไลน์",
         logo: GalleryVerticalEnd,
-        plan: "Enterprise",
+        plan: "HuayOnline",
       },
       {
         name: "Acme Corp.",
