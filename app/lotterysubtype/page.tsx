@@ -86,6 +86,16 @@ interface AnimalNumber {
   updated_at?: string;
 }
 
+interface LotterySubNumber {
+  id: number;
+  lottery_sub_type_id: number;
+  digit_number: number;
+  type_number: string;
+  price_paid: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export default function LotterySubTypePage() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     if (typeof window === "undefined") {
@@ -121,6 +131,12 @@ export default function LotterySubTypePage() {
   const [sortKey, setSortKey] = useState<keyof LotterySubType | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [payoutDrawerOpen, setPayoutDrawerOpen] = useState(false);
+  const [payouts, setPayouts] = useState<LotterySubNumber[]>([]);
+  const [payoutForm, setPayoutForm] = useState<Partial<LotterySubNumber>>({});
+  const [editPayoutId, setEditPayoutId] = useState<number | null>(null);
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [payoutSubTypeId, setPayoutSubTypeId] = useState<number | null>(null);
 
   // โหลด lottery_types สำหรับ select
   useEffect(() => {
@@ -317,6 +333,76 @@ export default function LotterySubTypePage() {
       return 0;
     });
 
+  // --- LotterySubNumber CRUD ---
+  const fetchPayouts = async (lottery_sub_type_id: number) => {
+    setPayoutLoading(true);
+    const { data } = await supabase
+      .from("lottery_sub_number")
+      .select("*")
+      .eq("lottery_sub_type_id", lottery_sub_type_id)
+      .order("digit_number", { ascending: false })
+      .order("type_number", { ascending: true });
+    setPayouts(data || []);
+    setPayoutLoading(false);
+  };
+
+  const openPayoutDrawer = async (lottery_sub_type_id: number) => {
+    setPayoutSubTypeId(lottery_sub_type_id);
+    setPayoutDrawerOpen(true);
+    setPayoutForm({});
+    setEditPayoutId(null);
+    await fetchPayouts(lottery_sub_type_id);
+  };
+
+  const handlePayoutChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setPayoutForm({ ...payoutForm, [e.target.name]: e.target.value });
+  };
+
+  const handlePayoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payoutSubTypeId) return;
+    setPayoutLoading(true);
+    const formData = {
+      ...payoutForm,
+      lottery_sub_type_id: payoutSubTypeId,
+      digit_number: Number(payoutForm.digit_number),
+      price_paid: Number(payoutForm.price_paid),
+    };
+    if (!formData.digit_number || !formData.type_number || !formData.price_paid) {
+      toast.error("กรุณากรอกข้อมูลให้ครบถ้วน");
+      setPayoutLoading(false);
+      return;
+    }
+    if (editPayoutId) {
+      await supabase.from("lottery_sub_number").update(formData).eq("id", editPayoutId);
+      toast.success("แก้ไขอัตราจ่ายสำเร็จ");
+    } else {
+      const { error } = await supabase.from("lottery_sub_number").insert([formData]);
+      if (error) {
+        toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึก");
+        setPayoutLoading(false);
+        return;
+      }
+      toast.success("บันทึกอัตราจ่ายสำเร็จ");
+    }
+    setPayoutForm({});
+    setEditPayoutId(null);
+    await fetchPayouts(payoutSubTypeId);
+  };
+
+  const handleEditPayout = (payout: LotterySubNumber) => {
+    setPayoutForm(payout);
+    setEditPayoutId(payout.id);
+  };
+
+  const handleDeletePayout = async (id: number) => {
+    if (!payoutSubTypeId) return;
+    if (!confirm("ยืนยันการลบอัตราจ่ายนี้?")) return;
+    await supabase.from("lottery_sub_number").delete().eq("id", id);
+    toast.success("ลบอัตราจ่ายสำเร็จ");
+    await fetchPayouts(payoutSubTypeId);
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -512,6 +598,7 @@ export default function LotterySubTypePage() {
                                 ลบ
                               </Button>
                               <Button onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>ตารางเวลา</Button>
+                              <Button onClick={() => openPayoutDrawer(item.lottery_sub_type_id)} variant="secondary">ราคาจ่าย</Button>
                               {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name === "หวยลาว" && (
                                 <Button onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>เลขสัตว์</Button>
                               )}
@@ -745,6 +832,110 @@ export default function LotterySubTypePage() {
                     </TableBody>
                   </Table>
                 </div>
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
+       
+        <Drawer open={payoutDrawerOpen} onOpenChange={setPayoutDrawerOpen}>
+          <DrawerContent className="fixed right-0 top-0 h-full w-full max-w-lg bg-white dark:bg-zinc-900 shadow-2xl z-50 flex flex-col p-0 border-l border-zinc-200 dark:border-zinc-800">
+            <div className="flex items-center justify-between px-8 py-6 border-b bg-zinc-50 dark:bg-zinc-900">
+              <DrawerTitle className="text-xl font-bold text-blue-700">จัดการอัตราจ่าย (Payout)</DrawerTitle>
+              <Button variant="ghost" size="icon" onClick={() => { setPayoutDrawerOpen(false); setPayoutForm({}); setEditPayoutId(null); }} aria-label="ปิด">
+                <span aria-hidden>X</span>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <form onSubmit={handlePayoutSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">จำนวนหลัก
+                      <span className="ml-1 text-xs text-muted-foreground">(2, 3{payoutSubTypeId && [3,13,15,16,17,18,19,20,21,22,23,25].includes(payoutSubTypeId) ? ', 4' : ''})</span>
+                    </label>
+                    <select
+                      name="digit_number"
+                      className="w-full border rounded px-2 py-2 mt-1"
+                      value={payoutForm.digit_number || ''}
+                      onChange={handlePayoutChange}
+                      required
+                    >
+                      <option value="">เลือกจำนวนหลัก</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      {payoutSubTypeId && [3,13,15,16,17,18,19,20,21,22,23,25].includes(payoutSubTypeId) && (
+                        <option value="4">4</option>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">ประเภท</label>
+                    <Input
+                      name="type_number"
+                      placeholder="เช่น บน, ล่าง, โต๊ด"
+                      value={payoutForm.type_number || ""}
+                      onChange={handlePayoutChange}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">ราคาจ่าย</label>
+                    <Input
+                      name="price_paid"
+                      type="number"
+                      placeholder="เช่น 900"
+                      value={payoutForm.price_paid || ""}
+                      onChange={handlePayoutChange}
+                      required
+                      min={1}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-4 justify-end mt-2">
+                  <Button type="submit" disabled={payoutLoading} className="px-8 py-2 text-base">
+                    {editPayoutId ? "อัปเดต" : "เพิ่ม"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="px-8 py-2 text-base border-red-300 text-red-600 hover:bg-red-50"
+                    onClick={() => { setPayoutForm({}); setEditPayoutId(null); }}
+                  >
+                    ยกเลิก
+                  </Button>
+                </div>
+              </form>
+              <hr className="my-6 border-zinc-200 dark:border-zinc-700" />
+              <div className="mt-2">
+                <h4 className="font-semibold mb-4 text-lg text-blue-700">รายการอัตราจ่าย</h4>
+                {payoutLoading ? (
+                  <div className="py-4 text-center">กำลังโหลด...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>จำนวนหลัก</TableHead>
+                          <TableHead>ประเภท</TableHead>
+                          <TableHead>ราคาจ่าย</TableHead>
+                          <TableHead>จัดการ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payouts.map((payout) => (
+                          <TableRow key={payout.id} className={editPayoutId === payout.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}>
+                            <TableCell>{payout.digit_number}</TableCell>
+                            <TableCell>{payout.type_number}</TableCell>
+                            <TableCell>{payout.price_paid}</TableCell>
+                            <TableCell>
+                              <Button size="sm" variant="outline" onClick={() => handleEditPayout(payout)} className="mr-2">แก้ไข</Button>
+                              <Button size="sm" variant="destructive" onClick={() => handleDeletePayout(payout.id)}>ลบ</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </div>
             </div>
           </DrawerContent>

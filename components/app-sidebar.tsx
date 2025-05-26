@@ -124,7 +124,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         items: [
           {
             title: "ซื้อหวยไทย",
-            url: "/huaythai",
+            url: "/lottery-ticket",
           },
           {
             title: "รายการซื้อ",
