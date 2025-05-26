@@ -275,17 +275,16 @@ export default function LotteryTicketPage() {
     const now = new Date();
     const currentDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    // Calculate next 7 days
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentDate);
       date.setDate(date.getDate() + i);
       
-      // Check if this date matches the schedule
+      // Only allow today or future
+      if (date < currentDate) continue;
+
       if (schedule.frequency_unit === 'day') {
-        // Daily draw
         dates.push(date);
       } else if (schedule.frequency_unit === 'week') {
-        // Weekly draw
         const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
         if (schedule.day_of_week.includes(dayOfWeek)) {
           dates.push(date);
@@ -338,6 +337,17 @@ export default function LotteryTicketPage() {
   // Only fetch available draws if not provided by props
   useEffect(() => {
     if (initialState.draw) {
+      const drawDate = new Date(initialState.draw.date);
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      drawDate.setHours(0,0,0,0);
+      if (drawDate < today) {
+        toast.error("วันที่ออกรางวัลที่เลือกหมดอายุแล้ว กรุณาเลือกใหม่");
+        setAvailableDraws([]);
+        setSelectedDraw(null);
+        setSelectedDrawDate(undefined);
+        return;
+      }
       setAvailableDraws([normalizeDraw(initialState.draw)]);
       setSelectedDraw(normalizeDraw(initialState.draw));
       setSelectedDrawDate(normalizeDraw(initialState.draw).date);
@@ -387,12 +397,29 @@ export default function LotteryTicketPage() {
     try {
       setIsSubmitting(true);
 
+      const drawDate = selectedDraw.date;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      drawDate.setHours(0,0,0,0);
+
+      console.log("Submitting draw date:", drawDate, "Today:", today);
+
+      if (drawDate < today) {
+        toast.error("ไม่สามารถซื้อหวยย้อนหลังได้ กรุณาเลือกวันที่ออกรางวัลที่ถูกต้อง");
+        setConfirmDialogOpen(false);
+        setIsSubmitting(false);
+        return;
+      }
+
       // 1. Create lottery ticket
+      const localDrawDate = selectedDraw.date.getFullYear() + '-' +
+        String(selectedDraw.date.getMonth() + 1).padStart(2, '0') + '-' +
+        String(selectedDraw.date.getDate()).padStart(2, '0');
       const { data: ticket, error: ticketError } = await supabase
         .from('lottery_tickets')
         .insert({
           user_id: user.id,
-          draw_date: selectedDraw.date.toISOString().split('T')[0],
+          draw_date: localDrawDate,
           draw_time: selectedDraw.schedule.drawing_time,
           bill_number: billNumber,
           bill_name: billName,

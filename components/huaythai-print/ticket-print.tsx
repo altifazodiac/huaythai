@@ -13,6 +13,9 @@ interface TicketPurchaseItem {
   total: number;
   created_at: string;
   sub_type_name?: string;
+  multiplication_factor?: number;
+  type_number?: string;
+  price_paid?: number;
 }
 
 interface ConsolidatedTicketPurchase {
@@ -453,4 +456,73 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
     printWindow.close();
   }
 };
+
+export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bill_number?: string }): Promise<ConsolidatedTicketPurchase | null> {
+  let query = supabase
+    .from("lottery_tickets")
+    .select(`
+      id,
+      bill_number,
+      bill_name,
+      purchase_date,
+      deleted_at,
+      lottery_ticket_items (
+        id,
+        ticket_id,
+        lottery_sub_type_id,
+        lottery_sub_number_id,
+        numbers,
+        amount,
+        created_at,
+        updated_at,
+        lottery_sub_types (
+          sub_type_name,
+          multiplication_factor
+        ),
+        lottery_sub_number (
+          type_number,
+          price_paid
+        )
+      )
+    `)
+    .limit(1);
+  if (id) query = query.eq("id", id);
+  if (bill_number) query = query.eq("bill_number", bill_number);
+  const { data, error } = await query;
+  if (error) {
+    toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูลบิล: " + error.message);
+    return null;
+  }
+  if (!data || !data[0]) return null;
+  const ticket = data[0];
+  // Map items ให้ตรงกับ TicketPurchaseItem
+  const items: TicketPurchaseItem[] = (ticket.lottery_ticket_items || []).map((item: any) => ({
+    id: item.id,
+    ticket_sub_type_id: String(item.lottery_sub_type_id),
+    ticket_number: (item.numbers || []).join(","),
+    amount: typeof item.amount === 'number' ? item.amount : Number(item.amount),
+    price: typeof item.lottery_sub_number?.price_paid === 'number'
+      ? item.lottery_sub_number.price_paid
+      : Number(item.lottery_sub_number?.price_paid) || 0,
+    total: (typeof item.lottery_sub_number?.price_paid === 'number'
+      ? item.lottery_sub_number.price_paid
+      : Number(item.lottery_sub_number?.price_paid) || 0) *
+      (typeof item.amount === 'number' ? item.amount : Number(item.amount)),
+    created_at: item.created_at,
+    sub_type_name: item.lottery_sub_types?.sub_type_name,
+    multiplication_factor: item.lottery_sub_types?.multiplication_factor,
+    type_number: item.lottery_sub_number?.type_number,
+    price_paid: typeof item.lottery_sub_number?.price_paid === 'number'
+      ? item.lottery_sub_number.price_paid
+      : Number(item.lottery_sub_number?.price_paid) || 0,
+  }));
+  return {
+    id: ticket.id,
+    ticket_set_name: ticket.bill_name,
+    ticket_set_number: ticket.bill_number,
+    purchase_date: ticket.purchase_date,
+    deleted_at: ticket.deleted_at,
+    items,
+  };
+}
 

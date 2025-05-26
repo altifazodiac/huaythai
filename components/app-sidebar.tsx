@@ -122,10 +122,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: SquareTerminal,
         isActive: true,
         items: [
-          {
-            title: "ซื้อหวยไทย",
-            url: "/lottery-ticket",
-          },
+        
           {
             title: "รายการซื้อ",
             url: "/ticketpurchases",

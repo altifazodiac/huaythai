@@ -49,6 +49,36 @@ const fadeSlideIn = {
   exit: { opacity: 0, y: 20, transition: { duration: 0.3 } },
 };
 
+interface LotteryTicketItem {
+  id: string;
+  ticket_id: string;
+  lottery_sub_type_id: number;
+  lottery_sub_number_id: number;
+  numbers: string[];
+  amount: number;
+  created_at: string;
+  updated_at: string;
+  sub_type_name?: string;
+  multiplication_factor?: number;
+  type_number?: string;
+  price_paid?: number;
+}
+
+interface LotteryTicket {
+  id: string;
+  user_id: string;
+  bill_number: string;
+  bill_name: string | null;
+  purchase_date: string;
+  draw_date: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+  items: LotteryTicketItem[];
+}
+
 interface TicketPurchaseItem {
   id: string;
   ticket_sub_type_id: string;
@@ -58,6 +88,9 @@ interface TicketPurchaseItem {
   total: number;
   created_at: string;
   sub_type_name?: string;
+  multiplication_factor?: number;
+  type_number?: string;
+  price_paid?: number;
 }
 
 interface TicketPurchase {
@@ -110,7 +143,7 @@ const TicketPurchasesPage = (): React.ReactElement => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [purchases, setPurchases] = useState<ConsolidatedTicketPurchase[]>([]);
+  const [purchases, setPurchases] = useState<LotteryTicket[]>([]);
   const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([]);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [filters, setFilters] = useState<{
@@ -118,15 +151,15 @@ const TicketPurchasesPage = (): React.ReactElement => {
       start: Date | undefined;
       end: Date | undefined;
     };
-    ticketSetNumber: string;
-    ticketSetName: string;
+    billNumber: string;
+    billName: string;
   }>({
     dateRange: {
       start: undefined,
       end: undefined,
     },
-    ticketSetNumber: "",
-    ticketSetName: "",
+    billNumber: "",
+    billName: "",
   });
 
   // Add debounced filter state
@@ -284,11 +317,10 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
         const thirtyDaysAgoUtc = thirtyDaysAgo.toISOString();
 
         const { count, error } = await supabase
-          .from("ticket_purchases")
+          .from("lottery_tickets")
           .select("*", { count: "exact", head: true })
           .eq("user_id", user.id)
-          .not("deleted_at", "is", null)
-          .gte("deleted_at", thirtyDaysAgoUtc);
+          .is("deleted_at", null);
 
         if (error) throw error;
         setDeletedCount(count || 0);
@@ -308,16 +340,15 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
         const thirtyDaysAgoUtc = thirtyDaysAgo.toISOString();
 
         const { data, error } = await supabase
-          .from("ticket_purchases")
+          .from("lottery_tickets")
           .select("id")
           .eq("user_id", user.id)
-          .not("deleted_at", "is", null)
-          .lt("deleted_at", thirtyDaysAgoUtc);
+          .is("deleted_at", null);
 
         if (error) throw error;
         if (data?.length) {
           const ids = data.map((item) => item.id);
-          const { error: deleteError } = await supabase.from("ticket_purchases").delete().in("id", ids);
+          const { error: deleteError } = await supabase.from("lottery_tickets").delete().in("id", ids);
           if (deleteError) throw deleteError;
         }
       } catch (err: any) {
@@ -334,53 +365,56 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
       try {
         const from = pageIndex * ITEMS_PER_PAGE;
         const to = from + ITEMS_PER_PAGE - 1;
-
-        // Build the base query
         let query = supabase
-          .from("ticket_purchases")
-          .select(
-            `
+          .from("lottery_tickets")
+          .select(`
             id,
-            transaction_id,
             user_id,
-            ticket_set_name,
-            ticket_set_number,
-            created_at,
+            bill_number,
+            bill_name,
             purchase_date,
+            draw_date,
+            total_amount,
+            status,
+            created_at,
+            updated_at,
             deleted_at,
-            ticket_purchase_items (
+            lottery_ticket_items (
               id,
-              ticket_sub_type_id,
-              ticket_number,
+              ticket_id,
+              lottery_sub_type_id,
+              lottery_sub_number_id,
+              numbers,
               amount,
-              price,
-              total,
               created_at,
-              ticket_sub_types (type_name)
+              updated_at,
+              lottery_sub_types (
+                sub_type_name,
+                multiplication_factor
+              ),
+              lottery_sub_number (
+                type_number,
+                price_paid
+              )
             )
-          `,
-            { count: 'exact' }
-          )
+          `, { count: 'exact' })
           .eq("user_id", user.id)
-          .order("purchase_date", { ascending: false })
+          .order("draw_date", { ascending: false })
           .order("created_at", { ascending: false });
-
-        // Apply date range filter if both start and end dates are selected
+        // Apply date range filter
         if (debouncedFilters.dateRange.start && debouncedFilters.dateRange.end) {
           const startDate = format(debouncedFilters.dateRange.start, "yyyy-MM-dd");
           const endDate = format(debouncedFilters.dateRange.end, "yyyy-MM-dd");
-          query = query.gte("purchase_date", startDate).lte("purchase_date", endDate);
+          query = query.gte("draw_date", startDate).lte("draw_date", endDate);
         }
-
-        // Apply ticket set filters
-        if (debouncedFilters.ticketSetNumber) {
-          query = query.ilike("ticket_set_number", `%${debouncedFilters.ticketSetNumber}%`);
+        // Apply bill number/name filters
+        if (debouncedFilters.billNumber) {
+          query = query.ilike("bill_number", `%${debouncedFilters.billNumber}%`);
         }
-        
-        if (debouncedFilters.ticketSetName) {
-          query = query.ilike("ticket_set_name", `%${debouncedFilters.ticketSetName}%`);
+        if (debouncedFilters.billName) {
+          query = query.ilike("bill_name", `%${debouncedFilters.billName}%`);
         }
-
+        // Soft-delete logic
         if (showDeleted) {
           const thirtyDaysAgo = startOfDay(getThailandTime());
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - RETENTION_DAYS);
@@ -389,57 +423,32 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
         } else {
           query = query.is("deleted_at", null);
         }
-
-        // Apply pagination
+        // Pagination
         query = query.range(from, to);
-
+        console.log('Supabase query:', query);
         const { data, error, count } = await query;
-
         if (error) {
-          toast.error(`เกิดข้อผิดพลาด: ${error.message}. กรุณาลองใหม่`, { position: "top-center" });
+          console.error('Supabase error:', error);
+          toast.error(`เกิดข้อผิดพลาด: ${error.message || JSON.stringify(error)}`, { position: "top-center" });
           return;
         }
-
-        const formattedPurchases: TicketPurchase[] = (data || []).map((purchase) => ({
-          ...purchase,
-          created_at: convertUtcToThailandTime(purchase.created_at).toISOString(),
-          purchase_date: format(convertUtcToThailandTime(purchase.purchase_date), "yyyy-MM-dd"),
-          deleted_at: purchase.deleted_at ? convertUtcToThailandTime(purchase.deleted_at).toISOString() : null,
-          items: purchase.ticket_purchase_items.map((item: any) => ({
+        const formattedTickets: LotteryTicket[] = (data || []).map((ticket) => ({
+          ...ticket,
+          created_at: convertUtcToThailandTime(ticket.created_at).toISOString(),
+          purchase_date: format(convertUtcToThailandTime(ticket.purchase_date), "yyyy-MM-dd"),
+          draw_date: format(convertUtcToThailandTime(ticket.draw_date), "yyyy-MM-dd"),
+          deleted_at: ticket.deleted_at ? convertUtcToThailandTime(ticket.deleted_at).toISOString() : null,
+          items: (ticket.lottery_ticket_items || []).map((item: any) => ({
             ...item,
             created_at: convertUtcToThailandTime(item.created_at).toISOString(),
-            sub_type_name: item.ticket_sub_types?.type_name || "Unknown",
+            sub_type_name: item.lottery_sub_types?.sub_type_name || "Unknown",
+            multiplication_factor: item.lottery_sub_types?.multiplication_factor,
+            type_number: item.lottery_sub_number?.type_number,
+            price_paid: item.lottery_sub_number?.price_paid,
           })),
         }));
-
-        // Group purchases by ticket_set_number and ticket_set_name
-        const groupedPurchases = formattedPurchases.reduce((acc, purchase) => {
-          const key = `${purchase.ticket_set_number}-${purchase.ticket_set_name || "ไม่มีชื่อ"}`;
-          if (!acc[key]) {
-            acc[key] = {
-              id: purchase.id,
-              ticket_set_name: purchase.ticket_set_name,
-              ticket_set_number: purchase.ticket_set_number,
-              purchase_date: purchase.purchase_date,
-              deleted_at: purchase.deleted_at,
-              items: purchase.items,
-            };
-          } else {
-            acc[key].items = [...acc[key].items, ...purchase.items];
-            if (!purchase.deleted_at) {
-              acc[key].deleted_at = null;
-            }
-          }
-          return acc;
-        }, {} as Record<string, ConsolidatedTicketPurchase>);
-
-        const consolidatedPurchases = Object.values(groupedPurchases);
-
-        // Update hasMore based on total count
-        const totalPages = Math.ceil((count || 0) / ITEMS_PER_PAGE);
-        setHasMore(pageIndex < totalPages - 1);
-        
-        setPurchases((prev) => (pageIndex === 0 ? consolidatedPurchases : [...prev, ...consolidatedPurchases]));
+        setHasMore(pageIndex < Math.ceil((count || 0) / ITEMS_PER_PAGE) - 1);
+        setPurchases((prev) => (pageIndex === 0 ? formattedTickets : [...prev, ...formattedTickets]));
       } catch (err: any) {
         toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + (err.message || "ไม่สามารถดึงข้อมูลได้"), {
           position: "top-center",
@@ -492,9 +501,8 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     setIsLoading(true);
     try {
       const now = getThailandTime().toISOString();
-      const { error } = await supabase.from("ticket_purchases").update({ deleted_at: now }).eq("id", purchaseToDelete);
+      const { error } = await supabase.from("lottery_tickets").update({ deleted_at: now }).eq("id", purchaseToDelete);
       if (error) throw error;
-
       setPurchases((prev) => prev.filter((purchase) => purchase.id !== purchaseToDelete));
       setDeletedCount((prev) => prev + 1);
       toast.success("ลบรายการเรียบร้อย (เก็บไว้ 30 วัน)", { position: "top-center" });
@@ -513,9 +521,8 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
   const handleRestorePurchase = async (purchaseId: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.from("ticket_purchases").update({ deleted_at: null }).eq("id", purchaseId);
+      const { error } = await supabase.from("lottery_tickets").update({ deleted_at: null }).eq("id", purchaseId);
       if (error) throw error;
-
       setPurchases((prev) => prev.filter((purchase) => purchase.id !== purchaseId));
       setDeletedCount((prev) => Math.max(0, prev - 1));
       toast.success("คืนค่ารายการเรียบร้อย", { position: "top-center" });
@@ -552,25 +559,26 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
     return Math.max(0, differenceInDays(expiryDate, getThailandTime()));
   };
 
-  const groupedPurchaseItems = (items: TicketPurchaseItem[]): GroupedItems => {
+  const groupedPurchaseItems = (items: LotteryTicketItem[]): GroupedItems => {
     // Step 1: Group by sub_type_name
     const groupedByType = items.reduce((acc, item) => {
       const group = item.sub_type_name || "ไม่ทราบประเภท";
       if (!acc[group]) acc[group] = [];
       acc[group].push(item);
       return acc;
-    }, {} as Record<string, TicketPurchaseItem[]>);
+    }, {} as Record<string, LotteryTicketItem[]>);
 
     // Step 2: Within each group, group ticket_numbers by amount
     const finalGrouped = Object.entries(groupedByType).reduce((acc, [groupName, groupItems]) => {
       const groupedByAmount: GroupedPurchaseItem[] = [];
       groupItems.forEach(item => {
+        const ticketNumber = item.numbers.join(",");
         const existingGroup = groupedByAmount.find(g => g.amount === item.amount);
         if (existingGroup) {
-          existingGroup.ticket_numbers.push(item.ticket_number);
+          existingGroup.ticket_numbers.push(ticketNumber);
         } else {
           groupedByAmount.push({
-            ticket_numbers: [item.ticket_number],
+            ticket_numbers: [ticketNumber],
             amount: item.amount,
           });
         }
@@ -687,21 +695,21 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                 >
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="ticket-set-number" className="text-xs font-medium text-gray-700">เลขบิล</Label>
+                      <Label htmlFor="bill-number" className="text-xs font-medium text-gray-700">เลขบิล</Label>
                       <Input
-                        id="ticket-set-number"
-                        value={filters.ticketSetNumber}
-                        onChange={(e) => setFilters(prev => ({ ...prev, ticketSetNumber: e.target.value }))}
+                        id="bill-number"
+                        value={filters.billNumber}
+                        onChange={(e) => setFilters(prev => ({ ...prev, billNumber: e.target.value }))}
                         placeholder="ค้นหาเลขบิล"
                         className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="ticket-set-name" className="text-xs font-medium text-gray-700">ชื่อบิล</Label>
+                      <Label htmlFor="bill-name" className="text-xs font-medium text-gray-700">ชื่อบิล</Label>
                       <Input
-                        id="ticket-set-name"
-                        value={filters.ticketSetName}
-                        onChange={(e) => setFilters(prev => ({ ...prev, ticketSetName: e.target.value }))}
+                        id="bill-name"
+                        value={filters.billName}
+                        onChange={(e) => setFilters(prev => ({ ...prev, billName: e.target.value }))}
                         placeholder="ค้นหาชื่อบิล"
                         className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                       />
@@ -770,8 +778,8 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                             start: undefined,
                             end: undefined
                           },
-                          ticketSetNumber: "",
-                          ticketSetName: ""
+                          billNumber: "",
+                          billName: ""
                         });
                         setShowDeleted(false);
                         setPage(0);
@@ -861,7 +869,7 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                               >
                                 <div className="flex items-center gap-2">
                                   <h2 className={`text-xs font-semibold ${isDeleted ? "text-red-800" : "text-blue-800"}`}>
-                                    {purchase.ticket_set_name || "ไม่มีชื่อ"} ({purchase.ticket_set_number})
+                                    {purchase.bill_name || "ไม่มีชื่อ"} ({purchase.bill_number})
                                   </h2>
                                   {isDeleted && daysRemaining !== null && (
                                     <Badge variant="secondary" className="bg-red-200 text-red-800 flex items-center gap-1 text-xs">
@@ -942,7 +950,30 @@ const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<strin
                                               <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handlePrint({ purchase, ticketSubTypes, user })}
+                                                onClick={() => handlePrint({
+                                                  purchase: {
+                                                    id: purchase.id,
+                                                    ticket_set_name: purchase.bill_name,
+                                                    ticket_set_number: purchase.bill_number,
+                                                    purchase_date: purchase.purchase_date,
+                                                    deleted_at: purchase.deleted_at,
+                                                    items: purchase.items.map(item => ({
+                                                      id: item.id,
+                                                      ticket_sub_type_id: String(item.lottery_sub_type_id),
+                                                      ticket_number: item.numbers.join(","),
+                                                      amount: item.amount,
+                                                      price: typeof item.price_paid === 'number' ? item.price_paid : 0,
+                                                      total: typeof item.price_paid === 'number' ? item.price_paid * item.amount : item.amount,
+                                                      created_at: item.created_at,
+                                                      sub_type_name: item.sub_type_name,
+                                                      multiplication_factor: item.multiplication_factor,
+                                                      type_number: item.type_number,
+                                                      price_paid: item.price_paid,
+                                                    })),
+                                                  },
+                                                  ticketSubTypes,
+                                                  user,
+                                                })}
                                                 className="border-blue-500 text-blue-600 hover:bg-blue-50 text-xs px-2"
                                               >
                                                 <Printer className="w-3 h-3 mr-1" />
