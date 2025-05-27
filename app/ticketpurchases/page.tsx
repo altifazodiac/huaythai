@@ -1,35 +1,12 @@
-"use client"
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase/supabaseClient";
-import { toast } from "sonner";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
+"use client";
+import React, { useEffect, useState, useMemo } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, ChevronDown, ChevronUp, Trash2, RotateCcw, Clock, Loader2, Printer } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import debounce from "lodash/debounce";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { format, addDays, differenceInDays, startOfDay, isAfter, parseISO, addMonths, isBefore, set } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
-import { th } from "date-fns/locale";
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Textarea } from "@/components/ui/textarea";
+import { motion, AnimatePresence } from "framer-motion";
+import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,1038 +16,470 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import { handlePrint } from "@/components/huaythai-print/ticket-print";
+import { DirectionProvider } from "@radix-ui/react-direction";
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+import { useRouter } from "next/navigation";
+import { PrinterIcon } from "lucide-react";
+import {
+  handlePrint,
+  fetchTicketPurchase,
+} from "@/components/huaythai-print/ticket-print";
 
-// Animation variants
-const fadeSlideIn = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
-  exit: { opacity: 0, y: 20, transition: { duration: 0.3 } },
-};
+import { toast } from "sonner";
+
+interface LotterySubType {
+  lottery_sub_type_id: number;
+  sub_type_name: string;
+}
+
+interface LotterySubNumber {
+  id: number;
+  lottery_sub_type_id: number;
+  digit_number: number;
+  type_number: string;
+  price_paid: number;
+}
+
+interface LotteryTicket {
+  id: number;
+  user_id: string;
+  draw_date: string;
+  draw_time: string;
+  bill_number: string;
+  bill_name: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  lottery_ticket_items: LotteryTicketItem[];
+}
 
 interface LotteryTicketItem {
-  id: string;
-  ticket_id: string;
+  id: number;
+  ticket_id: number;
   lottery_sub_type_id: number;
   lottery_sub_number_id: number;
   numbers: string[];
   amount: number;
-  created_at: string;
-  updated_at: string;
-  sub_type_name?: string;
-  multiplication_factor?: number;
-  type_number?: string;
-  price_paid?: number;
+  lottery_sub_types: LotterySubType;
+  lottery_sub_number: LotterySubNumber;
 }
 
-interface LotteryTicket {
-  id: string;
-  user_id: string;
-  bill_number: string;
-  bill_name: string | null;
-  purchase_date: string;
-  draw_date: string;
-  total_amount: number;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string | null;
-  items: LotteryTicketItem[];
-}
-
-interface TicketPurchaseItem {
-  id: string;
-  ticket_sub_type_id: string;
-  ticket_number: string;
-  amount: number;
-  price: number;
-  total: number;
-  created_at: string;
-  sub_type_name?: string;
-  multiplication_factor?: number;
-  type_number?: string;
-  price_paid?: number;
-}
-
-interface TicketPurchase {
-  id: string;
-  transaction_id: string;
-  user_id: string;
-  ticket_set_name: string | null;
-  ticket_set_number: string;
-  created_at: string;
-  purchase_date: string;
-  deleted_at?: string | null;
-  items: TicketPurchaseItem[];
-}
-
-interface ConsolidatedTicketPurchase {
-  id: string;
-  ticket_set_name: string | null;
-  ticket_set_number: string;
-  purchase_date: string;
-  deleted_at?: string | null;
-  items: TicketPurchaseItem[];
-}
-
-interface TicketSubType {
-  id: string;
-  type_name: string;
-  multiplication_factor: number;
-}
-
-interface MatchingTicket {
-  tod_number: string;
-  teng_number: string;
-  amount_display: string;
-}
-
-interface GroupedPurchaseItem {
-  ticket_numbers: string[];
+interface TicketDisplayItem {
+  subType: LotterySubType;
+  payout: LotterySubNumber;
+  numbers: string[];
   amount: number;
 }
 
-interface GroupedItems {
-  [key: string]: GroupedPurchaseItem[];
-}
+type GroupKey = string;
+type Grouped = {
+  digit_number: number;
+  numbers: string[];
+  typeLabels: string[];
+  amounts: Record<string, number>;
+  typeOrder: string[];
+};
 
-const ITEMS_PER_PAGE = 10;
-const RETENTION_DAYS = 30;
-const THAILAND_TZ = "Asia/Bangkok";
-
-const TicketPurchasesPage = (): React.ReactElement => {
+export default function LotteryPurchasePage() {
   const router = useRouter();
+  const [supabase] = useState(() =>
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  );
+  
+  const [tickets, setTickets] = useState<LotteryTicket[]>([]);
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [purchases, setPurchases] = useState<LotteryTicket[]>([]);
-  const [ticketSubTypes, setTicketSubTypes] = useState<TicketSubType[]>([]);
-  const [showFilters, setShowFilters] = useState<boolean>(false);
-  const [filters, setFilters] = useState<{
-    dateRange: {
-      start: Date | undefined;
-      end: Date | undefined;
-    };
-    billNumber: string;
-    billName: string;
-  }>({
-    dateRange: {
-      start: undefined,
-      end: undefined,
-    },
-    billNumber: "",
-    billName: "",
-  });
 
-  // Add debounced filter state
-  const [debouncedFilters, setDebouncedFilters] = useState(filters);
-
-  // Debounce filter updates
+  // Fetch user data
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedFilters(filters);
-    }, 500); // 500ms delay
-
-    return () => clearTimeout(timer);
-  }, [filters]);
-
-  const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [showDeleted, setShowDeleted] = useState<boolean>(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
-  const [purchaseToDelete, setPurchaseToDelete] = useState<string | null>(null);
-  const [deletedCount, setDeletedCount] = useState<number>(0);
-  const [hasWarnedFutureDate, setHasWarnedFutureDate] = useState<boolean>(false);
-  const [formattedDrawDate, setFormattedDrawDate] = useState<string>("")
-  const getThailandTime = () => {
-    const now = new Date();
-    return toZonedTime(now, THAILAND_TZ);
-  };
-
-  const convertUtcToThailandTime = (utcDateString: string) => {
-    const utcDate = parseISO(utcDateString);
-    return toZonedTime(utcDate, THAILAND_TZ);
-  };
-const getNextDrawDate = async (supabase: any, thailandTime: Date): Promise<string> => {
-  const day = thailandTime.getDate()
-  const hours = thailandTime.getHours()
-  const minutes = thailandTime.getMinutes()
-
-  let drawDate: Date
-
-  // Set cutoff times
-  const day1Cutoff = set(thailandTime, { date: 1, hours: 15, minutes: 0, seconds: 0, milliseconds: 0 })
-  const day16Cutoff = set(thailandTime, { date: 16, hours: 15, minutes: 0, seconds: 0, milliseconds: 0 })
-  const day1Evening = set(thailandTime, { date: 1, hours: 17, minutes: 0, seconds: 0, milliseconds: 0 })
-  const day16Evening = set(thailandTime, { date: 16, hours: 17, minutes: 0, seconds: 0, milliseconds: 0 })
-
-  // Calculate the target draw date based on purchase time
-  if (
-    (isAfter(thailandTime, day1Evening) && isBefore(thailandTime, day16Cutoff)) ||
-    (day === 1 && hours >= 17) ||
-    (day === 16 && hours < 15)
-  ) {
-    // Purchase is for the 16th of the current month
-    drawDate = set(thailandTime, { date: 16 })
-  } else if (
-    (isAfter(thailandTime, day16Evening) && isBefore(thailandTime, addMonths(day1Cutoff, 1))) ||
-    (day === 16 && hours >= 17) ||
-    (day > 16) ||
-    (day === 1 && hours < 15)
-  ) {
-    // Purchase is for the 1st of the next month
-    drawDate = set(addMonths(thailandTime, 1), { date: 1 })
-  } else {
-    // Default case (e.g., exactly at cutoff times), set to next draw
-    drawDate = set(thailandTime, { date: 16 })
-    if (isAfter(thailandTime, day16Cutoff)) {
-      drawDate = set(addMonths(thailandTime, 1), { date: 1 })
-    }
-  }
-
-  const formattedDrawDate = format(drawDate, "yyyy-MM-dd")
-
-  // Query the lottery_draw_dates table for the next draw date
-  const { data: drawDates, error: drawError } = await supabase
-    .from("lottery_draw_dates")
-    .select("draw_date")
-    .gte("draw_date", format(thailandTime, "yyyy-MM-dd"))
-    .order("draw_date", { ascending: true })
-    .limit(1)
-    .single()
-
-  if (drawError && drawError.code !== "PGRST116") {
-    throw new Error(`Error fetching draw date: ${drawError.message}`)
-  }
-
-  if (drawDates) {
-    return drawDates.draw_date
-  }
-
-  // If no draw date is found, insert the calculated draw date
-  const { error: insertError } = await supabase
-    .from("lottery_draw_dates")
-    .insert({ draw_date: formattedDrawDate })
-
-  if (insertError) {
-    throw new Error(`Error inserting draw date: ${insertError.message}`)
-  }
-
-  return formattedDrawDate
-}
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setIsLoading(true);
-      try {
-        const [
-          { data: { user } },
-          { data: ticketData, error: ticketError },
-        ] = await Promise.all([
-          supabase.auth.getUser(),
-          supabase.from("ticket_sub_types").select("*").order("type_name", { ascending: true }),
-        ]);
-
-        if (!user) {
-          router.push("/login");
-          return;
-        }
-        if (ticketError) throw ticketError;
-
+    const fetchUserData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
         setUser(user);
-        setTicketSubTypes(ticketData || []);
-        const today = startOfDay(getThailandTime());
-        setSelectedDate(today);
-        setFilters((prev) => ({ ...prev, dateRange: { start: today, end: today } }));
-      } catch (err: any) {
-        toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message);
-      } finally {
-        setIsLoading(false);
+      } else {
+        router.push("/signup");
       }
     };
-    fetchInitialData();
-  }, [router]);
-// Get purchase date and draw date in Thailand timezone
-  const thailandTime = getThailandTime()
-  const purchaseDate = format(thailandTime, "yyyy-MM-dd", { locale: th })
+    fetchUserData();
+  }, [router, supabase]);
 
-  // Fetch draw date for display
+  // Fetch lottery tickets
   useEffect(() => {
-    const fetchDrawDate = async () => {
-      try {
-        const drawDate = await getNextDrawDate(supabase, thailandTime)
-        const formatted = format(new Date(drawDate), "วันที่ d MMMM yyyy", { locale: th })
-        setFormattedDrawDate(formatted)
-      } catch (err: any) {
-        toast.error("ไม่สามารถโหลดวันที่หวยออกได้: " + err.message)
-      }
-    }
-    fetchDrawDate()
-  }, [supabase])
-  useEffect(() => {
-    const fetchDeletedCount = async () => {
+    const fetchTickets = async () => {
       if (!user) return;
+      
       try {
-        const thirtyDaysAgo = startOfDay(getThailandTime());
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - RETENTION_DAYS);
-        const thirtyDaysAgoUtc = thirtyDaysAgo.toISOString();
-
-        const { count, error } = await supabase
-          .from("lottery_tickets")
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .is("deleted_at", null);
-
-        if (error) throw error;
-        setDeletedCount(count || 0);
-      } catch (err: any) {
-        console.error("Error fetching deleted count:", err);
-      }
-    };
-    if (user) fetchDeletedCount();
-  }, [user, showDeleted]);
-
-  useEffect(() => {
-    const cleanupExpiredPurchases = async () => {
-      if (!user) return;
-      try {
-        const thirtyDaysAgo = startOfDay(getThailandTime());
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - RETENTION_DAYS);
-        const thirtyDaysAgoUtc = thirtyDaysAgo.toISOString();
-
+        setLoading(true);
         const { data, error } = await supabase
-          .from("lottery_tickets")
-          .select("id")
-          .eq("user_id", user.id)
-          .is("deleted_at", null);
-
-        if (error) throw error;
-        if (data?.length) {
-          const ids = data.map((item) => item.id);
-          const { error: deleteError } = await supabase.from("lottery_tickets").delete().in("id", ids);
-          if (deleteError) throw deleteError;
-        }
-      } catch (err: any) {
-        console.error("Error cleaning up expired purchases:", err);
-      }
-    };
-    if (user) cleanupExpiredPurchases();
-  }, [user]);
-
-  const fetchPurchases = useCallback(
-    async (pageIndex: number) => {
-      if (!user) return;
-      setIsLoading(true);
-      try {
-        const from = pageIndex * ITEMS_PER_PAGE;
-        const to = from + ITEMS_PER_PAGE - 1;
-        let query = supabase
-          .from("lottery_tickets")
+          .from('lottery_tickets')
           .select(`
-            id,
-            user_id,
-            bill_number,
-            bill_name,
-            purchase_date,
-            draw_date,
-            total_amount,
-            status,
-            created_at,
-            updated_at,
-            deleted_at,
+            *,
             lottery_ticket_items (
-              id,
-              ticket_id,
-              lottery_sub_type_id,
-              lottery_sub_number_id,
-              numbers,
-              amount,
-              created_at,
-              updated_at,
+              *,
               lottery_sub_types (
-                sub_type_name,
-                multiplication_factor
+                lottery_sub_type_id,
+                sub_type_name
               ),
               lottery_sub_number (
+                id,
+                lottery_sub_type_id,
+                digit_number,
                 type_number,
                 price_paid
               )
             )
-          `, { count: 'exact' })
-          .eq("user_id", user.id)
-          .order("draw_date", { ascending: false })
-          .order("created_at", { ascending: false });
-        // Apply date range filter
-        if (debouncedFilters.dateRange.start && debouncedFilters.dateRange.end) {
-          const startDate = format(debouncedFilters.dateRange.start, "yyyy-MM-dd");
-          const endDate = format(debouncedFilters.dateRange.end, "yyyy-MM-dd");
-          query = query.gte("draw_date", startDate).lte("draw_date", endDate);
-        }
-        // Apply bill number/name filters
-        if (debouncedFilters.billNumber) {
-          query = query.ilike("bill_number", `%${debouncedFilters.billNumber}%`);
-        }
-        if (debouncedFilters.billName) {
-          query = query.ilike("bill_name", `%${debouncedFilters.billName}%`);
-        }
-        // Soft-delete logic
-        if (showDeleted) {
-          const thirtyDaysAgo = startOfDay(getThailandTime());
-          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - RETENTION_DAYS);
-          const thirtyDaysAgoUtc = thirtyDaysAgo.toISOString();
-          query = query.not("deleted_at", "is", null).gte("deleted_at", thirtyDaysAgoUtc);
-        } else {
-          query = query.is("deleted_at", null);
-        }
-        // Pagination
-        query = query.range(from, to);
-        console.log('Supabase query:', query);
-        const { data, error, count } = await query;
-        if (error) {
-          console.error('Supabase error:', error);
-          toast.error(`เกิดข้อผิดพลาด: ${error.message || JSON.stringify(error)}`, { position: "top-center" });
-          return;
-        }
-        const formattedTickets: LotteryTicket[] = (data || []).map((ticket) => ({
-          ...ticket,
-          created_at: convertUtcToThailandTime(ticket.created_at).toISOString(),
-          purchase_date: format(convertUtcToThailandTime(ticket.purchase_date), "yyyy-MM-dd"),
-          draw_date: format(convertUtcToThailandTime(ticket.draw_date), "yyyy-MM-dd"),
-          deleted_at: ticket.deleted_at ? convertUtcToThailandTime(ticket.deleted_at).toISOString() : null,
-          items: (ticket.lottery_ticket_items || []).map((item: any) => ({
-            ...item,
-            created_at: convertUtcToThailandTime(item.created_at).toISOString(),
-            sub_type_name: item.lottery_sub_types?.sub_type_name || "Unknown",
-            multiplication_factor: item.lottery_sub_types?.multiplication_factor,
-            type_number: item.lottery_sub_number?.type_number,
-            price_paid: item.lottery_sub_number?.price_paid,
-          })),
-        }));
-        setHasMore(pageIndex < Math.ceil((count || 0) / ITEMS_PER_PAGE) - 1);
-        setPurchases((prev) => (pageIndex === 0 ? formattedTickets : [...prev, ...formattedTickets]));
-      } catch (err: any) {
-        toast.error("เกิดข้อผิดพลาดในการโหลดข้อมูล: " + (err.message || "ไม่สามารถดึงข้อมูลได้"), {
-          position: "top-center",
-        });
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setTickets(data || []);
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+        toast.error("ไม่สามารถโหลดข้อมูลตั๋วหวยได้");
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
-    },
-    [user, debouncedFilters, showDeleted]
-  );
+    };
 
-  const debouncedFetchPurchases = useCallback(debounce(fetchPurchases, 300), [fetchPurchases]);
+    fetchTickets();
+  }, [user, supabase]);
 
-  useEffect(() => {
-    setPage(0);
-    setPurchases([]);
-    debouncedFetchPurchases(0);
-    return () => debouncedFetchPurchases.cancel();
-  }, [user, debouncedFilters, showDeleted, debouncedFetchPurchases]);
-
-  const toggleExpand = (purchaseId: string) => {
-    setExpandedPurchases((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(purchaseId)) newSet.delete(purchaseId);
-      else newSet.add(purchaseId);
-      return newSet;
+  // Function to create groups from ticket items (same logic as in your original code)
+  const createGroups = (ticketItems: TicketDisplayItem[]) => {
+    const allTypeLabels: Record<number, string[]> = {};
+    
+    // Build type labels mapping
+    ticketItems.forEach(item => {
+      const label = item.payout.type_number || "-";
+      if (!allTypeLabels[item.payout.digit_number]) allTypeLabels[item.payout.digit_number] = [];
+      if (!allTypeLabels[item.payout.digit_number].includes(label)) {
+        allTypeLabels[item.payout.digit_number].push(label);
+      }
     });
-  };
 
-  const loadMore = () => {
-    if (!isLoading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      debouncedFetchPurchases(nextPage);
-    }
-  };
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight * 1.5) loadMore();
-  };
-
-  const openDeleteDialog = (purchaseId: string) => {
-    setPurchaseToDelete(purchaseId);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeletePurchase = async () => {
-    if (!purchaseToDelete) return;
-    setIsLoading(true);
-    try {
-      const now = getThailandTime().toISOString();
-      const { error } = await supabase.from("lottery_tickets").update({ deleted_at: now }).eq("id", purchaseToDelete);
-      if (error) throw error;
-      setPurchases((prev) => prev.filter((purchase) => purchase.id !== purchaseToDelete));
-      setDeletedCount((prev) => prev + 1);
-      toast.success("ลบรายการเรียบร้อย (เก็บไว้ 30 วัน)", { position: "top-center" });
-    } catch (err: any) {
-      toast.error("เกิดข้อผิดพลาดในการลบ: " + err.message, { position: "top-center" });
-    } finally {
-      setIsLoading(false);
-      setDeleteDialogOpen(false);
-      setPurchaseToDelete(null);
-      setPage(0);
-      setPurchases([]);
-      debouncedFetchPurchases(0);
-    }
-  };
-
-  const handleRestorePurchase = async (purchaseId: string) => {
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.from("lottery_tickets").update({ deleted_at: null }).eq("id", purchaseId);
-      if (error) throw error;
-      setPurchases((prev) => prev.filter((purchase) => purchase.id !== purchaseId));
-      setDeletedCount((prev) => Math.max(0, prev - 1));
-      toast.success("คืนค่ารายการเรียบร้อย", { position: "top-center" });
-    } catch (err: any) {
-      toast.error("เกิดข้อผิดพลาดในการคืนค่า: " + err.message, { position: "top-center" });
-    } finally {
-      setIsLoading(false);
-      setPage(0);
-      setPurchases([]);
-      debouncedFetchPurchases(0);
-    }
-  };
-
-  const fetchMatchingTickets = async (ticketSetNumber: string): Promise<MatchingTicket[] | null> => {
-    try {
-      const { data, error } = await supabase.rpc('get_matching_tickets', {
-        p_ticket_set_number: ticketSetNumber
-      });
-
-      if (error) throw error;
-      return data as MatchingTicket[];
-    } catch (err: any) {
-      console.error('Error fetching matching tickets:', err);
-      toast.error('เกิดข้อผิดพลาดในการดึงข้อมูล: ' + err.message);
-      return null;
-    }
-  };
-
-  const toggleShowDeleted = () => setShowDeleted((prev) => !prev);
-
-  const getDaysRemaining = (deletedAt: string) => {
-    const deletedDate = convertUtcToThailandTime(deletedAt);
-    const expiryDate = addDays(deletedDate, RETENTION_DAYS);
-    return Math.max(0, differenceInDays(expiryDate, getThailandTime()));
-  };
-
-  const groupedPurchaseItems = (items: LotteryTicketItem[]): GroupedItems => {
-    // Step 1: Group by sub_type_name
-    const groupedByType = items.reduce((acc, item) => {
-      const group = item.sub_type_name || "ไม่ทราบประเภท";
-      if (!acc[group]) acc[group] = [];
-      acc[group].push(item);
-      return acc;
-    }, {} as Record<string, LotteryTicketItem[]>);
-
-    // Step 2: Within each group, group ticket_numbers by amount
-    const finalGrouped = Object.entries(groupedByType).reduce((acc, [groupName, groupItems]) => {
-      const groupedByAmount: GroupedPurchaseItem[] = [];
-      groupItems.forEach(item => {
-        const ticketNumber = item.numbers.join(",");
-        const existingGroup = groupedByAmount.find(g => g.amount === item.amount);
-        if (existingGroup) {
-          existingGroup.ticket_numbers.push(ticketNumber);
+    // Order labels for specific digit numbers
+    Object.keys(allTypeLabels).forEach(digit => {
+      if (Number(digit) === 3 || Number(digit) === 4) {
+        const labels = allTypeLabels[Number(digit)];
+        let ordered = [];
+        if (labels.includes("เต็ง") && labels.includes("โต๊ด")) {
+          ordered = ["เต็ง", "โต๊ด"];
+        } else if (labels.includes("บน") && labels.includes("โต๊ด")) {
+          ordered = ["บน", "โต๊ด"];
+        } else if (labels.includes("เต็ง")) {
+          ordered = ["เต็ง", "โต๊ด"];
+        } else if (labels.includes("บน")) {
+          ordered = ["บน", "โต๊ด"];
+        } else if (labels.includes("โต๊ด")) {
+          ordered = ["เต็ง", "โต๊ด"];
         } else {
-          groupedByAmount.push({
-            ticket_numbers: [ticketNumber],
-            amount: item.amount,
-          });
+          ordered = labels;
         }
-      });
-      acc[groupName] = groupedByAmount;
-      return acc;
-    }, {} as GroupedItems);
-
-    return finalGrouped;
-  };
-
-  const getDrawPeriodDates = () => {
-    const now = getThailandTime();
-    const day = now.getDate();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    let startDate: Date, endDate: Date;
-
-    if ((day === 16 && hours >= 17) || (day > 16) || (day === 1 && hours < 15)) {
-      // Period: 16th 17:00 to 1st 14:30
-      startDate = set(now, { date: 16, hours: 17, minutes: 0, seconds: 0, milliseconds: 0 });
-      endDate = set(addMonths(now, 1), { date: 1, hours: 14, minutes: 30, seconds: 0, milliseconds: 0 });
-    } else {
-      // Period: 1st 17:00 to 16th 14:30
-      startDate = set(now, { date: 1, hours: 17, minutes: 0, seconds: 0, milliseconds: 0 });
-      endDate = set(now, { date: 16, hours: 14, minutes: 30, seconds: 0, milliseconds: 0 });
-    }
-
-    return { startDate, endDate };
-  };
-
-  const handleSearch = () => {
-    setPage(0);
-    setPurchases([]);
-    debouncedFetchPurchases(0);
-  };
-
-  const handleDateRangeSelect = () => {
-    const { startDate, endDate } = getDrawPeriodDates();
-    setFilters(prev => ({
-      ...prev,
-      dateRange: {
-        start: startDate,
-        end: endDate
+        allTypeLabels[Number(digit)] = ordered;
       }
-    }));
+    });
+
+    Object.keys(allTypeLabels).forEach(digit => {
+      if (Number(digit) === 2) {
+        const labels = allTypeLabels[Number(digit)];
+        let ordered = [];
+        if (labels.includes("บน") && labels.includes("ล่าง")) {
+          ordered = ["บน", "ล่าง"];
+        } else if (labels.includes("บน")) {
+          ordered = ["บน", "ล่าง"];
+        } else if (labels.includes("ล่าง")) {
+          ordered = ["บน", "ล่าง"];
+        } else {
+          ordered = labels;
+        }
+        allTypeLabels[Number(digit)] = ordered;
+      }
+    });
+
+    // Create groups
+    const groups: Map<GroupKey, Grouped> = new Map();
+    
+    ticketItems.forEach(item => {
+      const digit = item.payout.digit_number;
+      const labelOrder = allTypeLabels[digit] || [item.payout.type_number || "-"];
+      const amountsArr = labelOrder.map(lab => {
+        const found = ticketItems.find(t => 
+          t.payout.digit_number === digit && 
+          t.payout.type_number === lab && 
+          t.numbers.join(',') === item.numbers.join(',')
+        );
+        return found ? found.amount : 0;
+      });
+      const key = `${digit}|${labelOrder.join(",")}|${amountsArr.join(",")}`;
+      
+      if (!groups.has(key)) {
+        groups.set(key, {
+          digit_number: digit,
+          numbers: [],
+          typeLabels: labelOrder,
+          amounts: Object.fromEntries(labelOrder.map((lab, idx) => [lab, amountsArr[idx]])),
+          typeOrder: labelOrder,
+        });
+      }
+      
+      const group = groups.get(key)!;
+      item.numbers.forEach(num => {
+        if (!group.numbers.includes(num)) group.numbers.push(num);
+      });
+    });
+
+    return groups;
   };
+
+  const onPrintClick = async (billNumber: string) => {
+    const printToastId = toast.loading("กำลังเตรียมข้อมูลสำหรับพิมพ์...");
+    try {
+      const purchaseData = await fetchTicketPurchase({ bill_number: billNumber });
+      if (purchaseData) {
+        // The new printing logic in ticket-print.tsx (newGroupedHtml)
+        // does not seem to directly use ticketSubTypes.
+        // Passing an empty array for now.
+        await handlePrint({
+          purchase: purchaseData,
+          ticketSubTypes: [], // Placeholder as it's not used by newGroupedHtml
+          user: user,
+        });
+        toast.success("กำลังเปิดหน้าต่างพิมพ์...", { id: printToastId });
+      } else {
+        toast.error("ไม่พบข้อมูลบิลสำหรับพิมพ์", { id: printToastId });
+      }
+    } catch (error: any) {
+      console.error("Error preparing print data:", error);
+      toast.error("เกิดข้อผิดพลาดในการเตรียมพิมพ์: " + error.message, { id: printToastId });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'text-green-600';
+      case 'pending': return 'text-yellow-600';
+      case 'cancelled': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'ยืนยันแล้ว';
+      case 'pending': return 'รอดำเนินการ';
+      case 'cancelled': return 'ยกเลิก';
+      default: return status;
+    }
+  };
+
+  // Animation variants for list items
+  const listContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1, // Stagger delay for each ticket card
+      },
+    },
+  };
+
+  const ticketItemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+  };
+
+  const groupContainerVariants = {
+    visible: { transition: { staggerChildren: 0.07 } }, // Stagger for groups within a ticket
+  };
+
+  const groupItemVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.98 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, y: -15, scale: 0.95, transition: { duration: 0.2, ease: "easeOut" } },
+  };
+
+  if (loading) {
+    return (
+      <DirectionProvider dir="ltr">
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <div className="flex items-center justify-center h-screen">
+              <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </DirectionProvider>
+    );
+  }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-2 bg-white shadow-sm">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/">แดชบอร์ด</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>ประวัติการซื้อบิล</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeSlideIn}
-          className="min-h-screen bg-gray-50 p-4"
-        >
-          <div className="max-w-5xl mx-auto space-y-4">
-            {/* Header */}
-            <motion.div
-              variants={fadeSlideIn}
-              className="bg-white p-4 rounded-xl shadow-sm border border-gray-100"
-            >
-              <div className="flex justify-between items-center">
-                <h1 className="text-sm font-semibold text-gray-900">ประวัติการซื้อบิล</h1>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className="text-xs"
-                  >
-                    {showFilters ? "ซ่อนตัวกรอง" : "แสดงตัวกรอง"}
-                  </Button>
-                  <div className="text-sm text-gray-500 flex items-center gap-2">
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        กำลังโหลด...
-                      </>
-                    ) : (
-                      user?.user_metadata?.name || "Guest"
-                    )}
-                  </div>
+    <DirectionProvider dir="ltr">
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href="/">แดชบอร์ด</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>ตั๋วหวยของฉัน</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          </header>
+
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-4 lg:px-6 py-4" // Reduced padding
+          >
+            {/* Header Card */}
+            <Card className="mb-6 shadow-lg border-0"> {/* Reduced margin-bottom */}
+              <CardHeader className="h-28 mb-1 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-t-lg shadow-md flex flex-col items-center justify-center py-6"> {/* Reduced height, padding, shadow, border-radius */}
+                <div className="flex flex-col items-center">
+                  <span className="text-3xl md:text-4xl drop-shadow font-extrabold">🎟️</span> {/* Reduced font size */}
+                  <h1 className="text-xl md:text-2xl font-bold text-white drop-shadow">ตั๋วหวยของฉัน</h1> {/* Reduced font size */}
+                  <span className="text-sm md:text-base text-white/80 font-normal">รายการตั๋วหวยที่ซื้อแล้ว</span> {/* Reduced font size */}
                 </div>
-              </div>
-            </motion.div>
-
-            {/* Filter Form */}
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="bill-number" className="text-xs font-medium text-gray-700">เลขบิล</Label>
-                      <Input
-                        id="bill-number"
-                        value={filters.billNumber}
-                        onChange={(e) => setFilters(prev => ({ ...prev, billNumber: e.target.value }))}
-                        placeholder="ค้นหาเลขบิล"
-                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bill-name" className="text-xs font-medium text-gray-700">ชื่อบิล</Label>
-                      <Input
-                        id="bill-name"
-                        value={filters.billName}
-                        onChange={(e) => setFilters(prev => ({ ...prev, billName: e.target.value }))}
-                        placeholder="ค้นหาชื่อบิล"
-                        className="h-8 text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="date-range" className="text-xs font-medium text-gray-700">ช่วงวันที่</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full text-xs bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
-                            >
-                              {filters.dateRange.start ? format(filters.dateRange.start, "dd MMM yyyy", { locale: th }) : "วันที่เริ่มต้น"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={filters.dateRange.start}
-                              onSelect={(date) => {
-                                setFilters(prev => ({
-                                  ...prev,
-                                  dateRange: { ...prev.dateRange, start: date }
-                                }));
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full text-xs bg-white hover:bg-gray-50 text-gray-900 border-gray-200"
-                            >
-                              {filters.dateRange.end ? format(filters.dateRange.end, "dd MMM yyyy", { locale: th }) : "วันที่สิ้นสุด"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={filters.dateRange.end}
-                              onSelect={(date) => {
-                                setFilters(prev => ({
-                                  ...prev,
-                                  dateRange: { ...prev.dateRange, end: date }
-                                }));
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setFilters({
-                          dateRange: {
-                            start: undefined,
-                            end: undefined
-                          },
-                          billNumber: "",
-                          billName: ""
-                        });
-                        setShowDeleted(false);
-                        setPage(0);
-                        setPurchases([]);
-                        debouncedFetchPurchases(0);
-                      }}
-                      className="text-xs border-blue-500 text-blue-600 hover:bg-blue-50"
-                    >
-                      รีเซ็ตตัวกรอง
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleDateRangeSelect}
-                      className="text-xs bg-blue-600 hover:bg-blue-700"
-                    >
-                      เลือกช่วงวันที่ประกาศผล
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleSearch}
-                      className="text-xs bg-green-600 hover:bg-green-700"
-                    >
-                      ค้นหา
-                    </Button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Toggle Deleted */}
-            <motion.div 
-              variants={fadeSlideIn} 
-              className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-gray-100"
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleShowDeleted}
-                className={cn(
-                  "flex items-center gap-2 text-xs",
-                  showDeleted ? "bg-red-50 text-red-700 border-red-200" : "bg-white border-gray-200"
-                )}
-              >
-                {showDeleted ? (
-                  <>
-                    <RotateCcw className="w-3 h-3" /> แสดงรายการปกติ
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-3 h-3" /> แสดงรายการที่ลบ {deletedCount > 0 && `(${deletedCount})`}
-                  </>
-                )}
-              </Button>
-              <span className="text-xs text-gray-500">
-                {showDeleted ? "กำลังแสดงรายการที่ลบ (เก็บ 30 วัน)" : "กำลังแสดงรายการปกติ"}
-              </span>
-            </motion.div>
-
-            {/* Purchase List */}
-            <Card className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-100">
-              <ScrollArea className="max-h-auto" onScroll={handleScroll}>
-                <div className="p-4 space-y-3">
-                  {isLoading && !purchases.length ? (
-                    <div className="flex justify-center py-6">
-                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-                    </div>
-                  ) : purchases.length === 0 ? (
-                    <div className="text-center text-gray-500 py-6 text-sm">
-                      {showDeleted ? "ไม่พบรายการที่ลบใน 30 วัน" : `ไม่พบรายการซื้อสำหรับวันที่ ${selectedDate ? format(selectedDate, "dd MMM yyyy", { locale: th }) : "ที่เลือก"}`}
-                    </div>
-                  ) : (
-                    <>
-                      {purchases.map((purchase) => {
-                        const groupedItems = groupedPurchaseItems(purchase.items);
-                        const isDeleted = purchase.deleted_at !== null;
-                        const daysRemaining = isDeleted ? getDaysRemaining(purchase.deleted_at!) : null;
-                        const totalAmount = purchase.items.reduce((sum, item) => sum + item.amount, 0);
-
-                        return (
-                          <motion.div key={purchase.id} variants={fadeSlideIn}>
-                            <Card className={`border ${isDeleted ? "border-red-200 bg-red-50" : "border-gray-200"} rounded-lg`}>
-                              <div
-                                className={`flex justify-between items-center p-3 cursor-pointer ${
-                                  isDeleted ? "bg-red-100" : "bg-blue-50"
-                                }`}
-                                onClick={() => toggleExpand(purchase.id)}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <h2 className={`text-xs font-semibold ${isDeleted ? "text-red-800" : "text-blue-800"}`}>
-                                    {purchase.bill_name || "ไม่มีชื่อ"} ({purchase.bill_number})
-                                  </h2>
-                                  {isDeleted && daysRemaining !== null && (
-                                    <Badge variant="secondary" className="bg-red-200 text-red-800 flex items-center gap-1 text-xs">
-                                      <Clock className="w-3 h-3" /> {daysRemaining} วัน
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-600">
-                                    {new Date(purchase.purchase_date).toLocaleDateString("th-TH")}
-                                  </span>
-                                  {expandedPurchases.has(purchase.id) ? (
-                                    <ChevronUp className={`w-4 h-4 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
-                                  ) : (
-                                    <ChevronDown className={`w-4 h-4 ${isDeleted ? "text-red-600" : "text-blue-600"}`} />
-                                  )}
-                                </div>
-                              </div>
-                              <AnimatePresence>
-                                {expandedPurchases.has(purchase.id) && (
-                                  <motion.div initial="hidden" animate="visible" exit="exit" variants={fadeSlideIn}>
-                                    <div className="p-3">
-                                      {Object.entries(groupedItems).map(([groupName, groupedItems]) => (
-                                        <div key={groupName} className="mb-2">
-                                          <div className={`font-medium p-2 rounded-lg text-xs ${
-                                            isDeleted ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"
-                                          }`}>
-                                            {groupName}
-                                            {(() => {
-                                              const subType = ticketSubTypes.find(
-                                                (type) => type.type_name === groupName
-                                              );
-                                              return subType ? ` x ${subType.multiplication_factor}` : "";
-                                            })()}
-                                          </div>
-                                          <div className="space-y-1 mt-1">
-                                            {groupedItems.map((group, index) => (
-                                              <div
-                                                key={index}
-                                                className={`flex flex-wrap items-center p-2 rounded-lg gap-1 ${
-                                                  isDeleted ? "hover:bg-red-100" : "hover:bg-blue-50"
-                                                }`}
-                                              >
-                                                <div className="flex flex-wrap gap-0.5 mr-1">
-                                                  {group.ticket_numbers.map((number: string, numberIndex: number) => (
-                                                    <div key={numberIndex} className="flex gap-0.2">
-                                                      {number.split("  ").map((digit: string, i: number) => (
-                                                        <span
-                                                          key={i}
-                                                          className={`flex items-center justify-center text-xs font-semibold w-6 h-4 rounded-sm ${
-                                                            isDeleted ? "text-red-800 bg-red-100" : "text-blue-800 bg-blue-100"
-                                                          }`}
-                                                        >
-                                                          {digit}
-                                                        </span>
-                                                      ))}
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                                <span className="flex-1 min-w-[50px]" />
-                                                <span className="text-xs text-gray-600 whitespace-nowrap">
-                                                  x{group.amount.toFixed(0)} ฿
-                                                </span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                    <div className="p-3 bg-gray-50 flex flex-wrap justify-between items-center gap-2 rounded-b-lg">
-                                      <span className="text-xs font-medium text-gray-700">
-                                        ยอดรวม: {totalAmount.toFixed(0)} ฿
-                                      </span>
-                                      <TooltipProvider>
-                                        <div className="flex flex-wrap gap-2">
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePrint({
-                                                  purchase: {
-                                                    id: purchase.id,
-                                                    ticket_set_name: purchase.bill_name,
-                                                    ticket_set_number: purchase.bill_number,
-                                                    purchase_date: purchase.purchase_date,
-                                                    deleted_at: purchase.deleted_at,
-                                                    items: purchase.items.map(item => ({
-                                                      id: item.id,
-                                                      ticket_sub_type_id: String(item.lottery_sub_type_id),
-                                                      ticket_number: item.numbers.join(","),
-                                                      amount: item.amount,
-                                                      price: typeof item.price_paid === 'number' ? item.price_paid : 0,
-                                                      total: typeof item.price_paid === 'number' ? item.price_paid * item.amount : item.amount,
-                                                      created_at: item.created_at,
-                                                      sub_type_name: item.sub_type_name,
-                                                      multiplication_factor: item.multiplication_factor,
-                                                      type_number: item.type_number,
-                                                      price_paid: item.price_paid,
-                                                    })),
-                                                  },
-                                                  ticketSubTypes,
-                                                  user,
-                                                })}
-                                                className="border-blue-500 text-blue-600 hover:bg-blue-50 text-xs px-2"
-                                              >
-                                                <Printer className="w-3 h-3 mr-1" />
-                                                พิมพ์
-                                              </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>พิมพ์รายการบิลนี้</TooltipContent>
-                                          </Tooltip>
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => (isDeleted ? handleRestorePurchase(purchase.id) : openDeleteDialog(purchase.id))}
-                                                className={`${
-                                                  isDeleted
-                                                    ? "border-red-500 text-red-600 hover:bg-red-50"
-                                                    : "border-blue-500 text-blue-600 hover:bg-blue-50"
-                                                } text-xs px-2`}
-                                              >
-                                                {isDeleted ? (
-                                                  <>
-                                                    <RotateCcw className="w-3 h-3 mr-1" />
-                                                    คืนค่า
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <Trash2 className="w-3 h-3 mr-1" />
-                                                    ลบ
-                                                  </>
-                                                )}
-                                              </Button>
-                                            </TooltipTrigger>
-                                            <TooltipContent>{isDeleted ? "คืนค่ารายการนี้" : "ลบรายการนี้"}</TooltipContent>
-                                          </Tooltip>
-                                        </div>
-                                      </TooltipProvider>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </Card>
-                          </motion.div>
-                        );
-                      })}
-                      {isLoading && purchases.length > 0 && (
-                        <div className="flex justify-center py-3">
-                          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                        </div>
-                      )}
-                      {!isLoading && !hasMore && purchases.length > 0 && (
-                        <div className="text-center py-3 text-xs text-gray-500">ไม่มีข้อมูลเพิ่มเติม</div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </ScrollArea>
+              </CardHeader>
             </Card>
 
-            {/* Footer */}
-            <motion.div variants={fadeSlideIn} className="flex justify-between items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push("/huaythai")}
-                className="border-blue-500 text-blue-600 hover:bg-blue-50 text-xs"
-              >
-                <ArrowLeft className="w-3 h-3 mr-1" />
-                ย้อนกลับ
-              </Button>
-              {showDeleted && (
-                <span className="text-xs text-gray-500">รายการที่ลบจะถูกเก็บไว้ 30 วัน</span>
-              )}
-            </motion.div>
+            {/* Tickets List */}
+            {tickets.length === 0 ? (
+              <Card className="shadow-lg border-0"> {/* Reduced shadow */}
+                <CardContent className="py-10"> {/* Reduced padding */}
+                  <div className="text-center text-muted-foreground">
+                    <p className="text-base">ยังไม่มีตั๋วหวย</p> {/* Reduced font size */}
+                    <p className="text-xs mt-1">เริ่มซื้อหวยเพื่อดูรายการที่นี่</p> {/* Reduced font size */}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <motion.div className="space-y-4" variants={listContainerVariants} initial="hidden" animate="visible"> {/* Reduced space, added animation variants */}
+                {tickets.map((ticket) => {
+                  // Convert ticket items to display format
+                  const displayItems: TicketDisplayItem[] = ticket.lottery_ticket_items.map(item => ({
+                    subType: item.lottery_sub_types,
+                    payout: item.lottery_sub_number,
+                    numbers: item.numbers,
+                    amount: item.amount
+                  }));
 
-            {/* Delete Dialog */}
-            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-sm">ยืนยันการลบ</AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs">
-                    รายการที่ลบจะถูกเก็บไว้ 30 วัน หลังจากนั้นจะไม่สามารถกู้คืนได้
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="text-xs">ยกเลิก</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeletePurchase} className="bg-red-600 hover:bg-red-700 text-xs">
-                    ลบรายการ
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </motion.div>
-      </SidebarInset>
-    </SidebarProvider>
+                  const groups = createGroups(displayItems);
+
+                  return (
+                    <motion.div
+                      key={ticket.id}
+                      variants={ticketItemVariants} // Use ticket item variants
+                      className="w-full" // Ensure motion.div takes full width for layout
+                    >
+                      <Card className="shadow-lg border-0 w-full hover:shadow-xl transition-shadow duration-300"> {/* Reduced shadow, added hover effect */}
+                        <CardHeader className="pb-3 pt-4 px-4"> {/* Reduced padding */}
+                          <div className="flex justify-between items-start">
+                            <div className="flex-grow">
+                              <CardTitle className="text-base font-semibold"> {/* Reduced font size */}
+                                บิลเลขที่: {ticket.bill_number}
+                                {ticket.lottery_ticket_items && ticket.lottery_ticket_items.length > 0 && ticket.lottery_ticket_items[0].lottery_sub_types?.sub_type_name && (
+                                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400 ml-2">
+                                    ({ticket.lottery_ticket_items[0].lottery_sub_types.sub_type_name})
+                                  </span>
+                                )}
+                                {ticket.bill_name && <span className="text-xs font-normal text-muted-foreground ml-1.5">({ticket.bill_name})</span>}
+                              </CardTitle>
+                              <div className="text-xs text-muted-foreground mt-0.5"> {/* Reduced font size and margin */}
+                                วันที่ออกรางวัล: {format(new Date(ticket.draw_date), 'd MMM yyyy', { locale: th })} เวลา {ticket.draw_time}
+                              </div>
+                              <div className="text-xs text-muted-foreground"> {/* Reduced font size */}
+                                วันที่ซื้อ: {format(new Date(ticket.created_at), 'd MMM yyyy HH:mm', { locale: th })}
+                              </div>
+                            </div>
+                            <div className="text-right flex flex-col items-end">
+                              <div>
+                                <div className={`text-xs font-medium ${getStatusColor(ticket.status)}`}> {/* Reduced font size */}
+                                  {getStatusText(ticket.status)}
+                                </div>
+                                <div className="text-base font-semibold text-green-600 mt-0.5"> {/* Reduced font size and margin */}
+                                  {ticket.total_amount.toLocaleString()} ฿
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-2 text-xs px-2 py-1 h-auto"
+                                onClick={() => onPrintClick(ticket.bill_number)}
+                              >
+                                <PrinterIcon className="mr-1.5 h-3.5 w-3.5" />
+                                พิมพ์
+                              </Button>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0 pb-3 px-3"> {/* Reduced padding */}
+                          <motion.div className="space-y-2" variants={groupContainerVariants}> {/* Reduced space, added animation variants */}
+                            <AnimatePresence initial={false}> {/* initial={false} for AnimatePresence with stagger */}
+                              {Array.from(groups.values()).map((group, idx) => {
+                                const allLabels = group.typeLabels;
+                               
+                                
+                                return (
+                                  <motion.div
+                                    key={`${ticket.id}-group-${idx}`} // More specific key for AnimatePresence
+                                    variants={groupItemVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                    exit="exit"
+                                    className="bg-zinc-50 dark:bg-zinc-800/50 rounded-lg shadow-sm p-2 md:p-2.5 flex flex-row gap-2 md:gap-3 items-center w-full hover:bg-zinc-100 dark:hover:bg-zinc-700/70 transition-colors duration-200" // Reduced padding, gap, adjusted background and hover
+                                  >
+                                    {/* Left side */}
+                                    <div className="flex flex-col justify-center items-center text-center min-w-[50px] max-w-[80px] flex-shrink-0"> {/* Reduced width */}
+                                      <div className="text-[11px] md:text-xs font-medium leading-tight break-words">{group.digit_number} ตัว</div> {/* Reduced font size */}
+                                      <div className="text-[11px] md:text-xs text-red-600 dark:text-red-500 leading-tight break-words"> {/* Reduced font size */}
+                                        {allLabels.length > 0 && allLabels.join(" x ")}
+                                      </div>
+                                      <div className="text-[11px] md:text-xs leading-tight break-words"> {/* Reduced font size */}
+                                        {allLabels.map((label) => group.amounts[label] ?? 0).join(" x ")}
+                                      </div>
+                                      <div className="text-[10px] md:text-xs text-gray-400 break-words">รวม  {ticket.total_amount.toLocaleString()} ฿</div>
+                                    </div>
+                                    {/* Right side */}
+                                    <div className="flex items-center w-full h-auto min-h-10 max-h-32 overflow-y-auto">
+                                      <Textarea
+                                        value={group.numbers.join("  ")} // Added more space between numbers for readability
+                                        readOnly
+                                        rows={1} // Reduced rows, rely on scroll if many numbers
+                                        className="rounded-md p-1.5 w-full h-auto min-h-8 max-h-24 text-[11px] md:text-xs leading-tight resize-none bg-white dark:bg-zinc-700/60 border-zinc-200 dark:border-zinc-600 focus-visible:ring-1 focus-visible:ring-blue-500" // Reduced padding, font size, height, added border and focus style
+                                        style={{ textAlign: "left", wordBreak: "break-all", whiteSpace: "pre-wrap" }} // Ensure break-all for long number strings
+                                      />
+                                    </div>
+                                  </motion.div>
+                                );
+                              })}
+                            </AnimatePresence>
+                          </motion.div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </motion.div>
+            )}
+          </motion.div>
+        </SidebarInset>
+      </SidebarProvider>
+    </DirectionProvider>
   );
-};
-
-export default TicketPurchasesPage;
+}

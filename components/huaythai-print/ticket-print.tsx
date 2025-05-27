@@ -4,50 +4,55 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { getThailandTime, getNextDrawDate } from "@/lib/utils/date-utils";
 
-interface TicketPurchaseItem {
-  id: string;
-  ticket_sub_type_id: string;
-  ticket_number: string;
-  amount: number;
-  price: number;
-  total: number;
-  created_at: string;
-  sub_type_name?: string;
-  multiplication_factor?: number;
-  type_number?: string;
-  price_paid?: number;
+// --- START: Types adapted from page.tsx ---
+interface LotterySubType {
+  lottery_sub_type_id: number; // Or string, ensure consistency with your DB schema
+  sub_type_name: string;
 }
+
+interface LotterySubNumber {
+  id: number; // Or string
+  lottery_sub_type_id: number; // Or string
+  digit_number: number;
+  type_number: string;
+  price_paid: number;
+}
+
+interface PrintLotteryTicketItem {
+  id: string; // or number
+  numbers: string[];
+  amount: number;
+  lottery_sub_types: LotterySubType;
+  lottery_sub_number: LotterySubNumber;
+  // created_at?: string; // Add if needed
+}
+
+interface TicketDisplayItem { // For createGroups function
+  subType: LotterySubType;
+  payout: LotterySubNumber;
+  numbers: string[];
+  amount: number;
+}
+
+type GroupKey = string;
+type Grouped = {
+  digit_number: number;
+  numbers: string[];
+  typeLabels: string[];
+  amounts: Record<string, number>;
+  typeOrder: string[];
+};
+// --- END: Types adapted from page.tsx ---
 
 interface ConsolidatedTicketPurchase {
   id: string;
   ticket_set_name: string | null;
   ticket_set_number: string;
   purchase_date: string;
+  draw_date: string;
+  draw_time: string;
   deleted_at?: string | null;
-  items: TicketPurchaseItem[];
-}
-
-interface TicketSubType {
-  id: string;
-  type_name: string;
-  multiplication_factor: number;
-}
-
-interface MatchingTicket {
-  tod_number: string;
-  teng_number: string;
-  amount_display: string;
-  digit_label: string;
-  type_label: string;
-}
-
-interface GroupedPurchaseItem {
-  ticket_numbers: string[];
-  amount: number;
-}
-
-interface GroupedItems {
-  [key: string]: GroupedPurchaseItem[];
+  items: PrintLotteryTicketItem[]; // Updated to use richer item type
 }
 
 interface TicketPrintProps {
@@ -55,64 +60,84 @@ interface TicketPrintProps {
   ticketSubTypes: TicketSubType[];
   user: any;
 }
-type Ticket = {
-  amount_display: string;
-  teng_number?: string;
-  tod_number?: string;
-  two_digit_top_number?: string;
-  two_digit_bottom_number?: string;
-  run_top_number?: string;
-  run_bottom_number?: string;
-  three_digit_front_number?: string;
-  three_digit_back_number?: string;
-  pair_three_digit_number?: string;
-  pair_two_digit_number?: string;
-  pair_run_number?: string;
-  pair_three_digit_front_back_number?: string;
+
+// This TicketSubType might be different from LotterySubType, review if it's still needed or can be merged.
+// For now, keeping it as it might be used for other parts of the print logic not being replaced.
+interface TicketSubType {
+  id: string;
+  type_name: string;
+  multiplication_factor: number;
 }
-const fetchMatchingTickets = async (ticketSetNumber: string): Promise<MatchingTicket[] | null> => {
-  try {
-    const { data, error } = await supabase.rpc('get_matching_tickets', {
-      p_ticket_set_number: ticketSetNumber
-    });
 
-    if (error) throw error;
-    return data as MatchingTicket[];
-  } catch (err: any) {
-    console.error('Error fetching matching tickets:', err);
-    toast.error('เกิดข้อผิดพลาดในการดึงข้อมูล: ' + err.message);
-    return null;
-  }
-};
+// Copied and adapted createGroups function from page.tsx
+const createGroups = (ticketItems: TicketDisplayItem[]) => {
+  const allTypeLabels: Record<number, string[]> = {};
 
-const groupedPurchaseItems = (items: TicketPurchaseItem[]): GroupedItems => {
-  // Step 1: Group by sub_type_name
-  const groupedByType = items.reduce((acc, item) => {
-    const group = item.sub_type_name || "ไม่ทราบประเภท";
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(item);
-    return acc;
-  }, {} as Record<string, TicketPurchaseItem[]>);
+  // Build type labels mapping
+  ticketItems.forEach(item => {
+    const label = item.payout.type_number || "-";
+    if (!allTypeLabels[item.payout.digit_number]) allTypeLabels[item.payout.digit_number] = [];
+    if (!allTypeLabels[item.payout.digit_number].includes(label)) {
+      allTypeLabels[item.payout.digit_number].push(label);
+    }
+  });
 
-  // Step 2: Within each group, group ticket_numbers by amount
-  const finalGrouped = Object.entries(groupedByType).reduce((acc, [groupName, groupItems]) => {
-    const groupedByAmount: GroupedPurchaseItem[] = [];
-    groupItems.forEach(item => {
-      const existingGroup = groupedByAmount.find(g => g.amount === item.amount);
-      if (existingGroup) {
-        existingGroup.ticket_numbers.push(item.ticket_number);
-      } else {
-        groupedByAmount.push({
-          ticket_numbers: [item.ticket_number],
-          amount: item.amount,
-        });
+  // Order labels for specific digit numbers
+  Object.keys(allTypeLabels).forEach(digitStr => {
+    const digit = Number(digitStr);
+    const labels = allTypeLabels[digit];
+    let ordered: string[] = [...labels];
+    if (digit === 3 || digit === 4) {
+      const preferredOrder = ["เต็ง", "โต๊ด", "บน"];
+      ordered = preferredOrder.filter(l => labels.includes(l));
+      labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
+    } else if (digit === 2) {
+      const preferredOrder = ["บน", "ล่าง", "เต็ง"];
+      ordered = preferredOrder.filter(l => labels.includes(l));
+      labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
+    }
+    allTypeLabels[digit] = ordered;
+  });
+
+  // สร้าง groups ใหม่
+  const groups: Map<GroupKey, Grouped> = new Map();
+
+  // 1. สร้าง mapping: {digit, number} => {typeLabel: amount}
+  const numberMap: Record<string, { digit: number, number: string, amounts: Record<string, number> }> = {};
+
+  ticketItems.forEach(item => {
+    const digit = item.payout.digit_number;
+    const label = item.payout.type_number;
+    item.numbers.forEach(num => {
+      const key = `${digit}|${num}`;
+      if (!numberMap[key]) {
+        numberMap[key] = { digit, number: num, amounts: {} };
       }
+      numberMap[key].amounts[label] = item.amount;
     });
-    acc[groupName] = groupedByAmount;
-    return acc;
-  }, {} as GroupedItems);
+  });
 
-  return finalGrouped;
+  // 2. Group by digit + typeOrder + amounts signature
+  Object.values(numberMap).forEach(({ digit, number, amounts }) => {
+    const typeOrder = allTypeLabels[digit];
+    // signature เช่น "10|30" (เช่น บน 10 ล่าง 30)
+    const amountsSignature = typeOrder.map(label => amounts[label] || 0).join('|');
+    const key = `${digit}|${typeOrder.join(",")}|${amountsSignature}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        digit_number: digit,
+        numbers: [],
+        typeLabels: typeOrder,
+        amounts: Object.fromEntries(typeOrder.map((lab, idx) => [lab, amounts[lab] || 0])),
+        typeOrder: typeOrder,
+      });
+    }
+    const group = groups.get(key)!;
+    if (!group.numbers.includes(number)) group.numbers.push(number);
+  });
+
+  return groups;
 };
 
 export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrintProps) => {
@@ -123,111 +148,51 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
   }
 
   try {
-    // Fetch matching tickets data
-    const matchingTickets = await fetchMatchingTickets(purchase.ticket_set_number);
-    
     // Calculate total amount
-    const totalAmount = purchase.items.reduce((sum, item) => sum + item.amount, 0);
+    // This calculation might need to be revised based on how `purchase.items` amounts are structured
+    // If each item in purchase.items is a specific bet, this should still be correct.
+    const totalAmount = purchase.items.reduce((sum, item) => {
+        // Assuming item.amount is the bet amount for that specific number and type combination
+        return sum + item.amount;
+    }, 0);
 
-    // Get draw date
-    const thailandTime = getThailandTime();
-    const drawDate = await getNextDrawDate(supabase, thailandTime);
-    const formattedDrawDate = format(parseISO(drawDate), "d MMMM yyyy", { locale: th });
+    // Format actual draw date from purchase data
+    const formattedActualDrawDate = purchase.draw_date 
+      ? format(parseISO(purchase.draw_date), "d MMMM yyyy", { locale: th })
+      : "ไม่ระบุ";
+    const formattedPurchaseDateTime = format(parseISO(purchase.purchase_date), "d MMM yy HH:mm น.", { locale: th });
+    const lotteryTypeName = purchase.items.length > 0 ? purchase.items[0].lottery_sub_types.sub_type_name : "ไม่ระบุประเภท";
 
-    const matchingTicketsHtml = matchingTickets && matchingTickets.length > 0 
-    ? `
-      <div class="matching-tickets">
-        <table>
-          ${(() => {
-            // Group by type_label + amount_display
-            const grouped = matchingTickets.reduce((acc, ticket) => {
-              const key = ticket.digit_label + '|' + ticket.type_label + '|' + ticket.amount_display;
-              if (!acc[key]) acc[key] = [];
-              acc[key].push(ticket);
-              return acc;
-            }, {} as Record<string, MatchingTicket[]>);
+    // Transform PrintLotteryTicketItem[] to TicketDisplayItem[] for createGroups
+    const displayItems: TicketDisplayItem[] = purchase.items.map(item => ({
+      subType: item.lottery_sub_types,
+      payout: item.lottery_sub_number,
+      numbers: item.numbers,
+      amount: item.amount,
+    }));
 
-            return Object.entries(grouped).map(([key, tickets]) => {
-              const [digitLabel, typeLabel, amountDisplay] = key.split('|');
-              const displayNumbers = tickets.map(t => {
-                if (t.tod_number && t.teng_number && t.tod_number !== t.teng_number) {
-                  return `${t.tod_number} ${t.teng_number}`;
-                } else {
-                  return t.tod_number || t.teng_number;
-                }
-              }).join(' ');
-              return `
-                <tr>
-                  <td style="text-align: center;width: 75px;">
-                    <div style="font-size: 14px; background-color:rgb(65, 202, 76); color: white; padding: 2px 2px; border-radius: 5px;font-weight: 600;">${typeLabel}</div>
-                     <div style="font-size: 12px;color: rgb(241, 34, 34);">${digitLabel}</div>
-                    <div style="font-size: 12px;">${amountDisplay}</div>
-                  </td>
-                  <td>
-                    <div style="font-size: 14px; border: 1px solid rgb(56, 190, 243); padding: 2px 5px; border-radius: 5px;height: 45px;overflow-y: auto;background-color:rgb(245, 245, 245);width: 420px;">
-                      ${displayNumbers}
-                    </div>
-                  </td>
-                  <td style="text-align: right;width: 10px;">
-                    <div style="text-align: right;margin-right: 2px;"><i class="fa fa-trash-o" style="font-size:20px;color:red"></i></div>
-                  </td>
-                </tr>
-              `;
-            }).join('');
-          })()}
-        </table>
-      </div>
-    ` : '';
-  
+    const groups = createGroups(displayItems);
 
+    const newGroupedHtml = Array.from(groups.values()).map((group) => {
+      const groupTotalForDisplay = group.typeOrder.reduce((sum, label) => {
+        const amountForType = group.amounts[label] ?? 0;
+        return sum + (amountForType * group.numbers.length);
+      }, 0);
 
-    const groupedItems = groupedPurchaseItems(purchase.items);
-    const itemsHtml = Object.entries(groupedItems)
-      .map(([groupName, groupedItems], groupIndex) => {
-        let rowIndex = groupIndex > 0 
-          ? Object.entries(groupedItems).slice(0, groupIndex).reduce((sum, [, items]) => sum + (items as unknown as GroupedPurchaseItem[]).length, 0) 
-          : 0;
-        
-        return groupedItems
-          .reduce((acc: GroupedPurchaseItem[], group) => {
-            const lastGroup = acc[acc.length - 1];
-            if (lastGroup && lastGroup.amount === group.amount) {
-              lastGroup.ticket_numbers.push(...group.ticket_numbers);
-            } else {
-              acc.push({ ...group });
-            }
-            return acc;
-          }, [] as GroupedPurchaseItem[])
-          .map((group) => {
-            rowIndex++;
-            return `
-              <tr>
-                <td>${rowIndex}.</td>
-                <td>${groupName}x${
-                  (() => {
-                    const subType = ticketSubTypes.find(type => type.type_name === groupName);
-                    return subType ? subType.multiplication_factor : "";
-                  })()
-                }</td>
-                <td class="ticket-numbers">
-                  ${group.ticket_numbers
-                    .map(number => `
-                      <div class="number-group">
-                        ${number
-                          .split(" ")
-                          .map(digit => `<span>${digit}</span>`)
-                          .join("")}
-                      </div>
-                    `)
-                    .join(" ")}
-                </td>
-                <td>x${group.amount.toFixed(0)} ฿</td>
-              </tr>
-            `;
-          })
-          .join("");
-      })
-      .join("");
+      return `
+        <div class="ticket-group-item" style="display: flex; border-bottom: 1px solid #eee; padding: 4px 2px; font-size: 11px;">
+          <div class="group-info" style="width: 90px; text-align: center; padding-right: 5px; border-right: 1px dashed #ccc; flex-shrink: 0;">
+            <div style="font-weight: bold;">${group.digit_number} ตัว</div>
+            <div style="color: #d32f2f; font-size: 10px;">${group.typeOrder.join(" x ")}</div>
+            <div style="font-size: 10px;">${group.typeOrder.map(label => (group.amounts[label] ?? 0).toFixed(0)).join(" x ")}</div>
+            <div style="font-size: 10px; color: #555;">รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] ?? 0), 0) * group.numbers.length).toFixed(0)}฿</div>
+          </div>
+          <div class="group-numbers" style="flex-grow: 1; padding-left: 8px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+            ${group.numbers.map(num => `<span style="background-color: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size:12px;">${num}</span>`).join("")}
+          </div>
+        </div>
+      `;
+    }).join('');
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -425,17 +390,22 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
                 <div style="border: 1px solid rgb(81, 198, 245); width: 100px; height: 20px; background-color: #fff;"><h1 style="font-size: 14px; margin: 0;font-weight: 200;color: #bbbbbb;">${user?.user_metadata?.name || "Guest"}</h1></div>
               </div>
             </div>
-            <div class="ticket-info">
-              <div class="draw-date" style="margin-left: 10px;">งวด ${formattedDrawDate}</div>
-              <span>ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
-              <span>บิล: ${purchase.ticket_set_number}</span>
-              <div style="background-color: rgb(237, 240, 76);margin-right:10px"><span>วันที่ซื้อ: ${new Date(purchase.purchase_date).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}</span>
+            <div class="ticket-info" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 3mm; padding: 0 10px; position: relative; z-index: 1; font-size: 11px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
+                <span style="font-weight: bold; font-size: 14px; color: #d32f2f;">${lotteryTypeName}</span>
+                <span style="font-size: 12px; color: #333;">บิล: ${purchase.ticket_set_number}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #555;">งวด: ${formattedActualDrawDate} (เวลา ${purchase.draw_time || 'N/A'})</span>
+                <span style="color: #555;">ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
+              </div>
+              <div style="font-size: 11px; text-align: right; background-color: #fff8e1; padding: 4px 6px; border-radius: 3px; color: #5d4037; margin-top: 2px;">
+                วันที่ซื้อ: ${formattedPurchaseDateTime}
               </div>
             </div>
-            <div class="ticket-info">
-            </div>
+            
             <div class="ticket-number-barcode">****ขอบคุณที่อุดหนุน เฮงๆ รวยๆ ค่ะ****</div>
-            ${matchingTicketsHtml}
+            <div class="items-display" style="margin-top: 3mm; margin-bottom: 3mm;">${newGroupedHtml}</div>
             <div class="total" style="display: flex; align-items: center; justify-content: center; gap: 5px;">
               <div style="font-size: 16px; font-weight: 400; background-color:rgb(236, 236, 236);color: rgb(131, 131, 131); border-radius: 0px;height: 30px;width: 80px;padding-top: 10px;">ยอดรวม</div>
               <div style="font-size: 18px; font-weight: 800; background-color:rgb(209, 208, 208);color: rgb(56, 148, 201); border-radius: 0px;height: 30px;width: 200px;padding-top: 10px;">${totalAmount.toFixed(0)} ฿</div>
@@ -465,8 +435,10 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
       bill_number,
       bill_name,
       purchase_date,
+      draw_date,
+      draw_time,
       deleted_at,
-      lottery_ticket_items (
+      lottery_ticket_items!inner (
         id,
         ticket_id,
         lottery_sub_type_id,
@@ -475,11 +447,15 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
         amount,
         created_at,
         updated_at,
-        lottery_sub_types (
+        lottery_sub_types!inner (
+          lottery_sub_type_id,
           sub_type_name,
           multiplication_factor
         ),
-        lottery_sub_number (
+        lottery_sub_number!inner (
+          id,
+          lottery_sub_type_id,
+          digit_number,
           type_number,
           price_paid
         )
@@ -495,34 +471,36 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
   }
   if (!data || !data[0]) return null;
   const ticket = data[0];
-  // Map items ให้ตรงกับ TicketPurchaseItem
-  const items: TicketPurchaseItem[] = (ticket.lottery_ticket_items || []).map((item: any) => ({
+
+  const richItems: PrintLotteryTicketItem[] = (ticket.lottery_ticket_items || []).map((item: any) => ({
     id: item.id,
-    ticket_sub_type_id: String(item.lottery_sub_type_id),
-    ticket_number: (item.numbers || []).join(","),
+    numbers: item.numbers || [],
     amount: typeof item.amount === 'number' ? item.amount : Number(item.amount),
-    price: typeof item.lottery_sub_number?.price_paid === 'number'
-      ? item.lottery_sub_number.price_paid
-      : Number(item.lottery_sub_number?.price_paid) || 0,
-    total: (typeof item.lottery_sub_number?.price_paid === 'number'
-      ? item.lottery_sub_number.price_paid
-      : Number(item.lottery_sub_number?.price_paid) || 0) *
-      (typeof item.amount === 'number' ? item.amount : Number(item.amount)),
-    created_at: item.created_at,
-    sub_type_name: item.lottery_sub_types?.sub_type_name,
-    multiplication_factor: item.lottery_sub_types?.multiplication_factor,
-    type_number: item.lottery_sub_number?.type_number,
-    price_paid: typeof item.lottery_sub_number?.price_paid === 'number'
-      ? item.lottery_sub_number.price_paid
-      : Number(item.lottery_sub_number?.price_paid) || 0,
+    lottery_sub_types: {
+      lottery_sub_type_id: item.lottery_sub_types?.lottery_sub_type_id,
+      sub_type_name: item.lottery_sub_types?.sub_type_name,
+      // multiplication_factor: item.lottery_sub_types?.multiplication_factor, // Keep if needed elsewhere
+    },
+    lottery_sub_number: {
+      id: item.lottery_sub_number?.id,
+      lottery_sub_type_id: item.lottery_sub_number?.lottery_sub_type_id,
+      digit_number: item.lottery_sub_number?.digit_number,
+      type_number: item.lottery_sub_number?.type_number,
+      price_paid: typeof item.lottery_sub_number?.price_paid === 'number'
+        ? item.lottery_sub_number.price_paid
+        : Number(item.lottery_sub_number?.price_paid) || 0,
+    },
+    // created_at: item.created_at, // Add if needed
   }));
+
   return {
     id: ticket.id,
     ticket_set_name: ticket.bill_name,
     ticket_set_number: ticket.bill_number,
     purchase_date: ticket.purchase_date,
+    draw_date: ticket.draw_date,
+    draw_time: ticket.draw_time,
     deleted_at: ticket.deleted_at,
-    items,
+    items: richItems,
   };
 }
-

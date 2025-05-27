@@ -39,6 +39,7 @@ import {
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useSearchParams, useRouter } from "next/navigation";
+import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -121,6 +122,7 @@ export default function LotteryTicketPage() {
   const [billNumber] = useState(() => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   });
+  const [isNumberDrawerOpen, setIsNumberDrawerOpen] = useState(false);
   const [billName, setBillName] = useState("");
 
   // โหลดชนิดหวย
@@ -262,6 +264,17 @@ export default function LotteryTicketPage() {
     setAmounts({});
     setSelectedTypes([]);
     setReverseNumber(false);
+  }
+
+  function handleApplyNumbersFromDrawer(newNumbers: string[]) {
+    const currentNumbersArray = numberInput
+      .replace(/\n|,/g, " ")
+      .split(" ")
+      .map((n) => n.trim())
+      .filter((n) => n.length > 0);
+    
+    const combinedNumbers = Array.from(new Set([...currentNumbersArray, ...newNumbers]));
+    setNumberInput(combinedNumbers.join(" "));
   }
 
   // ลบรายการ
@@ -764,13 +777,25 @@ export default function LotteryTicketPage() {
                     <label htmlFor="reverseNumber" className="text-sm">กลับหมายเลข (เช่น 23 → 32)</label>
                   </div>
                   <div>
-                    <label className="text-sm font-medium">หมายเลขหวย <span className="text-xs text-muted-foreground">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span></label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-sm font-medium">หมายเลขหวย <span className="text-xs text-muted-foreground">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span></label>
+                      {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsNumberDrawerOpen(true)}
+                        >
+                          เลือกจากชุดตัวเลข
+                        </Button>
+                      )}
+                    </div>
                     <Textarea
                       rows={3}
                       placeholder={selectedDigit ? `กรอกหมายเลข ${selectedDigit} หลัก เช่น ${"1".repeat(selectedDigit)} ...` : "เลือกจำนวนหลักก่อน"}
                       value={numberInput}
                       onChange={e => setNumberInput(e.target.value)}
-                      disabled={!selectedDigit}
+                      disabled={!selectedDigit }
                     />
                   </div>
                   <div>
@@ -991,6 +1016,15 @@ export default function LotteryTicketPage() {
         </SidebarInset>
       </SidebarProvider>
       <ConfirmationDialog />
+      {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && (
+        <NumberSelectionDrawer
+          isOpen={isNumberDrawerOpen}
+          onOpenChange={setIsNumberDrawerOpen}
+          onApplyNumbers={handleApplyNumbersFromDrawer}
+          maxDigits={selectedDigit as 1 | 2 | 3}
+          initialUseReverseNumbers={reverseNumber && selectedDigit === 2}
+        />
+      )}
     </DirectionProvider>
   );
 } 
