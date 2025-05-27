@@ -24,7 +24,7 @@ import { PrinterIcon } from "lucide-react";
 import {
   handlePrint,
   fetchTicketPurchase,
-} from "@/components/huaythai-print/ticket-print";
+} from "@/lib/lottery-print";
 
 import { toast } from "sonner";
 
@@ -303,6 +303,12 @@ export default function LotteryPurchasePage() {
     exit: { opacity: 0, y: -15, scale: 0.95, transition: { duration: 0.2, ease: "easeOut" } },
   };
 
+  // ฟังก์ชันคำนวณยอดรวมของ group
+  const getGroupTotalAmount = (group: Grouped) => {
+    // รวมยอดเงินของทุกประเภทใน group คูณจำนวนเลข
+    return group.typeLabels.reduce((sum, label) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
+  };
+
   if (loading) {
     return (
       <DirectionProvider dir="ltr">
@@ -330,7 +336,7 @@ export default function LotteryPurchasePage() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="/">แดชบอร์ด</BreadcrumbLink>
+                    <BreadcrumbLink href="/">หน้าหลัก</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem>
@@ -380,6 +386,8 @@ export default function LotteryPurchasePage() {
                   }));
 
                   const groups = createGroups(displayItems);
+                  // คำนวณยอดรวมของทุก group ในบิลนี้
+                  const billTotal = Array.from(groups.values()).reduce((sum, group) => sum + getGroupTotalAmount(group), 0);
 
                   return (
                     <motion.div
@@ -413,7 +421,7 @@ export default function LotteryPurchasePage() {
                                   {getStatusText(ticket.status)}
                                 </div>
                                 <div className="text-base font-semibold text-green-600 mt-0.5"> {/* Reduced font size and margin */}
-                                  {ticket.total_amount.toLocaleString()} ฿
+                                  {billTotal.toLocaleString()} ฿
                                 </div>
                               </div>
                               <Button
@@ -453,7 +461,7 @@ export default function LotteryPurchasePage() {
                                       <div className="text-[11px] md:text-xs leading-tight break-words"> {/* Reduced font size */}
                                         {allLabels.map((label) => group.amounts[label] ?? 0).join(" x ")}
                                       </div>
-                                      <div className="text-[10px] md:text-xs text-gray-400 break-words">รวม  {ticket.total_amount.toLocaleString()} ฿</div>
+                                      <div className="text-[10px] md:text-xs text-gray-400 break-words">รวม  {getGroupTotalAmount(group).toLocaleString()} ฿</div>
                                     </div>
                                     {/* Right side */}
                                     <div className="flex items-center w-full h-auto min-h-10 max-h-32 overflow-y-auto">

@@ -88,7 +88,7 @@ const createGroups = (ticketItems: TicketDisplayItem[]) => {
     const labels = allTypeLabels[digit];
     let ordered: string[] = [...labels];
     if (digit === 3 || digit === 4) {
-      const preferredOrder = ["เต็ง", "โต๊ด", "บน"];
+      const preferredOrder = ["บน", "โต๊ด", "เต็ง"];
       ordered = preferredOrder.filter(l => labels.includes(l));
       labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
     } else if (digit === 2) {
@@ -172,6 +172,11 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
     }));
 
     const groups = createGroups(displayItems);
+
+    // คำนวณยอดรวมบิลแบบถูกต้อง (เหมือนหน้าอื่น)
+    const billTotal = Array.from(groups.values()).reduce((sum, group) => {
+      return sum + group.typeOrder.reduce((s, label) => s + (group.amounts[label] ?? 0) * group.numbers.length, 0);
+    }, 0);
 
     const newGroupedHtml = Array.from(groups.values()).map((group) => {
       const groupTotalForDisplay = group.typeOrder.reduce((sum, label) => {
@@ -408,7 +413,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
             <div class="items-display" style="margin-top: 3mm; margin-bottom: 3mm;">${newGroupedHtml}</div>
             <div class="total" style="display: flex; align-items: center; justify-content: center; gap: 5px;">
               <div style="font-size: 16px; font-weight: 400; background-color:rgb(236, 236, 236);color: rgb(131, 131, 131); border-radius: 0px;height: 30px;width: 80px;padding-top: 10px;">ยอดรวม</div>
-              <div style="font-size: 18px; font-weight: 800; background-color:rgb(209, 208, 208);color: rgb(56, 148, 201); border-radius: 0px;height: 30px;width: 200px;padding-top: 10px;">${totalAmount.toFixed(0)} ฿</div>
+              <div style="font-size: 18px; font-weight: 800; background-color:rgb(209, 208, 208);color: rgb(56, 148, 201); border-radius: 0px;height: 30px;width: 200px;padding-top: 10px;">${billTotal.toFixed(0)} ฿</div>
               <div style="font-size: 16px; font-weight: 400; background-color:rgb(236, 236, 236); color: rgb(133, 133, 133);border-radius: 0px;height: 30px;width: 80px;padding-top: 10px;">บาท</div>
             </div>
             <div class="footer">
@@ -420,6 +425,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
     `);
     printWindow.document.close();
     printWindow.print();
+    window.location.href = '/';
   } catch (err: any) {
     console.error('Error printing ticket:', err);
     toast.error('เกิดข้อผิดพลาดในการพิมพ์: ' + err.message);

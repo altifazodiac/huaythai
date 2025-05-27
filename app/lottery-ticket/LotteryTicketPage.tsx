@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DirectionProvider } from "@radix-ui/react-direction";
-import { Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
@@ -40,6 +40,8 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useSearchParams, useRouter } from "next/navigation";
 import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
+import SpectacularLoader from "@/components/ui/SpectacularLoader"; // Import the new loader
+ 
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -74,6 +76,14 @@ interface DrawingSchedule {
 interface AvailableDraw {
   date: Date;
   schedule: DrawingSchedule;
+}
+
+interface Grouped {
+  digit_number: number;
+  numbers: string[];
+  typeLabels: string[];
+  amounts: Record<string, number>;
+  typeOrder: string[];
 }
 
 function normalizeDraw(draw: any): AvailableDraw {
@@ -124,6 +134,7 @@ export default function LotteryTicketPage() {
   });
   const [isNumberDrawerOpen, setIsNumberDrawerOpen] = useState(false);
   const [billName, setBillName] = useState("");
+  const [isLoadingPrint, setIsLoadingPrint] = useState(false);
 
   // โหลดชนิดหวย
   useEffect(() => {
@@ -264,6 +275,7 @@ export default function LotteryTicketPage() {
     setAmounts({});
     setSelectedTypes([]);
     setReverseNumber(false);
+    toast.success("เพิ่มรายการสำเร็จ!");
   }
 
   function handleApplyNumbersFromDrawer(newNumbers: string[]) {
@@ -490,6 +502,7 @@ export default function LotteryTicketPage() {
       setSelectedDrawDate(new Date());
       setConfirmDialogOpen(false);
       toast.success("บันทึกการซื้อสำเร็จ!");
+      router.push(`/print-ticket?bill_number=${encodeURIComponent(ticket.bill_number)}`);
       
     } catch (error) {
       console.error('Error saving ticket:', error);
@@ -502,107 +515,96 @@ export default function LotteryTicketPage() {
       }
     } finally {
       setIsSubmitting(false);
-      setLoading(false);
     }
   }
 
-  const canAdd =
-    !!selectedDigit &&
-    selectedTypes.length > 0 &&
-    !!numberInput &&
-    (
-      (selectedTypes.length === 1 && !!amount && Number(amount) > 0) ||
-      (selectedTypes.length > 1 && selectedTypes.every(typeId => !!amounts[typeId] && Number(amounts[typeId]) > 0))
+  const canAdd = useMemo(() => {
+    return (
+      !!selectedDigit &&
+      selectedTypes.length > 0 &&
+      !!numberInput &&
+      (
+        (selectedTypes.length === 1 && !!amount && Number(amount) > 0) ||
+        (selectedTypes.length > 1 && selectedTypes.every(typeId => !!amounts[typeId] && Number(amounts[typeId]) > 0))
+      )
     );
+  }, [selectedDigit, selectedTypes, numberInput, amount, amounts]);
+
+
 
   // ฟังก์ชันลบ group
-  function handleRemoveGroup(group: { digit_number: number; typeLabels: string[]; amounts: Record<string, number>; numbers: string[] }) {
+  function handleRemoveGroup(group: Grouped) {
     setTicketList(ticketList.filter(item => {
       // เงื่อนไข: ถ้าเลข, digit, type, amount ตรงกับ group ให้ลบ
       const isInGroup = group.numbers.some(num =>
         item.numbers.includes(num) &&
         item.payout.digit_number === group.digit_number &&
         group.typeLabels.includes(item.payout.type_number || "-") &&
-        group.amounts[item.payout.type_number || "-"] === item.amount
+        (group.amounts[item.payout.type_number || "-"] === item.amount || (group.amounts[item.payout.type_number || "-"] === undefined && item.amount === 0) ) // Handle undefined amount if it means 0
       );
       return !isInGroup;
     }));
   }
 
-  // ===== Grouping logic for ticketList =====
-  type GroupKey = string; // `${digit_number}|${typeLabels.join(',')}|${amounts.join(',')}`
-  type Grouped = {
-    digit_number: number;
-    numbers: string[];
-    typeLabels: string[];
-    amounts: Record<string, number>;
-    typeOrder: string[];
-  };
-  const allTypeLabels: Record<number, string[]> = {};
-  ticketList.forEach(item => {
-    const label = item.payout.type_number || "-";
-    if (!allTypeLabels[item.payout.digit_number]) allTypeLabels[item.payout.digit_number] = [];
-    if (!allTypeLabels[item.payout.digit_number].includes(label)) allTypeLabels[item.payout.digit_number].push(label);
-  });
-  Object.keys(allTypeLabels).forEach(digit => {
-    if (Number(digit) === 3 || Number(digit) === 4) {
-      const labels = allTypeLabels[Number(digit)];
-      let ordered = [];
-      if (labels.includes("เต็ง") && labels.includes("โต๊ด")) {
-        ordered = ["เต็ง", "โต๊ด"];
-      } else if (labels.includes("บน") && labels.includes("โต๊ด")) {
-        ordered = ["บน", "โต๊ด"];
-      } else if (labels.includes("เต็ง")) {
-        ordered = ["เต็ง", "โต๊ด"];
-      } else if (labels.includes("บน")) {
-        ordered = ["บน", "โต๊ด"];
-      } else if (labels.includes("โต๊ด")) {
-        ordered = ["เต็ง", "โต๊ด"];
-      } else {
-        ordered = labels;
-      }
-      allTypeLabels[Number(digit)] = ordered;
-    }
-  });
-  Object.keys(allTypeLabels).forEach(digit => {
-    if (Number(digit) === 2) {
-      const labels = allTypeLabels[Number(digit)];
-      let ordered = [];
-      if (labels.includes("บน") && labels.includes("ล่าง")) {
-        ordered = ["บน", "ล่าง"];
-      } else if (labels.includes("บน")) {
-        ordered = ["บน", "ล่าง"];
-      } else if (labels.includes("ล่าง")) {
-        ordered = ["บน", "ล่าง"];
-      } else {
-        ordered = labels;
-      }
-      allTypeLabels[Number(digit)] = ordered;
-    }
-  });
-  const groups: Map<GroupKey, Grouped> = new Map();
-  ticketList.forEach(item => {
-    const digit = item.payout.digit_number;
-    const labelOrder = allTypeLabels[digit] || [item.payout.type_number || "-"];
-    const amountsArr = labelOrder.map(lab => {
-      const found = ticketList.find(t => t.payout.digit_number === digit && t.payout.type_number === lab && t.numbers.join(',') === item.numbers.join(','));
-      return found ? found.amount : 0;
+  // ===== Memoized Grouping logic for ticketList =====
+  const { allTypeLabels, groups } = useMemo(() => {
+    type GroupKey = string; // `${digit_number}|${typeLabels.join(',')}|${amounts.join(',')}`
+    const calculatedAllTypeLabels: Record<number, string[]> = {};
+    ticketList.forEach(item => {
+      const label = item.payout.type_number || "-";
+      if (!calculatedAllTypeLabels[item.payout.digit_number]) calculatedAllTypeLabels[item.payout.digit_number] = [];
+      if (!calculatedAllTypeLabels[item.payout.digit_number].includes(label)) calculatedAllTypeLabels[item.payout.digit_number].push(label);
     });
-    const key = `${digit}|${labelOrder.join(",")}|${amountsArr.join(",")}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
-        digit_number: digit,
-        numbers: [],
-        typeLabels: labelOrder,
-        amounts: Object.fromEntries(labelOrder.map((lab, idx) => [lab, amountsArr[idx]])),
-        typeOrder: labelOrder,
+
+    Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
+      const digit = Number(digitStr);
+      if (digit === 3 || digit === 4) {
+        const labels = calculatedAllTypeLabels[digit];
+        let ordered = [];
+        if (labels.includes("เต็ง") && labels.includes("โต๊ด")) ordered = ["เต็ง", "โต๊ด"];
+        else if (labels.includes("บน") && labels.includes("โต๊ด")) ordered = ["บน", "โต๊ด"];
+        else if (labels.includes("เต็ง")) ordered = ["เต็ง", "โต๊ด"]; // Assuming default pairing
+        else if (labels.includes("บน")) ordered = ["บน", "โต๊ด"];   // Assuming default pairing
+        else if (labels.includes("โต๊ด")) ordered = ["เต็ง", "โต๊ด"]; // Assuming default pairing if only โต๊ด exists
+        else ordered = labels;
+        calculatedAllTypeLabels[digit] = ordered;
+      }
+      if (digit === 2) {
+        const labels = calculatedAllTypeLabels[digit];
+        let ordered = [];
+        if (labels.includes("บน") && labels.includes("ล่าง")) ordered = ["บน", "ล่าง"];
+        else if (labels.includes("บน")) ordered = ["บน", "ล่าง"]; // Assuming default pairing
+        else if (labels.includes("ล่าง")) ordered = ["บน", "ล่าง"]; // Assuming default pairing
+        else ordered = labels;
+        calculatedAllTypeLabels[digit] = ordered;
+      }
+    });
+
+    const calculatedGroups: Map<GroupKey, Grouped> = new Map();
+    ticketList.forEach(item => {
+      const digit = item.payout.digit_number;
+      const labelOrder = calculatedAllTypeLabels[digit] || [item.payout.type_number || "-"];
+      const amountsArr = labelOrder.map(lab => {
+        const found = ticketList.find(t => t.payout.digit_number === digit && t.payout.type_number === lab && t.numbers.join(',') === item.numbers.join(','));
+        return found ? found.amount : 0;
       });
-    }
-    const group = groups.get(key)!;
-    item.numbers.forEach(num => {
-      if (!group.numbers.includes(num)) group.numbers.push(num);
+      const key = `${digit}|${labelOrder.join(",")}|${amountsArr.join(",")}`;
+      if (!calculatedGroups.has(key)) {
+        calculatedGroups.set(key, {
+          digit_number: digit,
+          numbers: [],
+          typeLabels: labelOrder,
+          amounts: Object.fromEntries(labelOrder.map((lab, idx) => [lab, amountsArr[idx]])),
+          typeOrder: labelOrder,
+        });
+      }
+      const group = calculatedGroups.get(key)!;
+      item.numbers.forEach(num => {
+        if (!group.numbers.includes(num)) group.numbers.push(num);
+      });
     });
-  });
+    return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
+  }, [ticketList]);
 
   // Add confirmation dialog JSX before the return statement
   const ConfirmationDialog = () => (
@@ -623,17 +625,34 @@ export default function LotteryTicketPage() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="text-sm">
-            <p className="font-medium">รายการที่เลือก:</p>
-            <ul className="list-disc list-inside mt-2">
-              {ticketList.map((item, index) => (
-                <li key={index}>
-                  {item.subType.sub_type_name} - {item.numbers.join(', ')} ({item.amount} บาท)
-                </li>
-              ))}
-            </ul>
+            <p className="font-medium mb-2">รายการที่เลือก:</p>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs border border-gray-200 rounded">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-2 py-1 border-b text-left">ประเภท</th>
+                    <th className="px-2 py-1 border-b text-left">หมายเลข</th>
+                    <th className="px-2 py-1 border-b text-right">จำนวนเงิน/เลข</th>
+                    <th className="px-2 py-1 border-b text-right">จำนวนเลข</th>
+                    <th className="px-2 py-1 border-b text-right">รวม</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ticketList.map((item, index) => (
+                    <tr key={index} className="border-b">
+                      <td className="px-2 py-1">{item.subType.sub_type_name} - {item.payout.type_number}</td>
+                      <td className="px-2 py-1">{item.numbers.join(', ')}</td>
+                      <td className="px-2 py-1 text-right">{item.amount.toLocaleString()}</td>
+                      <td className="px-2 py-1 text-right">{item.numbers.length}</td>
+                      <td className="px-2 py-1 text-right">{(item.amount * item.numbers.length).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="text-right font-medium">
-            ยอดรวม: {ticketList.reduce((sum, item) => sum + item.amount, 0).toLocaleString()} บาท
+          <div className="text-right font-medium mt-2">
+            ยอดรวม: {ticketList.reduce((sum, item) => sum + item.amount * item.numbers.length, 0).toLocaleString()} บาท
           </div>
         </div>
         <DialogFooter>
@@ -647,8 +666,16 @@ export default function LotteryTicketPage() {
           <Button
             onClick={handleConfirmSubmit}
             disabled={isSubmitting}
+            className="min-w-[120px]" // Give it a min-width to prevent layout shift
           >
-            {isSubmitting ? "กำลังบันทึก..." : "ยืนยัน"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                กำลังบันทึก...
+              </>
+            ) : (
+              "ยืนยัน"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -667,8 +694,6 @@ export default function LotteryTicketPage() {
     fetchUserData();
   }, [router, supabase]);
 
-  console.log("initialState.draw", initialState.draw);
-
   return (
     <DirectionProvider dir="ltr">
       <SidebarProvider>
@@ -681,7 +706,7 @@ export default function LotteryTicketPage() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="/">แดชบอร์ด</BreadcrumbLink>
+                    <BreadcrumbLink href="/">หน้าหลัก</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem>
@@ -693,9 +718,7 @@ export default function LotteryTicketPage() {
           </header>
           {/* Loading overlay */}
           {loading && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-              <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            </div>
+            <SpectacularLoader message="กำลังโหลดข้อมูล..." baseColor="sky" />
           )}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
@@ -757,7 +780,7 @@ export default function LotteryTicketPage() {
                   {selectedDigit && (
                     <div>
                       <label className="text-sm font-medium">เลือกประเภท/รูปแบบ <span className="text-xs text-muted-foreground">(เลือกได้หลายแบบ)</span></label>
-                      <div className="flex gap-2 flex-wrap mt-1">
+                      <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 ? 'animate-shake border-2 border-red-400 bg-red-50' : ''}`}>
                         {filteredTypes.map((type) => (
                           <label key={type.id} className="flex items-center gap-1 border rounded px-2 py-1 cursor-pointer bg-white dark:bg-zinc-900 shadow-sm">
                             <input
@@ -933,6 +956,38 @@ export default function LotteryTicketPage() {
                     <div className="text-center text-muted-foreground py-6">ยังไม่มีรายการ</div>
                   ) : (
                     <>
+                      <div className="mb-4 p-3 rounded-lg bg-[#f8fafc] border border-[#e0e7ef] shadow-sm">
+                        <div className="flex flex-wrap justify-between items-center border-b border-dashed pb-1 mb-1 gap-2">
+                          <span className="font-bold text-[15px] text-[#d32f2f] flex items-center gap-1">
+                            <svg className="inline-block w-4 h-4 text-[#d32f2f]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
+                            หวย {subTypeObj?.sub_type_name || '-'}
+                          </span>
+                          <span className="text-[13px] text-gray-700 flex items-center gap-1">
+                            <svg className="inline-block w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
+                            บิล: {billNumber}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between items-center gap-2">
+                          <span className="text-gray-600 flex items-center gap-1">
+                            <svg className="inline-block w-4 h-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            งวด: {selectedDrawDate ? format(selectedDrawDate, 'd MMMM yyyy', { locale: th }) : '-'} (เวลา {selectedDraw?.schedule.drawing_time || '-'})
+                          </span>
+                          <span className="text-gray-600 flex items-center gap-1">
+                            <svg className="inline-block w-4 h-4 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 8-4 8-4s8 0 8 4"/></svg>
+                            ผู้ซื้อ: {user?.user_metadata?.name || 'ไม่มีชื่อ'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap justify-between items-center mt-1 gap-2">
+                          <span className="text-[12px] text-[#5d4037] bg-[#fff8e1] px-2 py-1 rounded flex items-center gap-1">
+                          <svg className="inline-block w-4 h-4 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 8-4 8-4s8 0 8 4"/></svg>
+                            ชื่อบิล: {billName || '-'}
+                          </span>
+                          <span className="text-right text-[12px] bg-[#fff8e1] px-2 py-1 rounded text-[#5d4037] flex items-center gap-1">
+                            <svg className="inline-block w-4 h-4 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+                            วันที่ซื้อ: {format(new Date(), 'd MMM yy HH:mm น.', { locale: th })}
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-6">
                         {/* Group tickets by digit_number and numbers */}
                         {(() => {
@@ -942,49 +997,40 @@ export default function LotteryTicketPage() {
                           return (
                             <AnimatePresence>
                               {Array.from(groups.values()).map((group, idx) => {
-                                // หา label ทั้งหมดที่เป็นไปได้ใน digit_number นี้
                                 const allLabels = group.typeLabels;
-                                // ยอดรวมของ group นี้
                                 const groupTotal = allLabels.reduce((sum, label) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
                                 return (
-                                  <motion.div
+                                  <div
                                     key={idx}
-                                    initial={{ opacity: 0, y: 20, scale: 0.98 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 20, scale: 0.98 }}
-                                    transition={{ duration: 0.25 }}
-                                    className="bg-white dark:bg-zinc-900 rounded-xl shadow p-4 mb-4 flex flex-row gap-4 items-center w-full max-w-2xl mx-auto hover:shadow-lg transition-shadow"
+                                    className="flex flex-row items-center bg-[#f8fafc] border border-[#e0e7ef] rounded-lg px-2 py-1 mb-2 gap-2 shadow-sm hover:bg-[#f1f5f9] transition-colors"
+                                    style={{ minHeight: 38 }}
                                   >
-                                    {/* Left side */}
-                                    <div className="flex flex-col justify-center items-center text-center min-w-[70px] max-w-[90px]">
-                                      <div className="text-sm font-semibold leading-tight">{group.digit_number} ตัว</div>
-                                      <div className="text-sm text-red-500 leading-tight">
-                                        {allLabels.length > 0 && allLabels.join(" x ")}
-                                      </div>
-                                      <div className="text-sm leading-tight">
-                                        {allLabels.map((label) => group.amounts[label] ?? 0).join(" x ")}
-                                      </div>
-                                      <div className="text-xs text-gray-400">รวม {groupTotal.toLocaleString()} ฿</div>
-                                      
+                                    {/* Left: group info */}
+                                    <div className="flex flex-col items-center justify-center min-w-[60px] max-w-[80px] text-center flex-shrink-0">
+                                      <div className="text-[11px] font-bold text-[#d32f2f] leading-tight">{group.digit_number} ตัว</div>
+                                      <div className="text-[11px] text-[#e53935] leading-tight">{allLabels.join(' x ')}</div>
+                                      <div className="text-[11px] text-gray-700 leading-tight">{allLabels.map(label => group.amounts[label] ?? 0).join(' x ')}</div>
+                                      <div className="text-[10px] text-gray-400 leading-tight">รวม {groupTotal.toLocaleString()} ฿</div>
                                     </div>
-                                    {/* Right side */}
-                                    <div className="flex items-center w-full h-16">
-                                      <Textarea
-                                        value={group.numbers.join(" ")}
+                                    {/* Right: numbers */}
+                                    <div className="flex-1 flex items-center min-h-8 max-h-16 overflow-y-auto">
+                                      <textarea
+                                        value={group.numbers.join('  ')}
                                         readOnly
                                         rows={1}
-                                        className="rounded-lg p-2 w-full h-16"
-                                        style={{ textAlign: "left", minHeight: 40, fontSize: "16px" }}
+                                        className="rounded-md p-1 w-full h-auto min-h-7 max-h-12 text-[11px] leading-tight resize-none bg-white border border-[#e0e7ef] focus-visible:ring-1 focus-visible:ring-blue-400"
+                                        style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}
                                       />
                                       <button
-                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors"
+                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors flex-shrink-0"
                                         title="ลบกลุ่มนี้"
                                         onClick={() => handleRemoveGroup(group)}
+                                        style={{ padding: 2 }}
                                       >
-                                        <Trash2 className="w-5 h-5" />
+                                        <Trash2 className="w-4 h-4" />
                                       </button>
                                     </div>
-                                  </motion.div>
+                                  </div>
                                 );
                               })}
                             </AnimatePresence>
@@ -993,7 +1039,7 @@ export default function LotteryTicketPage() {
                       </div>
                       <div className="flex justify-end mt-4 text-lg font-semibold text-green-600">
                         ยอดรวมทั้งหมด: {(() => {
-                          // รวมยอดทุก group
+                          // รวมยอดทุก group แบบเดียวกับ LotteryPurchasePage
                           let total = 0;
                           Array.from(groups.values()).forEach((group: Grouped) => {
                             const allLabels = group.typeLabels;
@@ -1008,8 +1054,22 @@ export default function LotteryTicketPage() {
               </Card>
             </motion.div>
             <div className="flex justify-end">
-              <Button type="button" onClick={handleSubmit} disabled={loading || ticketList.length === 0} className="px-8 py-2 text-lg">
-                {loading ? "กำลังบันทึก..." : "ยืนยันซื้อ"}
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || ticketList.length === 0 || isSubmitting}
+                className="px-8 py-2 text-lg min-w-[170px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    <span>กำลังดำเนินการ...</span>
+                  </>
+                ) : loading ? (
+                  "กำลังโหลดข้อมูล..."
+                ) : (
+                  "ยืนยันซื้อ"
+                )}
               </Button>
             </div>
           </motion.div>
@@ -1025,6 +1085,22 @@ export default function LotteryTicketPage() {
           initialUseReverseNumbers={reverseNumber && selectedDigit === 2}
         />
       )}
+      {isLoadingPrint && ( 
+        <SpectacularLoader message="กำลังเตรียมข้อมูลสำหรับพิมพ์..." baseColor="green" />
+      )}
+      <style jsx global>{`
+@keyframes shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+.animate-shake {
+  animation: shake 0.5s;
+}
+`}</style>
     </DirectionProvider>
   );
 } 

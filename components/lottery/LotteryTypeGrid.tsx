@@ -9,6 +9,7 @@ import { countryFlagImg } from "@/lib/utils/flags";
 import BouncingCard from "@/components/lottery/BouncingCard";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 function isOpenNow(schedule: any) {
   if (!schedule) return false;
@@ -124,27 +125,37 @@ export default function LotteryTypeGrid({
                 const scheduleEn = schedule
                   ? { ...schedule, day_of_week: dayOfWeekToEn(schedule.day_of_week) }
                   : undefined;
+                const isCurrentlyOpen = isOpenNow(scheduleEn);
                 const isLoading = loadingCardId === sub.lottery_sub_type_id;
                 return (
-                  <BouncingCard key={sub.lottery_sub_type_id} idx={idx} bouncing={isOpenNow(scheduleEn)}>
+                  <BouncingCard key={sub.lottery_sub_type_id} idx={idx} bouncing={isCurrentlyOpen}>
                     <div className="relative">
                       <div
                         className="block"
                         style={{ pointerEvents: isLoading ? "none" : "auto" }}
                         onClick={async (e) => {
                           e.preventDefault();
+
+                          if (!isCurrentlyOpen) {
+                            toast.error("ขออภัย ยังไม่เปิดรับแทงรายการนี้");
+                            return;
+                          }
+
+                          if (isLoading) return; // Prevent multiple clicks if already loading
+
                           setLoadingCardId(sub.lottery_sub_type_id);
                           const today = new Date();
-                          const drawDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                          // Ensure the date is in YYYY-MM-DD format for consistency if needed by backend/query params
+                          const drawDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                           const availableDraw = {
-                            date: drawDate.toISOString(),
-                            schedule: scheduleEn
+                            date: new Date(drawDateString).toISOString(), // Keep as ISO string for consistency with LotteryTicketPage
+                            schedule: scheduleEn,
                           };
                           router.push(`/lottery-ticket?subType=${sub.lottery_sub_type_id}&draw=${encodeURIComponent(JSON.stringify(availableDraw))}`);
                         }}
                       >
                         <Card
-                          className="min-h-[220px] flex flex-col items-center shadow-md border border-gray-200 max-w-xs w-full mx-auto bg-white dark:bg-zinc-900 transition-all duration-500 ease-out opacity-0 translate-y-4 animate-fadein cursor-pointer hover:shadow-lg"
+                          className={`min-h-[220px] flex flex-col items-center shadow-md border border-gray-200 max-w-xs w-full mx-auto bg-white dark:bg-zinc-900 transition-all duration-500 ease-out opacity-0 translate-y-4 animate-fadein ${isCurrentlyOpen ? 'cursor-pointer hover:shadow-lg' : 'opacity-70 cursor-default'}`}
                           style={{
                             animationDelay: `${idx * 80}ms`,
                             animationFillMode: 'forwards',
@@ -153,13 +164,13 @@ export default function LotteryTypeGrid({
                           <div
                             className={
                               `w-full text-center rounded-t-md ` +
-                              (isOpenNow(scheduleEn)
+                              (isCurrentlyOpen
                                 ? "bg-green-600 text-white"
                                 : "bg-transparent text-gray-500 border-b border-gray-200")
                             }
                           >
                             <h2 className="text-base font-semibold">
-                              {isOpenNow(scheduleEn) ? "เปิดรับ" : "ปิดรับแทง"}
+                              {isCurrentlyOpen ? "เปิดรับ" : "ปิดรับแทง"}
                             </h2>
                           </div>
                           <img
