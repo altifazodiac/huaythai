@@ -28,8 +28,7 @@ import { debounce } from "lodash"
 import { format, addMonths, isBefore, isAfter, set } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 import { th } from "date-fns/locale"
-import { handlePrint } from "@/components/huaythai-print/ticket-print"
-
+import { handlePrint } from "@/lib/lottery-print"
 // Define interfaces for the parsed JSON data
 interface NumberSetsState {
   selectedNumbers: string[]
@@ -733,17 +732,7 @@ export default function PriceEntryPage() {
         }))
       };
       // Call print function
-      await handlePrint({ 
-        purchase: {
-          ...purchaseForPrint,
-          items: purchaseForPrint.items.map(item => ({
-            id: item.ticket_purchase_id, // Add id field
-            ...item
-          }))
-        }, 
-        ticketSubTypes, 
-        user 
-      });
+       
 
       const params = new URLSearchParams()
       params.set(
