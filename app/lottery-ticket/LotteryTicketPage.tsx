@@ -41,6 +41,9 @@ import { th } from "date-fns/locale";
 import { useSearchParams, useRouter } from "next/navigation";
 import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
 import SpectacularLoader from "@/components/ui/SpectacularLoader"; // Import the new loader
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+ 
+
  
 
 interface LotterySubType {
@@ -116,7 +119,10 @@ export default function LotteryTicketPage() {
   const [selectedPayout, setSelectedPayout] = useState<number | null>(null);
   const [selectedDigit, setSelectedDigit] = useState<number | null>(null);
   const [selectedTypes, setSelectedTypes] = useState<number[]>([]);
-  const [reverseNumber, setReverseNumber] = useState(false);
+  // const [reverseNumber, setReverseNumber] = useState(false); // Replaced by specific operation states
+  const [twoDigitOperation, setTwoDigitOperation] = useState<'none' | 'reverse' | 'swipeFront' | 'swipeBack'>('none');
+  const [permuteThreeDigits, setPermuteThreeDigits] = useState(false);
+  const [swipeNineSingleDigit, setSwipeNineSingleDigit] = useState(false);
   const [numberInput, setNumberInput] = useState("");
   const [amount, setAmount] = useState("");
   const [amounts, setAmounts] = useState<Record<number, string>>({});
@@ -135,6 +141,7 @@ export default function LotteryTicketPage() {
   const [isNumberDrawerOpen, setIsNumberDrawerOpen] = useState(false);
   const [billName, setBillName] = useState("");
   const [isLoadingPrint, setIsLoadingPrint] = useState(false);
+  const [countdownText, setCountdownText] = useState("");
 
   // โหลดชนิดหวย
   useEffect(() => {
@@ -154,6 +161,8 @@ export default function LotteryTicketPage() {
       .from("lottery_sub_number")
       .select("*")
       .eq("lottery_sub_type_id", selectedSubType)
+      .order('digit_number') 
+      .order('type_number')  
       .then(({ data }) => {
         if (data) setPayouts(data);
       });
@@ -197,29 +206,58 @@ export default function LotteryTicketPage() {
 
   // เพิ่มรายการ
   function handleAddTicket() {
-    if (!subTypeObj || !selectedDigit || selectedTypes.length === 0) {
+    if (!subTypeObj || selectedDigit === null || selectedTypes.length === 0) {
       toast.error("กรุณาเลือกชนิดหวย, จำนวนหลัก และประเภทก่อน");
       return;
     }
-    const numbersRaw = numberInput
+    const isSwipeMode = selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack');
+    const expectedInputLength = isSwipeMode ? 1 : selectedDigit;
+
+    let numbersRaw = numberInput
       .replace(/\n|,/g, " ")
       .split(" ")
       .map((n) => n.trim())
-      .filter((n) => n.length === selectedDigit && /^\d+$/.test(n));
+      .filter((n) => n.length === expectedInputLength && /^\d+$/.test(n));
+
+    // Handle swipe 9 for single digit
+    if (selectedDigit === 1 && swipeNineSingleDigit) {
+      numbersRaw = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    }
+
     if (!numbersRaw.length) {
-      toast.error(`กรุณากรอกหมายเลข ${selectedDigit} หลัก อย่างน้อย 1 หมายเลข`);
+      toast.error(`กรุณากรอกหมายเลข ${expectedInputLength} หลัก อย่างน้อย 1 หมายเลข`);
       return;
     }
-    // กลับหมายเลขถ้าเลือก (เฉพาะเลข 2 ตัว)
     let numbers: string[] = [];
     numbersRaw.forEach((num) => {
-      if (reverseNumber && selectedDigit === 2) {
-        numbers.push(...getPermutations(num));
+      if (selectedDigit === 2) {
+        switch (twoDigitOperation) {
+          case 'reverse':
+            numbers.push(...getPermutations(num)); // num is already validated to be 2 digits
+            break;
+          case 'swipeFront': // num is 1 digit
+            for (let i = 0; i <= 9; i++) {
+              numbers.push(num + i.toString());
+            }
+            break;
+          case 'swipeBack': // num is 1 digit
+            for (let i = 0; i <= 9; i++) {
+              numbers.push(i.toString() + num);
+            }
+            break;
+          case 'none':
+          default:
+            numbers.push(num);
+            break;
+        }
+      } else if (selectedDigit === 3 && permuteThreeDigits) {
+        numbers.push(...getPermutations(num)); // num is 3 digits
       } else {
         numbers.push(num);
       }
     });
     numbers = Array.from(new Set(numbers));
+
     // ป้องกันเลขซ้ำในแต่ละ type
     const duplicate = numbers.some(num =>
       selectedTypes.some(typeId =>
@@ -274,9 +312,23 @@ export default function LotteryTicketPage() {
     setAmount("");
     setAmounts({});
     setSelectedTypes([]);
-    setReverseNumber(false);
+    setTwoDigitOperation('none');
+    setPermuteThreeDigits(false);
     toast.success("เพิ่มรายการสำเร็จ!");
   }
+
+  const handlePermuteThreeDigitsChange = (isChecked: boolean) => {
+    setPermuteThreeDigits(isChecked);
+    if (isChecked && selectedDigit === 3) {
+      // Find the "โต๊ด" type ID among the currently filtered types for 3 digits
+      const todType = filteredTypes.find(t => t.digit_number === 3 && t.type_number === "โต๊ด");
+      if (todType) {
+        // Unselect "โต๊ด" if it's selected
+        setSelectedTypes(prevSelectedTypes => prevSelectedTypes.filter(id => id !== todType.id));
+      }
+    }
+    // If unchecking "รูด 6", "โต๊ด" will be re-enabled automatically by the disabled logic in JSX
+  };
 
   function handleApplyNumbersFromDrawer(newNumbers: string[]) {
     const currentNumbersArray = numberInput
@@ -533,7 +585,7 @@ export default function LotteryTicketPage() {
 
 
   // ฟังก์ชันลบ group
-  function handleRemoveGroup(group: Grouped) {
+  async function handleRemoveGroup(group: Grouped) {
     setTicketList(ticketList.filter(item => {
       // เงื่อนไข: ถ้าเลข, digit, type, amount ตรงกับ group ให้ลบ
       const isInGroup = group.numbers.some(num =>
@@ -544,6 +596,27 @@ export default function LotteryTicketPage() {
       );
       return !isInGroup;
     }));
+
+    const drawInfo = selectedDraw
+      ? {
+          draw_date: selectedDraw.date.toISOString(),
+          close_time: selectedDraw.schedule.close_time,
+          schedule_id: selectedDraw.schedule.schedule_id,
+          schedule: selectedDraw.schedule
+        }
+      : {};
+    try {
+      await supabase.from('lottery_ticket_remove_logs').insert({
+        user_id: user?.id,
+        bill_number: billNumber,
+        group_info: group,
+        removed_at: new Date().toISOString(),
+        reason: 'user removed group',
+        ...drawInfo
+      });
+    } catch (e: unknown) {
+      console.error('Error logging remove group:', e);
+    }
   }
 
   // ===== Memoized Grouping logic for ticketList =====
@@ -694,6 +767,37 @@ export default function LotteryTicketPage() {
     fetchUserData();
   }, [router, supabase]);
 
+  // Countdown to close_time
+  useEffect(() => {
+    function getCountdownText(selectedDraw: AvailableDraw | null) {
+      if (!selectedDraw) return "-";
+      const now = new Date();
+      // close_time is string: 'HH:mm:ss' or 'HH:mm'
+      const [h, m, s] = selectedDraw.schedule.close_time.split(":");
+      const closeDate = new Date(selectedDraw.date);
+      closeDate.setHours(Number(h), Number(m), Number(s || 0), 0);
+      const diff = closeDate.getTime() - now.getTime();
+      if (diff <= 0) return "หมดเวลา";
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      return `${hours > 0 ? hours + ' ชม. ' : ''}${minutes} นาที ${seconds} วินาที`;
+    }
+    if (!selectedDraw) {
+      setCountdownText("");
+      return;
+    }
+    setCountdownText(getCountdownText(selectedDraw));
+    const timer = setInterval(() => {
+      const text = getCountdownText(selectedDraw);
+      setCountdownText(text);
+      if (text === "หมดเวลา") {
+        router.push("/");
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [selectedDraw, router]);
+
   return (
     <DirectionProvider dir="ltr">
       <SidebarProvider>
@@ -754,7 +858,7 @@ export default function LotteryTicketPage() {
                           {subTypes.find(s => s.lottery_sub_type_id === initialState.subType)?.sub_type_name || "-"}
                         </div>
                       ) : (
-                        <Select value={selectedSubType?.toString() || ""} onValueChange={v => { setSelectedSubType(Number(v)); setSelectedPayout(null); setSelectedDigit(null); setSelectedTypes([]); }}>
+                        <Select value={selectedSubType?.toString() || ""} onValueChange={v => { setSelectedSubType(Number(v)); setSelectedPayout(null); setSelectedDigit(null); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); }}>
                           <SelectTrigger>
                             <SelectValue placeholder="เลือกชนิดหวย" />
                           </SelectTrigger>
@@ -770,7 +874,7 @@ export default function LotteryTicketPage() {
                       <label className="text-sm font-medium">จำนวนหลัก</label>
                       <div className="flex gap-2 mt-1">
                         {digitOptions.map((d) => (
-                          <Button key={d} type="button" variant={selectedDigit === d ? "default" : "outline"} onClick={() => { setSelectedDigit(d); setSelectedTypes([]); }}>
+                          <Button key={d} type="button" variant={selectedDigit === d ? "default" : "outline"} onClick={() => { setSelectedDigit(d); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); }}>
                             {d} ตัว
                           </Button>
                         ))}
@@ -782,11 +886,18 @@ export default function LotteryTicketPage() {
                       <label className="text-sm font-medium">เลือกประเภท/รูปแบบ <span className="text-xs text-muted-foreground">(เลือกได้หลายแบบ)</span></label>
                       <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 ? 'animate-shake border-2 border-red-400 bg-red-50' : ''}`}>
                         {filteredTypes.map((type) => (
+                          // DEBUG LOG: Inspect type_number
+                          (type.digit_number === 3 && console.log(`LotteryTicketPage - 3-digit type render: ID=${type.id}, TypeNumber='${type.type_number}', IsTengMatch=${type.type_number === "เต็ง"}`)),
+                          
                           <label key={type.id} className="flex items-center gap-1 border rounded px-2 py-1 cursor-pointer bg-white dark:bg-zinc-900 shadow-sm">
                             <input
                               type="checkbox"
                               checked={selectedTypes.includes(type.id)}
                               onChange={() => handleTypeToggle(type.id)}
+                              disabled={
+                                (permuteThreeDigits && selectedDigit === 3 && type.type_number === "เต็ง") ||
+                                (permuteThreeDigits && selectedDigit === 3 && type.type_number === "โต๊ด")
+                              }
                               className="accent-blue-600"
                             />
                             {type.type_number || "-"} <span className="text-xs text-muted-foreground">(จ่าย {type.price_paid})</span>
@@ -795,27 +906,81 @@ export default function LotteryTicketPage() {
                       </div>
                     </div>
                   )}
-                  <div className="flex items-center gap-2 mt-2">
-                    <input type="checkbox" checked={reverseNumber} onChange={e => setReverseNumber(e.target.checked)} id="reverseNumber" className="accent-blue-600" disabled={selectedDigit !== 2} />
-                    <label htmlFor="reverseNumber" className="text-sm">กลับหมายเลข (เช่น 23 → 32)</label>
-                  </div>
+                  {/* Number operation options */}
+                  {selectedDigit === 2 && (
+                    <div className="mt-3">
+                      <label className="text-sm font-medium">รูปแบบเลข 2 ตัว</label>
+                      <RadioGroup
+                        value={twoDigitOperation}
+                        onValueChange={(value: string) => setTwoDigitOperation(value as 'none' | 'reverse' | 'swipeFront' | 'swipeBack')}
+                        className="flex flex-wrap gap-x-4 gap-y-2 mt-1"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="none" id="op-none" />
+                          <label htmlFor="op-none" className="text-sm cursor-pointer">ไม่มี</label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="reverse" id="op-reverse" />
+                          <label htmlFor="op-reverse" className="text-sm cursor-pointer">กลับเลข (เช่น 12 → 21)</label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="swipeFront" id="op-swipeFront" />
+                          <label htmlFor="op-swipeFront" className="text-sm cursor-pointer">รูดหน้า (เช่น 1 → 10-19)</label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="swipeBack" id="op-swipeBack" />
+                          <label htmlFor="op-swipeBack" className="text-sm cursor-pointer">รูดหลัง (เช่น 1 → 01-91)</label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  )}
+                  {selectedDigit === 3 && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <input
+                        type="checkbox"
+                        checked={permuteThreeDigits}
+                        onChange={e => handlePermuteThreeDigitsChange(e.target.checked)}
+                        id="permuteThreeDigits"
+                        className="accent-blue-600 h-4 w-4"
+                      />
+                      <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer">
+                        รูด 6 (เช่น 123 → 123, 132, 213, 231, 312, 321)
+                      </label>
+                    </div>
+                  )}
+                  {selectedDigit === 1 && (
+                    <div className="flex items-center gap-2 mt-3">
+                      <input
+                        type="checkbox"
+                        checked={swipeNineSingleDigit}
+                        onChange={e => setSwipeNineSingleDigit(e.target.checked)}
+                        id="swipeNineSingleDigit"
+                        className="accent-blue-600 h-4 w-4"
+                      />
+                      <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer">
+                        รูด 9 (เพิ่มหมายเลข 1-9)
+                      </label>
+                    </div>
+                  )}
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-sm font-medium">หมายเลขหวย <span className="text-xs text-muted-foreground">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span></label>
-                      {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsNumberDrawerOpen(true)}
-                        >
-                          เลือกจากชุดตัวเลข
-                        </Button>
-                      )}
+                      {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
+                       !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack')) && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setIsNumberDrawerOpen(true)}>
+                            เลือกจากชุดตัวเลข
+                          </Button>
+                        )}
                     </div>
                     <Textarea
                       rows={3}
-                      placeholder={selectedDigit ? `กรอกหมายเลข ${selectedDigit} หลัก เช่น ${"1".repeat(selectedDigit)} ...` : "เลือกจำนวนหลักก่อน"}
+                      placeholder={
+                        selectedDigit
+                          ? selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack')
+                            ? `กรอกหมายเลข 1 หลัก สำหรับรูดหน้า/หลัง (เช่น 1 2 3)`
+                            : `กรอกหมายเลข ${selectedDigit} หลัก (เช่น ${"1".repeat(selectedDigit)} ${"2".repeat(selectedDigit)})`
+                          : "เลือกจำนวนหลักก่อน"
+                      }
                       value={numberInput}
                       onChange={e => setNumberInput(e.target.value)}
                       disabled={!selectedDigit }
@@ -966,6 +1131,10 @@ export default function LotteryTicketPage() {
                             <svg className="inline-block w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
                             บิล: {billNumber}
                           </span>
+                          <span className="text-[13px] text-gray-700 flex items-center gap-1">
+                            <svg className="inline-block w-4 h-4 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
+                            ปิดรับใน:  <span className="ml-1 text-red-600 font-bold">{countdownText}</span>
+                          </span>
                         </div>
                         <div className="flex flex-wrap justify-between items-center gap-2">
                           <span className="text-gray-600 flex items-center gap-1">
@@ -1076,15 +1245,23 @@ export default function LotteryTicketPage() {
         </SidebarInset>
       </SidebarProvider>
       <ConfirmationDialog />
-      {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && (
-        <NumberSelectionDrawer
-          isOpen={isNumberDrawerOpen}
-          onOpenChange={setIsNumberDrawerOpen}
-          onApplyNumbers={handleApplyNumbersFromDrawer}
-          maxDigits={selectedDigit as 1 | 2 | 3}
-          initialUseReverseNumbers={reverseNumber && selectedDigit === 2}
-        />
-      )}
+      {(() => {
+        const isSwipeInputMode = selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack');
+        const shouldRenderDrawer = selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && !isSwipeInputMode;
+        
+        if (!shouldRenderDrawer) return null;
+
+        let useReverseForDrawer = false;
+        if (selectedDigit === 2 && twoDigitOperation === 'reverse') useReverseForDrawer = true;
+        else if (selectedDigit === 3 && permuteThreeDigits) useReverseForDrawer = true;
+
+        return (<NumberSelectionDrawer
+            isOpen={isNumberDrawerOpen}
+            onOpenChange={setIsNumberDrawerOpen}
+            onApplyNumbers={handleApplyNumbersFromDrawer}
+            maxDigits={selectedDigit as 1 | 2 | 3}
+            initialUseReverseNumbers={useReverseForDrawer} />);
+      })()}
       {isLoadingPrint && ( 
         <SpectacularLoader message="กำลังเตรียมข้อมูลสำหรับพิมพ์..." baseColor="green" />
       )}

@@ -68,12 +68,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         plan: "HuayOnline",
       },
       {
-        name: "Acme Corp.",
+        name: "มาเฟียพารวย",
         logo: AudioWaveform,
         plan: "Startup",
       },
       {
-        name: "Evil Corp.",
+        name: "หวยเศรษฐี",
         logo: Command,
         plan: "Free",
       },
@@ -112,16 +112,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: "รายงาน",
             url: "/admin/reports",
           },
+          {
+            title: "รายการที่ลบ",
+            url: "/admin/lottery-ticket",
+          },
+          {
+            title: "จัดการชนิดย่อยของหวย",
+            url: "/admin/lotterysubtype",
+          },
         ],
       },
     ] as NavItem[],
     navMain: [
       {
-        title: "หวยไทย",
+        title: "รายการหวย",
         url: "#",
         icon: SquareTerminal,
         isActive: true,
         items: [
+          {
+            title: "รายการหวยทั้งหมด",
+            url: "/",
+          },
         
           {
             title: "รายการซื้อ",
@@ -151,123 +163,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: "สรุปรายงาน",
             url: "/lottery-summary",
           },
-          {
-            title: "จัดการชนิดย่อยของหวย",
-            url: "/lotterysubtype",
-          },
+         
         ],
       },
-      {
-        title: "หวยหุ้น",
-        url: "#",
-        icon: SquareTerminal,
-        items: [
-          {
-            title: "ซื้อหวยหุ้น",
-            url: "#",
-          },
-          {
-            title: "รายการซื้อหวยหุ้น",
-            url: "#",
-          },
-          {
-            title: "ตรวจผลหวยหุ้น",
-            url: "#",
-          },
-          {
-            title: "ผลหวยหุ้นย้อนหลัง",
-            url: "#",
-          },
-        ],
-      },
-      {
-        title: "หวยลาว",
-        url: "#",
-        icon: SquareTerminal,
-        items: [
-          {
-            title: "ซื้อหวยลาว",
-            url: "#",
-          },
-          {
-            title: "รายการซื้อหวยลาว",
-            url: "#",
-          },
-          {
-            title: "ตรวจผลหวยลาว",
-            url: "#",
-          },
-          {
-            title: "ผลหวยลาวย้อนหลัง",
-            url: "#",
-          },
-        ],
-      },
-      {
-        title: "หวยฮานอย",
-        url: "#",
-        icon: SquareTerminal,
-        items: [
-          {
-            title: "ซื้อหวยฮานอย",
-            url: "#",
-          },
-          {
-            title: "รายการซื้อหวยฮานอย",
-            url: "#",
-          },
-          {
-            title: "ตรวจผลหวยฮานอย",
-            url: "#",
-          },
-          {
-            title: "ผลหวยฮานอยย้อนหลัง",
-            url: "#",
-          },
-        ],
-      },
-      {
-        title: "Models",
-        url: "#",
-        icon: Bot,
-        items: [
-          {
-            title: "Genesis",
-            url: "#",
-          },
-          {
-            title: "Explorer",
-            url: "#",
-          },
-          {
-            title: "Quantum",
-            url: "#",
-          },
-        ],
-      },
-      {
-        title: "Documentation",
-        url: "#",
-        icon: BookOpen,
-        items: [
-          {
-            title: "Introduction",
-            url: "#",
-          },
-          {
-            title: "Get Started",
-            url: "#",
-          },
-          {
-            title: "Tutorials",
-            url: "#",
-          },
-          {
-            title: "Changelog",
-            url: "#",
-          },
-        ],
-      },
+     
       {
         title: "Settings",
         url: "#",

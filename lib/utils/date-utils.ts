@@ -72,4 +72,48 @@ export const getNextDrawDate = async (supabase: any, thailandTime: Date): Promis
   }
 
   return formattedDrawDate;
-}; 
+};
+
+/**
+ * แปลงข้อความวัน (ภาษาไทย) เป็น array ของเลขวัน (0=อาทิตย์, 1=จันทร์, ... 6=เสาร์)
+ * @param dayOfWeekStr เช่น 'จันทร์-ศุกร์', 'เสาร์-อาทิตย์', 'จันทร์, พุธ, ศุกร์', 'จันทร์–อาทิตย์'
+ */
+export function parseThaiDayOfWeek(dayOfWeekStr: string): number[] {
+  const dayMap: Record<string, number> = {
+    'อาทิตย์': 0,
+    'จันทร์': 1,
+    'อังคาร': 2,
+    'พุธ': 3,
+    'พฤหัสบดี': 4,
+    'ศุกร์': 5,
+    'เสาร์': 6,
+  };
+  // Normalize dash
+  const normalized = dayOfWeekStr.replace(/–|—/g, '-').replace(/\s+/g, '');
+  if (normalized === 'จันทร์-อาทิตย์') return [0,1,2,3,4,5,6];
+  if (normalized === 'เสาร์-อาทิตย์') return [6,0];
+  if (normalized === 'จันทร์-ศุกร์') return [1,2,3,4,5];
+  if (normalized === 'อาทิตย์-พฤหัสบดี') return [0,1,2,3,4];
+  // กรณีคั่นด้วย ,
+  if (normalized.includes(',')) {
+    return normalized.split(',').map(d => dayMap[d]).filter(x => x !== undefined);
+  }
+  // กรณีคั่นด้วย -
+  if (normalized.includes('-')) {
+    const [start, end] = normalized.split('-');
+    const startIdx = dayMap[start];
+    const endIdx = dayMap[end];
+    if (startIdx !== undefined && endIdx !== undefined) {
+      if (startIdx <= endIdx) {
+        return Array.from({length: endIdx - startIdx + 1}, (_,i) => startIdx + i);
+      } else {
+        // เช่น ศุกร์-จันทร์ (5-1) => [5,6,0,1]
+        return Array.from({length: 7 - startIdx + endIdx + 1}, (_,i) => (startIdx + i)%7);
+      }
+    }
+  }
+  // กรณีวันเดียว
+  if (dayMap[normalized] !== undefined) return [dayMap[normalized]];
+  // fallback
+  return [];
+} 

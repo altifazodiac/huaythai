@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { createClient } from "@supabase/supabase-js";
 import { Card, CardContent } from "@/components/ui/card";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -79,18 +80,23 @@ function dayOfWeekToEn(day: string) {
 function isOpenNow(schedule: any) {
   if (!schedule) return false;
   const now = new Date();
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const today = dayNames[now.getDay()];
-  const days = schedule.day_of_week?.split(",").map((d: string) => d.trim()) || [];
-  if (!days.includes(today)) return false;
-  if (!schedule.open_time || !schedule.close_time) return false;
   const [openH, openM] = schedule.open_time.split(":");
   const [closeH, closeM] = schedule.close_time.split(":");
   const open = new Date(now);
   open.setHours(+openH, +openM, 0, 0);
   const close = new Date(now);
   close.setHours(+closeH, +closeM, 0, 0);
-  return now >= open && now <= close;
+
+  // ถ้าเวลาปิดรับ < เวลาเปิดรับ แปลว่าข้ามวัน
+  if (close <= open) {
+    // เปิดรับตั้งแต่ open ของวันนี้ ถึง close ของวันถัดไป
+    const closeNext = new Date(open);
+    closeNext.setDate(open.getDate() + 1);
+    closeNext.setHours(+closeH, +closeM, 0, 0);
+    return now >= open || now <= closeNext;
+  } else {
+    return now >= open && now <= close;
+  }
 }
 
 export default async function Page() {
@@ -126,7 +132,7 @@ export default async function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="#">
-                    แดชบอร์ด
+                    หน้าหลัก
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />

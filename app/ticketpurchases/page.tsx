@@ -21,12 +21,15 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import { PrinterIcon } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   handlePrint,
   fetchTicketPurchase,
 } from "@/lib/lottery-print";
 
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -94,6 +97,13 @@ export default function LotteryPurchasePage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
 
+  // Filter states
+  const [filterBillNumber, setFilterBillNumber] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTicket, setDeletingTicket] = useState<LotteryTicket | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+
   // Fetch user data
   useEffect(() => {
     const fetchUserData = async () => {
@@ -111,10 +121,9 @@ export default function LotteryPurchasePage() {
   useEffect(() => {
     const fetchTickets = async () => {
       if (!user) return;
-      
       try {
         setLoading(true);
-        const { data, error } = await supabase
+        let query = supabase
           .from('lottery_tickets')
           .select(`
             *,
@@ -134,8 +143,15 @@ export default function LotteryPurchasePage() {
             )
           `)
           .eq('user_id', user.id)
+          .is('deleted_at', null)
           .order('created_at', { ascending: false });
-
+        if (filterBillNumber) {
+          query = query.ilike('bill_number', `%${filterBillNumber}%`);
+        }
+        if (filterDate) {
+          query = query.eq('draw_date', filterDate);
+        }
+        const { data, error } = await query;
         if (error) throw error;
         setTickets(data || []);
       } catch (error) {
@@ -145,9 +161,8 @@ export default function LotteryPurchasePage() {
         setLoading(false);
       }
     };
-
     fetchTickets();
-  }, [user, supabase]);
+  }, [user, supabase, filterBillNumber, filterDate]);
 
   // Function to create groups from ticket items (same logic as in your original code)
   const createGroups = (ticketItems: TicketDisplayItem[]) => {
@@ -309,6 +324,40 @@ export default function LotteryPurchasePage() {
     return group.typeLabels.reduce((sum, label) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
   };
 
+  // Soft delete function
+  const handleDeleteTicket = async () => {
+    if (!deletingTicket || !user) return;
+    setLoading(true);
+    try {
+      // 1. Update deleted_at in lottery_tickets
+      const { error } = await supabase
+        .from('lottery_tickets')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', deletingTicket.id);
+      if (error) throw error;
+      // 2. Insert into delete_history
+      const { error: histError } = await supabase
+        .from('delete_history')
+        .insert({
+          ticket_id: deletingTicket.id,
+          user_id: user.id,
+          reason: deleteReason,
+          deleted_at: new Date().toISOString(),
+        });
+      if (histError) throw histError;
+      toast.success("ลบรายการสำเร็จ (จะถูกลบถาวรใน 30 วัน)");
+      setDeleteDialogOpen(false);
+      setDeletingTicket(null);
+      setDeleteReason("");
+      // Refresh tickets
+      setTickets((prev) => prev.filter(t => t.id !== deletingTicket.id));
+    } catch (error: any) {
+      toast.error("เกิดข้อผิดพลาดในการลบ: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <DirectionProvider dir="ltr">
@@ -363,6 +412,25 @@ export default function LotteryPurchasePage() {
                 </div>
               </CardHeader>
             </Card>
+
+            {/* Filter UI */}
+            <div className="flex flex-wrap gap-2 mb-4 px-2 md:px-4 lg:px-6">
+              <Input
+                type="text"
+                placeholder="ค้นหาด้วยเลขบิล..."
+                value={filterBillNumber}
+                onChange={e => setFilterBillNumber(e.target.value)}
+                className="w-40 text-xs"
+              />
+              <Input
+                type="date"
+                placeholder="ค้นหาด้วยวันที่ออกรางวัล"
+                value={filterDate}
+                onChange={e => setFilterDate(e.target.value)}
+                className="w-44 text-xs"
+              />
+              <Button variant="outline" size="sm" onClick={() => { setFilterBillNumber(""); setFilterDate(""); }}>ล้างตัวกรอง</Button>
+            </div>
 
             {/* Tickets List */}
             {tickets.length === 0 ? (
@@ -433,6 +501,15 @@ export default function LotteryPurchasePage() {
                                 <PrinterIcon className="mr-1.5 h-3.5 w-3.5" />
                                 พิมพ์
                               </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="mt-1 text-xs px-2 py-1 h-auto"
+                                onClick={() => { setDeletingTicket(ticket); setDeleteDialogOpen(true); }}
+                              >
+                                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                ลบ
+                              </Button>
                             </div>
                           </div>
                         </CardHeader>
@@ -485,6 +562,27 @@ export default function LotteryPurchasePage() {
                 })}
               </motion.div>
             )}
+
+            {/* Delete Dialog */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>ยืนยันการลบรายการ</DialogTitle>
+                </DialogHeader>
+                <div className="text-sm mb-2">คุณต้องการลบรายการบิลเลขที่ <span className="font-bold">{deletingTicket?.bill_number}</span> หรือไม่?<br/> (ข้อมูลจะถูกเก็บไว้อีก 30 วันก่อนลบถาวร)</div>
+                <Input
+                  type="text"
+                  placeholder="เหตุผลในการลบ (ไม่บังคับ)"
+                  value={deleteReason}
+                  onChange={e => setDeleteReason(e.target.value)}
+                  className="mb-2"
+                />
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>ยกเลิก</Button>
+                  <Button variant="destructive" onClick={handleDeleteTicket}>ยืนยันลบ</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </motion.div>
         </SidebarInset>
       </SidebarProvider>
