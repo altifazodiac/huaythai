@@ -484,12 +484,11 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
 
       const { data: existingResults, error } = await supabase
         .from("lottery_results")
-        .select("schedule_id, result_data, draw_time")
+        .select("schedule_id, draw_time, prize_code, winning_number")
         .eq("draw_date", todayDateStr)
         .in("schedule_id", allScheduleIds);
 
       if (error) {
-        console.error("Error fetching existing lottery results:", error.message);
         toast.error("ไม่สามารถโหลดผลรางวัลที่บันทึกไว้ได้");
         return;
       }
@@ -497,19 +496,13 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
       if (existingResults && existingResults.length > 0) {
         const newSavedSet = new Set<number>();
         const newResultInputs: { [scheduleId: number]: any } = {};
-
         existingResults.forEach(dbResult => {
-          const scheduleForThisResult = Object.values(currentGroupedSchedules)
-            .flatMap(g => g.schedules)
-            .find(s => s.schedule_id === dbResult.schedule_id && s.drawing_time === dbResult.draw_time);
-
-          if (scheduleForThisResult) {
-            newSavedSet.add(dbResult.schedule_id);
-            newResultInputs[dbResult.schedule_id] = dbResult.result_data;
-          }
+          if (!newResultInputs[dbResult.schedule_id]) newResultInputs[dbResult.schedule_id] = {};
+          newResultInputs[dbResult.schedule_id][dbResult.prize_code] = dbResult.winning_number;
+          newSavedSet.add(dbResult.schedule_id);
         });
-        setSuccessfullySavedSchedules(prev => new Set([...Array.from(prev), ...Array.from(newSavedSet)]));
-        setResultInputs(prev => ({ ...prev, ...newResultInputs }));
+        setSuccessfullySavedSchedules(newSavedSet);
+        setResultInputs(newResultInputs);
       }
     };
     // Orchestrate the data fetching process
@@ -593,46 +586,48 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
        if (saveInProgressForScheduleId === sch.schedule_id) setSaveInProgressForScheduleId(null);
         return false;
     }
-    const subTypeData = sch.lottery_sub_types[0]; // Get the first sub_type
-
-    setSaveInProgressForScheduleId(sch.schedule_id);
-
+    const subTypeData = sch.lottery_sub_types[0];
     const subTypeId = subTypeData.lottery_sub_type_id;
     const typeId = subTypeData.lottery_type_id;
     const scheduleId = sch.schedule_id;
     const drawDate = format(new Date(), "yyyy-MM-dd");
-     const drawTime = sch.drawing_time; // Assuming sch.drawing_time is in HH:MM:SS or HH:MM format
+    const drawTime = sch.drawing_time;
     const resultData = resultInputs[scheduleId] || {};
 
     const filteredResultData = Object.entries(resultData)
-      .filter(([_, val]) => val !== "" && val !== null && val !== undefined)
-      .reduce((obj, [key, val]) => { obj[key] = val; return obj; }, {} as Record<string, any>);
+      .filter(([_, val]) => val !== "" && val !== null && val !== undefined);
 
-    if (Object.keys(filteredResultData).length === 0) {
+    if (filteredResultData.length === 0) {
       toast.error("กรุณากรอกผลรางวัลอย่างน้อย 1 รายการ");
-      setSaveInProgressForScheduleId(null);
       return false;
     }
 
-    const { error } = await supabase.from("lottery_results").upsert({
-      lottery_type_id: typeId,
-      lottery_sub_type_id: subTypeId,
-      schedule_id: scheduleId,
-      draw_date: drawDate,
-      draw_time: drawTime, // Add draw_time here
-      result_data: filteredResultData,
-     }, { onConflict: 'schedule_id, draw_date, draw_time' }); // Update onConflict
+    setSaveInProgressForScheduleId(scheduleId);
 
-    setSaveInProgressForScheduleId(null); 
-    if (!error) {
-      toast.success(`บันทึกผลสำหรับ ${subTypeData.sub_type_name} (${sch.drawing_time}) สำเร็จ!`);
-      setSuccessfullySavedSchedules(prev => new Set(prev).add(sch.schedule_id));
-       return true;
-    } else {
-      toast.error(`เกิดข้อผิดพลาดในการบันทึก ${subTypeData.sub_type_name} (${sch.drawing_time}): ${error.message}`);
-      console.error("Save error:", error);
-     return false;
+    let hasError = false;
+    for (const [prize_code, winning_number] of filteredResultData) {
+      const { error } = await supabase.from("lottery_results").upsert({
+        lottery_type_id: typeId,
+        lottery_sub_type_id: subTypeId,
+        schedule_id: scheduleId,
+        draw_date: drawDate,
+        draw_time: drawTime,
+        prize_code,
+        winning_number,
+      }, { onConflict: 'schedule_id, draw_date, draw_time, prize_code' });
+      if (error) {
+        hasError = true;
+        toast.error(`บันทึก ${prize_code} ผิดพลาด: ${error.message}`);
+      }
     }
+
+    setSaveInProgressForScheduleId(null);
+    if (!hasError) {
+      toast.success(`บันทึกผลสำหรับ ${subTypeData.sub_type_name} (${sch.drawing_time}) สำเร็จ!`);
+      setSuccessfullySavedSchedules(prev => new Set(prev).add(scheduleId));
+      return true;
+    }
+    return false;
   };
   // Helper to get schedules that have been modified and not yet saved
   const getSchedulesToSave = (): Schedule[] => {

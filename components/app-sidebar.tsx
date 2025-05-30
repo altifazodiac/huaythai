@@ -141,29 +141,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           },
           {
             title: "ตรวจผลหวย",
-            url: "/huayresults",
+            url: "/lottery-ticketresults",
           },
           {
             title: "ผลสลากกินแบ่ง",
             url: "/lottery-results",
           },
           {
-            title: "ผลหวยย้อนหลัง",
-            url: "#",
-          },
-          {
             title: "การจ่ายรางวัล",
-            url: "/huaythaigroup",
-          },
-          {
-            title: "การจ่ายรางวัลย้อนหลัง",
-            url: "/lottery-winnings-report",
-          },
-          {
-            title: "สรุปรายงาน",
             url: "/lottery-summary",
           },
-         
+          
         ],
       },
      
