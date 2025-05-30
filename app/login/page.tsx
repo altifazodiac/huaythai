@@ -93,7 +93,7 @@ const LoginPage = () => {
       if (signInError) throw signInError;
       if (data.user) {
         await new Promise(resolve => setTimeout(resolve, 500));
-        router.push('/huaythai'); // Adjust path as needed
+        router.push('/'); // Adjust path as needed
       }
     } catch (err: any) {
       if (err.message.includes('Invalid login credentials')) {
@@ -143,7 +143,7 @@ const LoginPage = () => {
         </motion.div>
         <motion.div variants={navItemVariants} className="flex items-center space-x-4 md:space-x-6">
           <a href="#" className="text-sm text-gray-600 hover:text-blue-600">ติดต่อเรา</a>
-          <a href="#" className="text-sm text-gray-600 hover:text-blue-600">เข้าสู่ระบบ</a>
+         
           <Button variant="default" className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">
             สมัครสมาชิก
           </Button>
