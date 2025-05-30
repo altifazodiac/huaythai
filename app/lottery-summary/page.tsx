@@ -154,7 +154,7 @@ const LotterySummaryPage: React.FC = () => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
 
- return (
+return (
   <DirectionProvider dir="ltr">
     <SidebarProvider>
       <AppSidebar />

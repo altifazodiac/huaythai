@@ -143,10 +143,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             title: "ตรวจผลหวย",
             url: "/lottery-ticketresults",
           },
-          {
-            title: "ผลสลากกินแบ่ง",
-            url: "/lottery-results",
-          },
+      
           {
             title: "การจ่ายรางวัล",
             url: "/lottery-summary",
