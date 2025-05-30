@@ -734,18 +734,30 @@ export default function LotteryTicketPage() {
         const subTypeId = item.subType.lottery_sub_type_id;
 
         const canonicalLabelOrderForKey = calculatedAllTypeLabels[digit] || [itemTypeLabel];
-        const amountsPattern = canonicalLabelOrderForKey.map(label =>
-            label === itemTypeLabel ? item.amount : 0
-        ).join(',');
+        let groupAmounts: Record<string, number> = {};
+        let canMerge = true;
+        canonicalLabelOrderForKey.forEach(label => {
+            const found = ticketList.find(t =>
+                t.subType.lottery_sub_type_id === subTypeId &&
+                t.payout.digit_number === digit &&
+                t.payout.type_number === label
+            );
+            if (found) {
+                groupAmounts[label] = found.amount;
+            } else {
+                groupAmounts[label] = 0;
+                canMerge = false;
+            }
+        });
 
-        const groupKey = `${subTypeId}|${digit}|${canonicalLabelOrderForKey.join(',')}|${amountsPattern}`;
+        const amountsArr = Object.values(groupAmounts);
+        if (amountsArr.every(a => a === amountsArr[0])) {
+            canMerge = true;
+        }
+
+        const groupKey = `${subTypeId}|${digit}|${canonicalLabelOrderForKey.join(',')}|${Object.values(groupAmounts).join('x')}`;
 
         if (!calculatedGroups.has(groupKey)) {
-            const groupAmounts: Record<string, number> = {};
-            canonicalLabelOrderForKey.forEach(label => {
-                groupAmounts[label] = (label === itemTypeLabel ? item.amount : 0);
-            });
-
             calculatedGroups.set(groupKey, {
                 digit_number: digit,
                 numbers: [],
@@ -759,7 +771,9 @@ export default function LotteryTicketPage() {
 
         const group = calculatedGroups.get(groupKey)!;
         item.numbers.forEach(numStr => {
-            group.numbers.push(numStr);
+            if (!group.numbers.includes(numStr)) {
+                group.numbers.push(numStr);
+            }
         });
     });
 
@@ -786,7 +800,10 @@ export default function LotteryTicketPage() {
         <div className="space-y-4">
           <div className="text-sm">
             <p className="font-medium mb-2">รายการที่เลือก:</p>
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto max-h-[40vh] overflow-y-auto mb-4"
+              style={{ maxHeight: '40vh', overflowY: 'auto', marginBottom: '1rem' }}
+            >
               <table className="min-w-full text-xs border border-gray-200 rounded">
                 <thead>
                   <tr className="bg-gray-50">
