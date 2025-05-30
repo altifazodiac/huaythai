@@ -8,6 +8,7 @@ import { getThailandTime, getNextDrawDate } from "@/lib/utils/date-utils";
 interface LotterySubType {
   lottery_sub_type_id: number; // Or string, ensure consistency with your DB schema
   sub_type_name: string;
+  multiplication_factor: number;
 }
 
 interface LotterySubNumber {
@@ -16,6 +17,19 @@ interface LotterySubNumber {
   digit_number: number;
   type_number: string;
   price_paid: number;
+}
+
+// Define an interface for the item structure returned by the Supabase query
+// This helps TypeScript understand the nested joined objects
+interface SupabaseTicketItem {
+  id: string; // or number
+  ticket_id: string; // or number
+  lottery_sub_type_id: number; // The FK in lottery_ticket_items
+  lottery_sub_number_id: number; // The FK in lottery_ticket_items
+  numbers: string[];
+  amount: number;
+  lottery_sub_types: LotterySubType; // Joined object
+  lottery_sub_number: LotterySubNumber; // Joined object
 }
 
 interface PrintLotteryTicketItem {
@@ -51,6 +65,7 @@ interface ConsolidatedTicketPurchase {
   purchase_date: string;
   draw_date: string;
   draw_time: string;
+  close_time?: string;
   deleted_at?: string | null;
   items: PrintLotteryTicketItem[]; // Updated to use richer item type
 }
@@ -70,7 +85,7 @@ interface TicketSubType {
 }
 
 // Copied and adapted createGroups function from page.tsx
-const createGroups = (ticketItems: TicketDisplayItem[]) => {
+const createGroups = (ticketItems: TicketDisplayItem[], preferredOrderMap: Record<number, string[]> = {}) => {
   const allTypeLabels: Record<number, string[]> = {};
 
   // Build type labels mapping
@@ -82,21 +97,39 @@ const createGroups = (ticketItems: TicketDisplayItem[]) => {
     }
   });
 
-  // Order labels for specific digit numbers
+  // Order labels for specific digit numbers using preferredOrderMap from DB
   Object.keys(allTypeLabels).forEach(digitStr => {
     const digit = Number(digitStr);
     const labels = allTypeLabels[digit];
     let ordered: string[] = [...labels];
-    if (digit === 3 || digit === 4) {
-      const preferredOrder = ["บน", "โต๊ด", "เต็ง"];
-      ordered = preferredOrder.filter(l => labels.includes(l));
+    // กำหนด fallback order ตาม digit
+    let fallback: string[] = [];
+    if (digit === 2) fallback = ["บน", "ล่าง"];
+    else if (digit === 3 || digit === 4) fallback = ["บน", "โต๊ด"];
+    else if (digit === 1) fallback = ["วิ่งบน", "วิ่งล่าง"];
+    // ใช้ preferredOrderMap ถ้ามีและครบ
+    if (preferredOrderMap[digit] && preferredOrderMap[digit].length >= fallback.length) {
+      ordered = preferredOrderMap[digit].filter(l => labels.includes(l));
       labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
-    } else if (digit === 2) {
-      const preferredOrder = ["บน", "ล่าง", "เต็ง"];
-      ordered = preferredOrder.filter(l => labels.includes(l));
+    } else if (fallback.length > 0) {
+      ordered = fallback.filter(l => labels.includes(l));
       labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
     }
     allTypeLabels[digit] = ordered;
+
+    // หลังจาก allTypeLabels[digit] = ordered; ให้แน่ใจว่า typeOrder มีครบ
+    if (digit === 2) {
+      allTypeLabels[digit] = ["บน", "ล่าง"];
+    }
+    if (digit === 3) {
+      allTypeLabels[digit] = ["บน", "โต๊ด"];
+    }
+    if (digit === 4) {
+      allTypeLabels[digit] = ["บน", "โต๊ด"];
+    }
+    if (digit === 1) {
+      allTypeLabels[digit] = ["วิ่งบน", "วิ่งล่าง"];
+    }
   });
 
   // สร้าง groups ใหม่
@@ -121,7 +154,8 @@ const createGroups = (ticketItems: TicketDisplayItem[]) => {
   Object.values(numberMap).forEach(({ digit, number, amounts }) => {
     const typeOrder = allTypeLabels[digit];
     // signature เช่น "10|30" (เช่น บน 10 ล่าง 30)
-    const amountsSignature = typeOrder.map(label => amounts[label] || 0).join('|');
+    // ปรับ amountsSignature ให้แสดง 0 ถ้าไม่มีการสั่งซื้อ label นั้น
+    const amountsSignature = typeOrder.map(label => amounts[label] !== undefined ? amounts[label] : 0).join('|');
     const key = `${digit}|${typeOrder.join(",")}|${amountsSignature}`;
 
     if (!groups.has(key)) {
@@ -129,7 +163,7 @@ const createGroups = (ticketItems: TicketDisplayItem[]) => {
         digit_number: digit,
         numbers: [],
         typeLabels: typeOrder,
-        amounts: Object.fromEntries(typeOrder.map((lab, idx) => [lab, amounts[lab] || 0])),
+        amounts: Object.fromEntries(typeOrder.map((lab, idx) => [lab, amounts[lab] !== undefined ? amounts[lab] : 0])),
         typeOrder: typeOrder,
       });
     }
@@ -139,13 +173,38 @@ const createGroups = (ticketItems: TicketDisplayItem[]) => {
 
   return groups;
 };
+// Function to calculate countdown text
+function getCountdownTextForPrint(drawDateStr: string, closeTimeStr: string | undefined): string {
+  if (!closeTimeStr || !drawDateStr) return "N/A";
 
+  const now = new Date(); // Current local time
+
+  // closeTimeStr is 'HH:mm:ss' or 'HH:mm'
+  const [h, m, s] = closeTimeStr.split(":").map(Number);
+
+  // drawDateStr is 'YYYY-MM-DD'
+  // parseISO will interpret YYYY-MM-DD as YYYY-MM-DDT00:00:00.000Z (UTC midnight)
+  const closeDate = parseISO(drawDateStr);
+  // setHours will set the time in the local timezone of the environment (browser)
+  closeDate.setHours(h, m, s || 0, 0);
+
+  const diff = closeDate.getTime() - now.getTime();
+
+  if (diff <= 0) return "หมดเวลา";
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  return `${hours > 0 ? hours + ' ชม. ' : ''}${minutes} นาที ${seconds} วินาที`.trim();
+}
 export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrintProps) => {
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     toast.error('ไม่สามารถเปิดหน้าพิมพ์ได้ กรุณาอนุญาตป๊อปอัพ');
     return;
   }
+// Get countdown text
+    const countdownText = getCountdownTextForPrint(purchase.draw_date, purchase.close_time);
 
   try {
     // Calculate total amount
@@ -189,8 +248,8 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
           <div class="group-info" style="width: 90px; text-align: center; padding-right: 5px; border-right: 1px dashed #ccc; flex-shrink: 0;">
             <div style="font-weight: bold;">${group.digit_number} ตัว</div>
             <div style="color: #d32f2f; font-size: 10px;">${group.typeOrder.join(" x ")}</div>
-            <div style="font-size: 10px;">${group.typeOrder.map(label => (group.amounts[label] ?? 0).toFixed(0)).join(" x ")}</div>
-            <div style="font-size: 10px; color: #555;">รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] ?? 0), 0) * group.numbers.length).toFixed(0)}฿</div>
+            <div style="font-size: 10px;">${group.typeOrder.map(label => (group.amounts[label] !== undefined ? group.amounts[label] : 0).toFixed(0)).join(" x ")}</div>
+            <div style="font-size: 10px; color: #555;">รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] !== undefined ? group.amounts[label] : 0), 0) * group.numbers.length).toFixed(0)}฿</div>
           </div>
           <div class="group-numbers" style="flex-grow: 1; padding-left: 8px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
             ${group.numbers.map(num => `<span style="background-color: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size:12px;">${num}</span>`).join("")}
@@ -404,6 +463,12 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
                 <span style="color: #555;">งวด: ${formattedActualDrawDate} (เวลา ${purchase.draw_time || 'N/A'})</span>
                 <span style="color: #555;">ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
               </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 2px; padding-bottom: 2px; border-bottom: 1px dashed #ccc;">
+                <span style="color: #c0392b; font-weight: bold; font-size: 11px;">
+                  <i class="fa fa-clock-o" aria-hidden="true" style="margin-right: 3px;"></i>ปิดรับใน:
+                </span>
+                <span style="color: #c0392b; font-weight: bold; font-size: 11px;">${countdownText}</span>
+              </div>
               <div style="font-size: 11px; text-align: right; background-color: #fff8e1; padding: 4px 6px; border-radius: 3px; color: #5d4037; margin-top: 2px;">
                 วันที่ซื้อ: ${formattedPurchaseDateTime}
               </div>
@@ -443,6 +508,7 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
       purchase_date,
       draw_date,
       draw_time,
+      close_time,
       deleted_at,
       lottery_ticket_items!inner (
         id,
@@ -478,20 +544,24 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
   if (!data || !data[0]) return null;
   const ticket = data[0];
 
-  const richItems: PrintLotteryTicketItem[] = (ticket.lottery_ticket_items || []).map((item: any) => ({
+  // ใช้ close_time ที่ดึงมาจาก ticket โดยตรง
+  // หาก ticket.close_time เป็น null/undefined (สำหรับบิลเก่า) countdown จะยังคงแสดง N/A หรือตามตรรกะเดิมของ getCountdownTextForPrint
+
+  // Explicitly cast the items array to the expected type before mapping
+  const richItems: PrintLotteryTicketItem[] = (ticket.lottery_ticket_items as unknown as SupabaseTicketItem[] || []).map((item) => ({
     id: item.id,
     numbers: item.numbers || [],
     amount: typeof item.amount === 'number' ? item.amount : Number(item.amount),
     lottery_sub_types: {
-      lottery_sub_type_id: item.lottery_sub_types?.lottery_sub_type_id,
-      sub_type_name: item.lottery_sub_types?.sub_type_name,
-      // multiplication_factor: item.lottery_sub_types?.multiplication_factor, // Keep if needed elsewhere
+      lottery_sub_type_id: item.lottery_sub_types.lottery_sub_type_id,
+      sub_type_name: item.lottery_sub_types.sub_type_name,
+      multiplication_factor: item.lottery_sub_types.multiplication_factor,
     },
     lottery_sub_number: {
-      id: item.lottery_sub_number?.id,
-      lottery_sub_type_id: item.lottery_sub_number?.lottery_sub_type_id,
-      digit_number: item.lottery_sub_number?.digit_number,
-      type_number: item.lottery_sub_number?.type_number,
+      id: item.lottery_sub_number.id,
+      lottery_sub_type_id: item.lottery_sub_number.lottery_sub_type_id,
+      digit_number: item.lottery_sub_number.digit_number,
+      type_number: item.lottery_sub_number.type_number,
       price_paid: typeof item.lottery_sub_number?.price_paid === 'number'
         ? item.lottery_sub_number.price_paid
         : Number(item.lottery_sub_number?.price_paid) || 0,
@@ -506,7 +576,32 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
     purchase_date: ticket.purchase_date,
     draw_date: ticket.draw_date,
     draw_time: ticket.draw_time,
+    close_time: ticket.close_time, // <<<< ใช้ close_time จาก ticket โดยตรง
     deleted_at: ticket.deleted_at,
     items: richItems,
   };
+}
+
+// ดึง preferred order ของแต่ละ digit จาก lottery_sub_types ใน Supabase
+export async function getPreferredOrderMapFromDB(): Promise<Record<number, string[]>> {
+  // ดึงข้อมูลจาก lottery_sub_types (สมมุติว่ามี field digit_number, type_order หรือ type_labels)
+  // ถ้าไม่มี type_order ใน DB ให้ดึงจาก lottery_sub_number แทน
+  const { data, error } = await supabase
+    .from('lottery_sub_number')
+    .select('digit_number, type_number')
+    .order('digit_number', { ascending: true })
+    .order('type_number', { ascending: true });
+  if (error) {
+    console.error('Error fetching preferred order from DB:', error);
+    return {};
+  }
+  // สร้าง mapping digit_number -> type_number[] (เรียงตามที่ดึงมา)
+  const map: Record<number, string[]> = {};
+  data.forEach((row: { digit_number: number; type_number: string }) => {
+    if (!map[row.digit_number]) map[row.digit_number] = [];
+    if (!map[row.digit_number].includes(row.type_number)) {
+      map[row.digit_number].push(row.type_number);
+    }
+  });
+  return map;
 }

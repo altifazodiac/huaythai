@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,10 +42,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
 import SpectacularLoader from "@/components/ui/SpectacularLoader"; // Import the new loader
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
- 
-
- 
-
+import debounce from "lodash.debounce";
+import { Progress } from "@/components/ui/progress"
 interface LotterySubType {
   lottery_sub_type_id: number;
   sub_type_name: string;
@@ -62,8 +60,20 @@ interface TicketItem {
   payout: LotterySubNumber;
   numbers: string[];
   amount: number;
+  uniqueKey: string;
 }
-
+interface DisplayCardItemGroup {
+  subTypeName: string;
+  digitNumber: number;
+  typeLabelsString: string; // เช่น "บน x ล่าง"
+  typeAmountsString: string; // เช่น "100x0"
+  
+  // รายการ Grouped objects เดิมที่จะแสดงในการ์ดนี้
+  groupedItems: Grouped[]; 
+  // อาจมีข้อมูลอื่นๆ ที่ต้องการแสดงร่วมกันในการ์ด เช่น uniqueKey แรก, ยอดรวมของการ์ด
+  cardUniqueKey: string; // Key สำหรับ React list
+  cardTotalAmount: number;
+}
 interface DrawingSchedule {
   schedule_id: number;
   lottery_sub_type_id: number;
@@ -84,9 +94,11 @@ interface AvailableDraw {
 interface Grouped {
   digit_number: number;
   numbers: string[];
-  typeLabels: string[];
-  amounts: Record<string, number>;
-  typeOrder: string[];
+  typeLabels: string[]; // Should be derived from items in group, or canonical
+  amounts: Record<string, number>; // Aggregated amounts for typeLabels
+  typeOrder: string[]; // Canonical order for display
+  uniqueKey: string; // Unique key of the first item forming the group, or a new group-specific key
+  _inferredPivotForSort?: string | null; // For swipe19 sorting
 }
 
 function normalizeDraw(draw: any): AvailableDraw {
@@ -95,6 +107,28 @@ function normalizeDraw(draw: any): AvailableDraw {
     date: draw?.date ? new Date(draw.date) : undefined,
   };
 }
+
+// Helper function to infer swipe19 pivot digit
+function inferSwipe19Pivot(arr: string[]): string | null {
+    if (arr.length !== 19) return null;
+
+    for (let dVal = 0; dVal <= 9; dVal++) {
+        const D = dVal.toString();
+        const expectedSet = new Set<string>();
+        for (let i = 0; i <= 9; i++) expectedSet.add(i.toString() + D);
+        for (let i = 0; i <= 9; i++) expectedSet.add(D + i.toString());
+
+        if (expectedSet.size !== 19) continue; // Should yield 19 unique numbers for a valid pivot
+
+        const currentSet = new Set(arr);
+        if (expectedSet.size === currentSet.size &&
+            [...expectedSet].every(val => currentSet.has(val))) {
+            return D;
+        }
+    }
+    return null;
+}
+
 
 export default function LotteryTicketPage() {
   const searchParams = useSearchParams();
@@ -119,13 +153,13 @@ export default function LotteryTicketPage() {
   const [selectedPayout, setSelectedPayout] = useState<number | null>(null);
   const [selectedDigit, setSelectedDigit] = useState<number | null>(null);
   const [selectedTypes, setSelectedTypes] = useState<number[]>([]);
-  // const [reverseNumber, setReverseNumber] = useState(false); // Replaced by specific operation states
-  const [twoDigitOperation, setTwoDigitOperation] = useState<'none' | 'reverse' | 'swipeFront' | 'swipeBack'>('none');
+   
+  const [twoDigitOperation, setTwoDigitOperation] = useState<'none' | 'reverse' | 'swipeFront' | 'swipeBack' | 'swipe19'>('none');
   const [permuteThreeDigits, setPermuteThreeDigits] = useState(false);
   const [swipeNineSingleDigit, setSwipeNineSingleDigit] = useState(false);
   const [numberInput, setNumberInput] = useState("");
-  const [amount, setAmount] = useState("");
-  const [amounts, setAmounts] = useState<Record<number, string>>({});
+  const [amount, setAmount] = useState(""); // For single type selection
+  const [amounts, setAmounts] = useState<Record<number, string>>({}); // For multi-type selection
   const [fillAllAmount, setFillAllAmount] = useState("");
   const [ticketList, setTicketList] = useState<TicketItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,15 +176,17 @@ export default function LotteryTicketPage() {
   const [billName, setBillName] = useState("");
   const [isLoadingPrint, setIsLoadingPrint] = useState(false);
   const [countdownText, setCountdownText] = useState("");
+  const [progress, setProgress] = useState(0);
 
-  // โหลดชนิดหวย
+  const debouncedSetNumberInput = useRef(debounce((val: string) => setNumberInput(val), 200)).current;
+
   useEffect(() => {
     supabase.from("lottery_sub_types").select("lottery_sub_type_id, sub_type_name").then(({ data }) => {
       if (data) setSubTypes(data);
     });
   }, [supabase]);
 
-  // โหลด payout เมื่อเลือกชนิดหวย
+ 
   useEffect(() => {
     if (!selectedSubType) {
       setPayouts([]);
@@ -168,30 +204,25 @@ export default function LotteryTicketPage() {
       });
   }, [selectedSubType, supabase]);
 
-  // ดึง object ของชนิดหวยและ payout
+ 
   const subTypeObj = subTypes.find((s) => s.lottery_sub_type_id === selectedSubType) || null;
-  const payoutObj = payouts.find((p) => p.id === selectedPayout) || null;
 
-  // ดึง digit_number ที่มีใน payout
   const digitOptions = useMemo(() => {
     const digits = new Set<number>();
     payouts.forEach((p) => digits.add(p.digit_number));
     return Array.from(digits).sort();
   }, [payouts]);
 
-  // filter เฉพาะประเภทที่ตรงกับ digit ที่เลือก
   const filteredTypes = useMemo(() => {
     if (!selectedDigit) return [];
     return payouts.filter((p) => p.digit_number === selectedDigit);
   }, [payouts, selectedDigit]);
 
-  // handle multi-select type
   function handleTypeToggle(id: number) {
     setSelectedTypes((prev) => prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]);
   }
 
-  // กลับหมายเลข (permutation)
-  function getPermutations(str: string) {
+  function getPermutations(str: string): string[] {
     if (str.length <= 1) return [str];
     let results: string[] = [];
     for (let i = 0; i < str.length; i++) {
@@ -204,130 +235,183 @@ export default function LotteryTicketPage() {
     return Array.from(new Set(results));
   }
 
-  // เพิ่มรายการ
   function handleAddTicket() {
     if (!subTypeObj || selectedDigit === null || selectedTypes.length === 0) {
       toast.error("กรุณาเลือกชนิดหวย, จำนวนหลัก และประเภทก่อน");
       return;
     }
-    const isSwipeMode = selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack');
-    const expectedInputLength = isSwipeMode ? 1 : selectedDigit;
 
-    let numbersRaw = numberInput
+    // Determine expected input length for numbers based on operation
+    const isSwipeModeForSingleDigitInput = selectedDigit === 2 &&
+        (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19');
+    const expectedInputLength = isSwipeModeForSingleDigitInput ? 1 : selectedDigit;
+
+    let rawNumbersFromInput = numberInput
       .replace(/\n|,/g, " ")
       .split(" ")
       .map((n) => n.trim())
-      .filter((n) => n.length === expectedInputLength && /^\d+$/.test(n));
+      .filter(n => n.length > 0); // Filter empty strings first
 
-    // Handle swipe 9 for single digit
     if (selectedDigit === 1 && swipeNineSingleDigit) {
-      numbersRaw = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-    }
-
-    if (!numbersRaw.length) {
-      toast.error(`กรุณากรอกหมายเลข ${expectedInputLength} หลัก อย่างน้อย 1 หมายเลข`);
-      return;
-    }
-    let numbers: string[] = [];
-    numbersRaw.forEach((num) => {
-      if (selectedDigit === 2) {
-        switch (twoDigitOperation) {
-          case 'reverse':
-            numbers.push(...getPermutations(num)); // num is already validated to be 2 digits
-            break;
-          case 'swipeFront': // num is 1 digit
-            for (let i = 0; i <= 9; i++) {
-              numbers.push(num + i.toString());
-            }
-            break;
-          case 'swipeBack': // num is 1 digit
-            for (let i = 0; i <= 9; i++) {
-              numbers.push(i.toString() + num);
-            }
-            break;
-          case 'none':
-          default:
-            numbers.push(num);
-            break;
-        }
-      } else if (selectedDigit === 3 && permuteThreeDigits) {
-        numbers.push(...getPermutations(num)); // num is 3 digits
-      } else {
-        numbers.push(num);
-      }
-    });
-    numbers = Array.from(new Set(numbers));
-
-    // ป้องกันเลขซ้ำในแต่ละ type
-    const duplicate = numbers.some(num =>
-      selectedTypes.some(typeId =>
-        ticketList.some(item =>
-          item.payout.digit_number === selectedDigit &&
-          item.payout.id === typeId &&
-          item.numbers.includes(num)
-        )
-      )
-    );
-    if (duplicate) {
-      toast.error("มีหมายเลขที่เลือกซ้ำในประเภทที่เลือกแล้ว");
-      return;
-    }
-    let newTickets: TicketItem[] = [];
-    if (selectedTypes.length > 1) {
-      let valid = true;
-      selectedTypes.forEach((typeId) => {
-        const amt = amounts[typeId];
-        if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) valid = false;
-      });
-      if (!valid) {
-        toast.error("กรุณากรอกจำนวนเงินให้ถูกต้องสำหรับทุกประเภท");
-        return;
-      }
-      newTickets = selectedTypes.map((typeId) => {
-        const payout = payouts.find((p) => p.id === typeId)!;
-        return {
-          subType: subTypeObj,
-          payout,
-          numbers,
-          amount: Number(amounts[typeId]),
-        };
-      });
+        // If swipeNineSingleDigit is active, rawNumbersFromInput is ignored and replaced.
+        rawNumbersFromInput = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
     } else {
-      if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-        toast.error("กรุณากรอกจำนวนเงินให้ถูกต้อง");
-        return;
-      }
-      newTickets = selectedTypes.map((typeId) => {
-        const payout = payouts.find((p) => p.id === typeId)!;
-        return {
-          subType: subTypeObj,
-          payout,
-          numbers,
-          amount: Number(amount),
-        };
-      });
+        // Validate each raw number based on expected length and digits only
+        rawNumbersFromInput = rawNumbersFromInput.filter((n) => {
+            const isValid = n.length === expectedInputLength && /^\d+$/.test(n);
+            if (!isValid && !swipeNineSingleDigit) { // Don't toast if swipeNine will override
+                 toast.error(`หมายเลข '${n}' ไม่ถูกต้องสำหรับ ${expectedInputLength} หลัก`);
+            }
+            return isValid;
+        });
     }
-    setTicketList([...ticketList, ...newTickets]);
-    setNumberInput("");
-    setAmount("");
-    setAmounts({});
-    setSelectedTypes([]);
-    setTwoDigitOperation('none');
-    setPermuteThreeDigits(false);
-    toast.success("เพิ่มรายการสำเร็จ!");
+    
+    if (!rawNumbersFromInput.length && !(selectedDigit === 1 && swipeNineSingleDigit)) {
+         toast.error(`กรุณากรอกหมายเลข ${expectedInputLength} หลัก อย่างน้อย 1 หมายเลขที่ถูกต้อง`);
+         return;
+    }
+
+
+    let allNewTickets: TicketItem[] = [];
+    const processingTimestampKey = Date.now().toString();
+
+    rawNumbersFromInput.forEach((rawNum, rawNumIndex) => {
+        let singleRawNumProcessedNumbers: string[] = [];
+
+        if (selectedDigit === 1 && swipeNineSingleDigit) {
+            // rawNum here is one of "1" through "9"
+            singleRawNumProcessedNumbers.push(rawNum);
+        } else if (selectedDigit === 2) {
+            switch (twoDigitOperation) {
+                case 'reverse':
+                    if (rawNum.length === 2) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
+                    break;
+                case 'swipeFront': // rawNum is 1 digit
+                    if (rawNum.length === 1) for (let i = 0; i <= 9; i++) singleRawNumProcessedNumbers.push(rawNum + i.toString());
+                    break;
+                case 'swipeBack': // rawNum is 1 digit
+                    if (rawNum.length === 1) for (let i = 0; i <= 9; i++) singleRawNumProcessedNumbers.push(i.toString() + rawNum);
+                    break;
+                case 'swipe19': // rawNum is 1 digit
+                    if (rawNum.length === 1) {
+                        const D = rawNum;
+                        const part1_endingWithD: string[] = [];
+                        for (let i = 0; i <= 9; i++) part1_endingWithD.push(i.toString() + D);
+
+                        const part2_startingWithD: string[] = [];
+                        for (let i = 0; i <= 9; i++) {
+                            const currentNumStarting = D + i.toString();
+                            if (!part1_endingWithD.includes(currentNumStarting)) {
+                                part2_startingWithD.push(currentNumStarting);
+                            }
+                        }
+                        const allNums = [...part1_endingWithD, ...part2_startingWithD];
+                        const uniqueNums = Array.from(new Set(allNums));
+
+                        // --- กรองเลข double ที่เคยถูกใช้ใน ticketList ออกเท่านั้น ---
+                        const usedDoubles = new Set<string>();
+                        ticketList.forEach(item => {
+                          if (item.payout.digit_number === 2) {
+                            item.numbers.forEach(num => {
+                              if (num.length === 2 && num[0] === num[1]) {
+                                usedDoubles.add(num);
+                              }
+                            });
+                          }
+                        });
+                        const filteredNums = uniqueNums.filter(num => {
+                          if (num.length === 2 && num[0] === num[1]) {
+                            return !usedDoubles.has(num);
+                          }
+                          return true;
+                        });
+                        singleRawNumProcessedNumbers.push(...filteredNums);
+                    }
+                    break;
+                case 'none':
+                default:
+                    if (rawNum.length === 2) singleRawNumProcessedNumbers.push(rawNum);
+                    break;
+            }
+        } else if (selectedDigit === 3 && permuteThreeDigits) {
+            if (rawNum.length === 3) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
+        } else { // Includes 1-digit 'none', and other non-handled selectedDigit cases
+            if (rawNum.length === selectedDigit) singleRawNumProcessedNumbers.push(rawNum);
+        }
+        
+        singleRawNumProcessedNumbers = Array.from(new Set(singleRawNumProcessedNumbers)); // Ensure unique numbers per rawNum processing
+
+
+        if (singleRawNumProcessedNumbers.length === 0) {
+            return; // Skip if this rawNum yielded no valid numbers
+        }
+        
+        const uniqueKeyForThisSet = `${processingTimestampKey}_${rawNumIndex}_${Math.random().toString(36).slice(2, 8)}`;
+
+        if (selectedTypes.length > 1) {
+            let typeAmountsAreValid = true;
+            selectedTypes.forEach((typeId) => {
+                const amt = amounts[typeId];
+                if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) typeAmountsAreValid = false;
+            });
+            if (!typeAmountsAreValid) {
+                toast.error("กรุณากรอกจำนวนเงินให้ถูกต้องสำหรับทุกประเภทที่เลือก (เมื่อประมวลผลเลขชุด)");
+                // Decide if to `return` from forEach or break outer processing
+                // For now, assume it might skip adding for this rawNum if amounts are bad for multi-type
+                return; 
+            }
+            selectedTypes.forEach((typeId) => {
+                const payout = payouts.find((p) => p.id === typeId)!;
+                allNewTickets.push({
+                    subType: subTypeObj,
+                    payout,
+                    numbers: [...singleRawNumProcessedNumbers],
+                    amount: Number(amounts[typeId]),
+                    uniqueKey: uniqueKeyForThisSet,
+                });
+            });
+        } else if (selectedTypes.length === 1) {
+            if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+                toast.error("กรุณากรอกจำนวนเงินให้ถูกต้อง (เมื่อประมวลผลเลขชุด)");
+                // Skip for this rawNum if amount is bad for single-type
+                return;
+            }
+            const typeId = selectedTypes[0];
+            const payout = payouts.find((p) => p.id === typeId)!;
+            allNewTickets.push({
+                subType: subTypeObj,
+                payout,
+                numbers: [...singleRawNumProcessedNumbers],
+                amount: Number(amount),
+                uniqueKey: uniqueKeyForThisSet,
+            });
+        }
+    }); // End of rawNumbersFromInput.forEach
+
+    if (allNewTickets.length > 0) {
+        setTicketList(prevList => [...prevList, ...allNewTickets]);
+        setNumberInput("");
+        // Consider resetting amount/amounts and selectedTypes carefully based on desired UX
+        // setAmount(""); 
+        // setAmounts({});
+        // setSelectedTypes([]); 
+        // setTwoDigitOperation('none');
+        // setPermuteThreeDigits(false);
+        // setSwipeNineSingleDigit(false);
+        toast.success("เพิ่มรายการใหม่สำเร็จ!");
+    } else if (rawNumbersFromInput.length > 0) {
+        toast.warning("ไม่มีรายการถูกเพิ่ม อาจเกิดจากข้อมูลไม่ถูกต้องหรือซ้ำซ้อน");
+    }
   }
 
   const handlePermuteThreeDigitsChange = (isChecked: boolean) => {
     setPermuteThreeDigits(isChecked);
     if (isChecked && selectedDigit === 3) {
-      // Find the "โต๊ด" type ID among the currently filtered types for 3 digits
       const todType = filteredTypes.find(t => t.digit_number === 3 && t.type_number === "โต๊ด");
       if (todType) {
-        // Unselect "โต๊ด" if it's selected
         setSelectedTypes(prevSelectedTypes => prevSelectedTypes.filter(id => id !== todType.id));
       }
     }
-    // If unchecking "รูด 6", "โต๊ด" will be re-enabled automatically by the disabled logic in JSX
   };
 
   function handleApplyNumbersFromDrawer(newNumbers: string[]) {
@@ -341,12 +425,10 @@ export default function LotteryTicketPage() {
     setNumberInput(combinedNumbers.join(" "));
   }
 
-  // ลบรายการ
-  function handleRemoveTicket(idx: number) {
+  function handleRemoveTicket(idx: number) { // This removes by index, might need update if group removal is main way
     setTicketList(ticketList.filter((_, i) => i !== idx));
   }
 
-  // Add new function to calculate next draw dates
   function calculateNextDrawDates(schedule: DrawingSchedule): Date[] {
     const dates: Date[] = [];
     const now = new Date();
@@ -355,63 +437,50 @@ export default function LotteryTicketPage() {
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentDate);
       date.setDate(date.getDate() + i);
-      
-      // Only allow today or future
       if (date < currentDate) continue;
 
       if (schedule.frequency_unit === 'day') {
         dates.push(date);
       } else if (schedule.frequency_unit === 'week') {
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+        const dayOfWeek = date.toLocaleString('en-US', { weekday: 'long' });
         if (schedule.day_of_week.includes(dayOfWeek)) {
           dates.push(date);
         }
       }
     }
-    
     return dates;
   }
 
-  // Add new function to fetch available draws
   async function fetchAvailableDraws() {
-    try {
       if (!selectedSubType) return;
-
       const { data: schedules, error } = await supabase
         .from('drawing_schedules')
         .select('*')
         .eq('lottery_sub_type_id', selectedSubType)
         .eq('is_active', true);
 
-      if (error) throw error;
+      if (error) { console.error(error); throw error; }
+      if (!schedules) { setAvailableDraws([]); return; }
 
-      const availableDraws: AvailableDraw[] = [];
+      const newAvailableDraws: AvailableDraw[] = [];
       schedules.forEach(schedule => {
         const dates = calculateNextDrawDates(schedule);
         dates.forEach(date => {
-          availableDraws.push({
-            date,
-            schedule
-          });
+          newAvailableDraws.push({ date, schedule });
         });
       });
+      newAvailableDraws.sort((a, b) => a.date.getTime() - b.date.getTime());
+      setAvailableDraws(newAvailableDraws);
 
-      // Sort by date
-      availableDraws.sort((a, b) => a.date.getTime() - b.date.getTime());
-      setAvailableDraws(availableDraws);
-
-      // Set first available draw as selected
-      if (availableDraws.length > 0) {
-        setSelectedDraw(availableDraws[0]);
-        setSelectedDrawDate(availableDraws[0].date);
+      if (newAvailableDraws.length > 0) {
+        setSelectedDraw(newAvailableDraws[0]);
+        setSelectedDrawDate(newAvailableDraws[0].date);
+      } else {
+        setSelectedDraw(null);
+        setSelectedDrawDate(undefined);
       }
-    } catch (error) {
-      console.error('Error fetching available draws:', error);
-      toast.error("ไม่สามารถโหลดวันที่ออกรางวัลได้");
-    }
   }
 
-  // Only fetch available draws if not provided by props
   useEffect(() => {
     if (initialState.draw) {
       const drawDate = new Date(initialState.draw.date);
@@ -420,9 +489,10 @@ export default function LotteryTicketPage() {
       drawDate.setHours(0,0,0,0);
       if (drawDate < today) {
         toast.error("วันที่ออกรางวัลที่เลือกหมดอายุแล้ว กรุณาเลือกใหม่");
-        setAvailableDraws([]);
-        setSelectedDraw(null);
-        setSelectedDrawDate(undefined);
+        setAvailableDraws([]); setSelectedDraw(null); setSelectedDrawDate(undefined);
+        // Potentially clear initialState.draw or redirect
+        router.replace('/lottery-ticket'); // Clear query params
+        fetchAvailableDraws(); // Try to fetch new ones if subType selected
         return;
       }
       setAvailableDraws([normalizeDraw(initialState.draw)]);
@@ -433,253 +503,270 @@ export default function LotteryTicketPage() {
     if (selectedSubType) {
       fetchAvailableDraws();
     } else {
-      setAvailableDraws([]);
-      setSelectedDraw(null);
-      setSelectedDrawDate(undefined);
+      setAvailableDraws([]); setSelectedDraw(null); setSelectedDrawDate(undefined);
     }
-  }, [selectedSubType, initialState.draw]);
+  }, [selectedSubType, initialState.draw]); // supabase, router in deps if used inside fetch
 
-  // Update handleSubmit function
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!ticketList.length) {
       toast.error("กรุณาเพิ่มรายการอย่างน้อย 1 รายการ");
       return;
     }
-
     if (!selectedDraw) {
       toast.error("กรุณาเลือกวันที่ออกรางวัล");
       return;
     }
-
-    // Check if current time is within open_time and close_time
     const now = new Date();
     const currentTime = now.toLocaleTimeString('en-US', { hour12: false });
     if (currentTime < selectedDraw.schedule.open_time || currentTime > selectedDraw.schedule.close_time) {
       toast.error(`เวลารับซื้อ: ${selectedDraw.schedule.open_time} - ${selectedDraw.schedule.close_time}`);
       return;
     }
-
-    // Show confirmation dialog
     setConfirmDialogOpen(true);
   }
 
-  // Update handleConfirmSubmit function
   async function handleConfirmSubmit() {
-    if (!selectedDraw) return;
-    if (!user) {
-      toast.error("กรุณาเข้าสู่ระบบก่อนทำรายการ");
+    if (!selectedDraw || !user) {
+      toast.error(!user ? "กรุณาเข้าสู่ระบบก่อนทำรายการ" : "ไม่พบข้อมูลรอบรางวัล");
       return;
     }
     try {
       setIsSubmitting(true);
+      setProgress(10); // Start
 
-      const drawDate = selectedDraw.date;
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      drawDate.setHours(0,0,0,0);
+      const drawDateForCheck = new Date(selectedDraw.date); drawDateForCheck.setHours(0, 0, 0, 0);
+      const todayForCheck = new Date(); todayForCheck.setHours(0, 0, 0, 0);
 
-      console.log("Submitting draw date:", drawDate, "Today:", today);
-
-      if (drawDate < today) {
+      if (drawDateForCheck < todayForCheck) {
         toast.error("ไม่สามารถซื้อหวยย้อนหลังได้ กรุณาเลือกวันที่ออกรางวัลที่ถูกต้อง");
-        setConfirmDialogOpen(false);
-        setIsSubmitting(false);
+        setConfirmDialogOpen(false); setIsSubmitting(false);
         return;
       }
 
-      // 1. Create lottery ticket
-      const localDrawDate = selectedDraw.date.getFullYear() + '-' +
-        String(selectedDraw.date.getMonth() + 1).padStart(2, '0') + '-' +
-        String(selectedDraw.date.getDate()).padStart(2, '0');
+      const localDrawDate = format(selectedDraw.date, 'yyyy-MM-dd');
+      let formattedCloseTime = selectedDraw.schedule.close_time;
+      const timeParts = selectedDraw.schedule.close_time.split(':');
+      if (timeParts.length >= 2) formattedCloseTime = `${timeParts[0]}:${timeParts[1]}`;
+
       const { data: ticket, error: ticketError } = await supabase
         .from('lottery_tickets')
         .insert({
-          user_id: user.id,
-          draw_date: localDrawDate,
-          draw_time: selectedDraw.schedule.drawing_time,
-          bill_number: billNumber,
-          bill_name: billName,
-          total_amount: ticketList.reduce((sum, item) => sum + item.amount, 0),
+          user_id: user.id, draw_date: localDrawDate, draw_time: selectedDraw.schedule.drawing_time,
+          close_time: formattedCloseTime, bill_number: billNumber, bill_name: billName,
+          total_amount: ticketList.reduce((sum, item) => sum + (item.amount * item.numbers.length), 0), // Sum based on items, not groups for accuracy
           status: 'pending'
-        })
-        .select()
-        .single();
+        }).select().single();
 
       if (ticketError) throw ticketError;
 
-      // 2. Create ticket items
       const ticketItems = ticketList.map(item => ({
-        ticket_id: ticket.id,
-        lottery_sub_type_id: item.subType.lottery_sub_type_id,
-        lottery_sub_number_id: item.payout.id,
-        numbers: item.numbers,
-        amount: item.amount
+        ticket_id: ticket.id, lottery_sub_type_id: item.subType.lottery_sub_type_id,
+        lottery_sub_number_id: item.payout.id, numbers: item.numbers, amount: item.amount
       }));
 
-      const { error: itemsError } = await supabase
-        .from('lottery_ticket_items')
-        .insert(ticketItems);
-
+      const { error: itemsError } = await supabase.from('lottery_ticket_items').insert(ticketItems);
       if (itemsError) {
-        // If items insert fails, delete the ticket
-        await supabase
-          .from('lottery_tickets')
-          .delete()
-          .eq('id', ticket.id);
+        await supabase.from('lottery_tickets').delete().eq('id', ticket.id);
         throw itemsError;
       }
 
-      // 3. Update ticket status to confirmed
-      const { error: updateError } = await supabase
-        .from('lottery_tickets')
-        .update({ status: 'confirmed' })
-        .eq('id', ticket.id);
-
+      const { error: updateError } = await supabase.from('lottery_tickets').update({ status: 'confirmed' }).eq('id', ticket.id);
       if (updateError) {
-        // If update fails, delete the ticket and items
-        await supabase
-          .from('lottery_ticket_items')
-          .delete()
-          .eq('ticket_id', ticket.id);
-        await supabase
-          .from('lottery_tickets')
-          .delete()
-          .eq('id', ticket.id);
+        await supabase.from('lottery_ticket_items').delete().eq('ticket_id', ticket.id);
+        await supabase.from('lottery_tickets').delete().eq('id', ticket.id);
         throw updateError;
       }
 
-      // Success
-      setTicketList([]);
-      setSelectedDrawDate(new Date());
+      setTicketList([]); // setSelectedDrawDate(new Date()); // Don't reset draw date, user might continue for same draw
+      setBillName(""); // Reset bill name for next bill
+      // billNumber will auto-generate a new one if page reloads or component re-mounts.
+      // For SPA, might need to explicitly generate new billNumber: setBillNumber(Math.floor...);
       setConfirmDialogOpen(false);
       toast.success("บันทึกการซื้อสำเร็จ!");
       router.push(`/print-ticket?bill_number=${encodeURIComponent(ticket.bill_number)}`);
       
-    } catch (error) {
+      setProgress(60);
+    } catch (error: any) {
       console.error('Error saving ticket:', error);
-      if (error && typeof error === 'object' && 'message' in error) {
-        toast.error((error as any).message);
-      } else if (error && typeof error === 'object') {
-        toast.error(JSON.stringify(error));
-      } else {
-        toast.error("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-      }
+      toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
       setIsSubmitting(false);
+      setProgress(0); // Reset after done
     }
   }
-
+  
   const canAdd = useMemo(() => {
+    const validRawNumbers = numberInput
+      .replace(/\n|,/g, " ")
+      .split(" ")
+      .map((n) => n.trim())
+      .filter(n => n.length > 0);
+
+    const hasValidRawNumbers = (selectedDigit === 1 && swipeNineSingleDigit) || validRawNumbers.length > 0;
+
     return (
+      !!selectedSubType && // subTypeObj is derived, use selectedSubType
       !!selectedDigit &&
       selectedTypes.length > 0 &&
-      !!numberInput &&
+      hasValidRawNumbers &&
       (
         (selectedTypes.length === 1 && !!amount && Number(amount) > 0) ||
         (selectedTypes.length > 1 && selectedTypes.every(typeId => !!amounts[typeId] && Number(amounts[typeId]) > 0))
       )
     );
-  }, [selectedDigit, selectedTypes, numberInput, amount, amounts]);
+  }, [selectedSubType, selectedDigit, selectedTypes, numberInput, amount, amounts, swipeNineSingleDigit]);
 
 
+  const arraysEqual = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((v, i) => v === b[i]);
 
-  // ฟังก์ชันลบ group
-  async function handleRemoveGroup(group: Grouped) {
-    setTicketList(ticketList.filter(item => {
-      // เงื่อนไข: ถ้าเลข, digit, type, amount ตรงกับ group ให้ลบ
-      const isInGroup = group.numbers.some(num =>
-        item.numbers.includes(num) &&
-        item.payout.digit_number === group.digit_number &&
-        group.typeLabels.includes(item.payout.type_number || "-") &&
-        (group.amounts[item.payout.type_number || "-"] === item.amount || (group.amounts[item.payout.type_number || "-"] === undefined && item.amount === 0) ) // Handle undefined amount if it means 0
-      );
-      return !isInGroup;
+  async function handleRemoveGroup(groupToRemove: Grouped) {
+    // This function needs to identify which TicketItems in ticketList correspond to the displayed group
+    // The uniqueKey on the group might be from the first item that formed it.
+    // The most reliable way is to filter ticketList based on properties that define the group.
+    // However, with the new grouping key (including itemSpecificKeyPart), a group is more granular.
+    // If group.uniqueKey is the uniqueKey of the specific TicketItem(s) primarily defining this group.
+    
+    setTicketList(prevList => prevList.filter(item => {
+        // A more robust check would be if item.uniqueKey was part of the group's identity,
+        // or if the group itself held a list of original ticketItem uniqueKeys.
+        // For now, if uniqueKey on group is from ONE item, this removes that one item.
+        // If group numbers are aggregated from multiple items (less likely with new key), this is complex.
+
+        // Let's assume group._inferredPivotForSort and group.digit_number, and matching numbers define the group.
+        // And the type/amount define which items within the ticketList are part of this displayed group.
+        // The handleRemoveGroup function was passed a 'group' which is a 'Grouped' object.
+        // We need to remove all TicketItems that contributed to this 'groupToRemove'.
+        
+        // Reconstruct key parts for the item, similar to how groups are keyed in useMemo
+        const itemDigit = item.payout.digit_number;
+        if (itemDigit !== groupToRemove.digit_number) return true; // Keep, different digit number
+
+        // Check if this item's numbers are all within the group's numbers
+        // (or if group numbers are a direct reflection of one item's numbers with new granular key)
+        const itemIsExactGroup = arraysEqual(item.numbers, groupToRemove.numbers);
+
+        if (!itemIsExactGroup) return true; // Keep, numbers don't match this group
+
+        // Check type and amount
+        // A group has typeLabels and amounts. An item has one payout.type_number and item.amount.
+        // The groupToRemove.typeLabels and groupToRemove.amounts should reflect this.
+        // With the new granular key, groupToRemove.typeLabels likely has 1 entry.
+        if (!groupToRemove.typeLabels.includes(item.payout.type_number || "-")) return true; // Keep
+        if (groupToRemove.amounts[item.payout.type_number || "-"] !== item.amount) return true; // Keep
+
+        // If item matches the group's defining properties (numbers, type, amount for that type)
+        // and pivot matches if it's a swipe19 group
+        let itemPivotD: string | null = null;
+        if (itemDigit === 2 && item.numbers.length === 19) {
+            itemPivotD = inferSwipe19Pivot(item.numbers);
+        }
+        if (groupToRemove._inferredPivotForSort !== itemPivotD) return true; // Keep, different pivot status
+
+        // If all checks pass, this item belongs to the group, so filter it out (return false)
+        return false; 
     }));
 
-    const drawInfo = selectedDraw
-      ? {
-          draw_date: selectedDraw.date.toISOString(),
-          close_time: selectedDraw.schedule.close_time,
-          schedule_id: selectedDraw.schedule.schedule_id,
-          schedule: selectedDraw.schedule
+
+    if (user && selectedDraw) { // Log removal
+        try {
+          await supabase.from('lottery_ticket_remove_logs').insert({
+            user_id: user.id,
+            bill_number: billNumber,
+            group_info: { // Log relevant info about the removed group
+                digit_number: groupToRemove.digit_number,
+                numbers: groupToRemove.numbers,
+                typeLabels: groupToRemove.typeLabels,
+                amounts: groupToRemove.amounts,
+                pivot: groupToRemove._inferredPivotForSort
+            },
+            removed_at: new Date().toISOString(),
+            reason: 'user removed group',
+            draw_date: selectedDraw.date.toISOString(),
+            close_time: selectedDraw.schedule.close_time,
+            schedule_id: selectedDraw.schedule.schedule_id,
+          });
+        } catch (e: unknown) {
+          console.error('Error logging remove group:', e);
         }
-      : {};
-    try {
-      await supabase.from('lottery_ticket_remove_logs').insert({
-        user_id: user?.id,
-        bill_number: billNumber,
-        group_info: group,
-        removed_at: new Date().toISOString(),
-        reason: 'user removed group',
-        ...drawInfo
-      });
-    } catch (e: unknown) {
-      console.error('Error logging remove group:', e);
     }
   }
 
-  // ===== Memoized Grouping logic for ticketList =====
   const { allTypeLabels, groups } = useMemo(() => {
-    type GroupKey = string; // `${digit_number}|${typeLabels.join(',')}|${amounts.join(',')}`
     const calculatedAllTypeLabels: Record<number, string[]> = {};
-    ticketList.forEach(item => {
-      const label = item.payout.type_number || "-";
-      if (!calculatedAllTypeLabels[item.payout.digit_number]) calculatedAllTypeLabels[item.payout.digit_number] = [];
-      if (!calculatedAllTypeLabels[item.payout.digit_number].includes(label)) calculatedAllTypeLabels[item.payout.digit_number].push(label);
+    payouts.forEach(p => {
+        if (!p.type_number) return;
+        if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
+        if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
+            calculatedAllTypeLabels[p.digit_number].push(p.type_number);
+        }
     });
 
+    // Apply specific ordering for display if needed (e.g., เต็ง then โต๊ด)
     Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
-      const digit = Number(digitStr);
-      if (digit === 3 || digit === 4) {
+        const digit = Number(digitStr);
         const labels = calculatedAllTypeLabels[digit];
-        let ordered = [];
-        if (labels.includes("เต็ง") && labels.includes("โต๊ด")) ordered = ["เต็ง", "โต๊ด"];
-        else if (labels.includes("บน") && labels.includes("โต๊ด")) ordered = ["บน", "โต๊ด"];
-        else if (labels.includes("เต็ง")) ordered = ["เต็ง", "โต๊ด"]; // Assuming default pairing
-        else if (labels.includes("บน")) ordered = ["บน", "โต๊ด"];   // Assuming default pairing
-        else if (labels.includes("โต๊ด")) ordered = ["เต็ง", "โต๊ด"]; // Assuming default pairing if only โต๊ด exists
-        else ordered = labels;
-        calculatedAllTypeLabels[digit] = ordered;
-      }
-      if (digit === 2) {
-        const labels = calculatedAllTypeLabels[digit];
-        let ordered = [];
-        if (labels.includes("บน") && labels.includes("ล่าง")) ordered = ["บน", "ล่าง"];
-        else if (labels.includes("บน")) ordered = ["บน", "ล่าง"]; // Assuming default pairing
-        else if (labels.includes("ล่าง")) ordered = ["บน", "ล่าง"]; // Assuming default pairing
-        else ordered = labels;
-        calculatedAllTypeLabels[digit] = ordered;
-      }
+        if (!labels) return;
+        let ordered = [...labels]; // Default to original order from DB or payout fetch
+        if (digit === 3 || digit === 4) { // Example for 3/4 digits
+            if (labels.includes("เต็ง") && labels.includes("โต๊ด")) {
+                ordered = ordered.filter(l => l !== "เต็ง" && l !== "โต๊ด");
+                ordered.unshift("โต๊ด"); ordered.unshift("เต็ง");
+            } else if (labels.includes("บน") && labels.includes("โต๊ด")) {
+                 ordered = ordered.filter(l => l !== "บน" && l !== "โต๊ด");
+                 ordered.unshift("โต๊ด"); ordered.unshift("บน");
+            }
+        } else if (digit === 2) { // Example for 2 digits
+            if (labels.includes("บน") && labels.includes("ล่าง")) {
+                 ordered = ordered.filter(l => l !== "บน" && l !== "ล่าง");
+                 ordered.unshift("ล่าง"); ordered.unshift("บน");
+            }
+        }
+        calculatedAllTypeLabels[digit] = Array.from(new Set(ordered)); // Ensure unique if manual ordering adds duplicates
     });
 
-    const calculatedGroups: Map<GroupKey, Grouped> = new Map();
+
+    const calculatedGroups: Map<string, Grouped> = new Map();
     ticketList.forEach(item => {
-      const digit = item.payout.digit_number;
-      const labelOrder = calculatedAllTypeLabels[digit] || [item.payout.type_number || "-"];
-      const amountsArr = labelOrder.map(lab => {
-        const found = ticketList.find(t => t.payout.digit_number === digit && t.payout.type_number === lab && t.numbers.join(',') === item.numbers.join(','));
-        return found ? found.amount : 0;
-      });
-      const key = `${digit}|${labelOrder.join(",")}|${amountsArr.join(",")}`;
-      if (!calculatedGroups.has(key)) {
-        calculatedGroups.set(key, {
-          digit_number: digit,
-          numbers: [],
-          typeLabels: labelOrder,
-          amounts: Object.fromEntries(labelOrder.map((lab, idx) => [lab, amountsArr[idx]])),
-          typeOrder: labelOrder,
-        });
-      }
-      const group = calculatedGroups.get(key)!;
-      item.numbers.forEach(num => {
-        if (!group.numbers.includes(num)) group.numbers.push(num);
-      });
-    });
-    return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
-  }, [ticketList]);
+        const digit = item.payout.digit_number;
+        const itemTypeLabel = item.payout.type_number || "-";
+        const subTypeId = item.subType.lottery_sub_type_id;
 
-  // Add confirmation dialog JSX before the return statement
+        const canonicalLabelOrderForKey = calculatedAllTypeLabels[digit] || [itemTypeLabel];
+        const amountsPattern = canonicalLabelOrderForKey.map(label =>
+            label === itemTypeLabel ? item.amount : 0
+        ).join(',');
+
+        const groupKey = `${subTypeId}|${digit}|${canonicalLabelOrderForKey.join(',')}|${amountsPattern}`;
+
+        if (!calculatedGroups.has(groupKey)) {
+            const groupAmounts: Record<string, number> = {};
+            canonicalLabelOrderForKey.forEach(label => {
+                groupAmounts[label] = (label === itemTypeLabel ? item.amount : 0);
+            });
+
+            calculatedGroups.set(groupKey, {
+                digit_number: digit,
+                numbers: [],
+                typeLabels: canonicalLabelOrderForKey,
+                amounts: groupAmounts,
+                typeOrder: canonicalLabelOrderForKey,
+                uniqueKey: item.uniqueKey,
+                _inferredPivotForSort: null,
+            });
+        }
+
+        const group = calculatedGroups.get(groupKey)!;
+        item.numbers.forEach(numStr => {
+            group.numbers.push(numStr);
+        });
+    });
+
+    return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
+  }, [ticketList, payouts]);
+
+
   const ConfirmationDialog = () => (
     <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
       <DialogContent>
@@ -712,7 +799,7 @@ export default function LotteryTicketPage() {
                 </thead>
                 <tbody>
                   {ticketList.map((item, index) => (
-                    <tr key={index} className="border-b">
+                    <tr key={item.uniqueKey + "_" + index} className="border-b">{/* Use more robust key */}
                       <td className="px-2 py-1">{item.subType.sub_type_name} - {item.payout.type_number}</td>
                       <td className="px-2 py-1">{item.numbers.join(', ')}</td>
                       <td className="px-2 py-1 text-right">{item.amount.toLocaleString()}</td>
@@ -729,26 +816,16 @@ export default function LotteryTicketPage() {
           </div>
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => setConfirmDialogOpen(false)}
-            disabled={isSubmitting}
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={handleConfirmSubmit}
-            disabled={isSubmitting}
-            className="min-w-[120px]" // Give it a min-width to prevent layout shift
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                กำลังบันทึก...
-              </>
-            ) : (
-              "ยืนยัน"
-            )}
+          {isSubmitting && (
+            <div className="w-full mb-2">
+              <div className="relative w-full h-2 bg-gray-200 rounded overflow-hidden">
+                <div className="progress-indeterminate-bar"></div>
+              </div>
+            </div>
+          )}
+          <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
+          <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px]">
+            {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -757,46 +834,101 @@ export default function LotteryTicketPage() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser(); // Renamed to avoid conflict
+      if (supabaseUser) {
+        setUser(supabaseUser);
       } else {
-        router.push("/signup");
+        router.push("/login");
       }
     };
     fetchUserData();
   }, [router, supabase]);
 
-  // Countdown to close_time
   useEffect(() => {
-    function getCountdownText(selectedDraw: AvailableDraw | null) {
-      if (!selectedDraw) return "-";
+    function getCountdownText(currentSelectedDraw: AvailableDraw | null) { // Renamed param
+      if (!currentSelectedDraw) return "-";
       const now = new Date();
-      // close_time is string: 'HH:mm:ss' or 'HH:mm'
-      const [h, m, s] = selectedDraw.schedule.close_time.split(":");
-      const closeDate = new Date(selectedDraw.date);
+      const [h, m, s] = currentSelectedDraw.schedule.close_time.split(":");
+      const closeDate = new Date(currentSelectedDraw.date);
       closeDate.setHours(Number(h), Number(m), Number(s || 0), 0);
       const diff = closeDate.getTime() - now.getTime();
       if (diff <= 0) return "หมดเวลา";
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      return `${hours > 0 ? hours + ' ชม. ' : ''}${minutes} นาที ${seconds} วินาที`;
+      // const seconds = Math.floor((diff % (1000 * 60)) / 1000); // Seconds not shown in example
+      return `${hours > 0 ? hours + ' ชม. ' : ''}${minutes} นาที`;
     }
     if (!selectedDraw) {
-      setCountdownText("");
-      return;
+      setCountdownText(""); return;
     }
     setCountdownText(getCountdownText(selectedDraw));
     const timer = setInterval(() => {
       const text = getCountdownText(selectedDraw);
       setCountdownText(text);
       if (text === "หมดเวลา") {
-        router.push("/");
+        // toast.info("หมดเวลารับซื้อสำหรับรอบนี้แล้ว"); // Inform user
+        // fetchAvailableDraws(); // Optionally fetch next available draws
+        router.push("/"); // Or redirect to a page indicating closure
       }
-    }, 1000);
+    }, 1000 * 30); // Update every 30s is enough for minutes display
     return () => clearInterval(timer);
-  }, [selectedDraw, router]);
+  }, [selectedDraw, router]); // Added router to deps
+
+  const TicketListGroupComponent = React.memo(({ groupsMap, handleRemoveGroupFn }: { groupsMap: Map<any, Grouped>, handleRemoveGroupFn: (group: Grouped) => void }) => {
+    return (
+      <AnimatePresence>
+        {Array.from(groupsMap.values()).map((group, idx) => {
+          const allLabelsInGroup: string[] = group.typeLabels || [];
+          // Calculate group total based on its numbers and amounts for its typeLabels
+          const groupTotal = allLabelsInGroup.reduce((sum: number, label: string) => {
+                const amountForLabel = group.amounts[label] ?? 0;
+                return sum + (amountForLabel * group.numbers.length);
+            }, 0);
+
+          return (
+            <motion.div
+              key={group.uniqueKey + "_" + idx} // Use a more stable key if group.uniqueKey is reliable
+              initial={{ opacity: 0, y: -10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.98 }}
+              transition={{ duration: 0.3 }}
+              className="flex flex-row items-start bg-[#f8fafc] border border-[#e0e7ef] rounded-lg px-2 py-2 mb-2 gap-2 shadow-sm hover:bg-[#f1f5f9] transition-colors"
+            >
+              <div className="flex flex-col items-center justify-start min-w-[70px] max-w-[90px] text-center flex-shrink-0 pt-1">
+                <div className="text-[11px] font-bold text-[#d32f2f] leading-tight">{group.digit_number} ตัว</div>
+                <div className="text-[10px] text-[#e53935] leading-tight break-words">
+                    {group.typeLabels.join(' x ')}
+                    {group._inferredPivotForSort ? ` (รูด19:${group._inferredPivotForSort})` : ''}
+                </div>
+                <div className="text-[10px] text-gray-700 leading-tight break-words">
+                    {group.typeLabels.map(label => group.amounts[label] ?? 0).join(' x ')}
+                </div>
+                <div className="text-[10px] text-gray-400 leading-tight mt-0.5">รวม {groupTotal.toLocaleString()} ฿</div>
+              </div>
+              <div className="flex-1 flex items-start min-h-8">
+                <Textarea
+                  value={group.numbers.join('  ')}
+                  readOnly
+                  rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))} // Auto rows based on content
+                  className="rounded-md p-1 w-full text-[11px] leading-tight resize-none bg-white border border-[#e0e7ef] focus-visible:ring-1 focus-visible:ring-blue-400"
+                  style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit', minHeight: '28px' }}
+                />
+                 <button
+                  className="ml-2 text-red-500 hover:text-red-700 transition-colors flex-shrink-0 p-1 mt-0.5"
+                  title="ลบกลุ่มนี้"
+                  onClick={() => handleRemoveGroupFn(group)} // Changed prop name
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    );
+  });
+  TicketListGroupComponent.displayName = 'TicketListGroupComponent';
+
 
   return (
     <DirectionProvider dir="ltr">
@@ -820,13 +952,9 @@ export default function LotteryTicketPage() {
               </Breadcrumb>
             </div>
           </header>
-          {/* Loading overlay */}
-          {loading && (
-            <SpectacularLoader message="กำลังโหลดข้อมูล..." baseColor="sky" />
-          )}
+          {loading && (<SpectacularLoader message="กำลังโหลดข้อมูล..." baseColor="sky" />)}
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-6 lg:px-8 py-6"
           >
@@ -849,7 +977,7 @@ export default function LotteryTicketPage() {
                     <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" />
                   </div>
                 </div>
-                <form className="space-y-4" onSubmit={handleSubmit}>
+                <form className="space-y-4" onSubmit={(e) => e.preventDefault()}> {/* Changed to preventDefault, submit via button explicitly */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium">ชนิดหวย</label>
@@ -858,45 +986,38 @@ export default function LotteryTicketPage() {
                           {subTypes.find(s => s.lottery_sub_type_id === initialState.subType)?.sub_type_name || "-"}
                         </div>
                       ) : (
-                        <Select value={selectedSubType?.toString() || ""} onValueChange={v => { setSelectedSubType(Number(v)); setSelectedPayout(null); setSelectedDigit(null); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); }}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="เลือกชนิดหวย" />
-                          </SelectTrigger>
+                        <Select value={selectedSubType?.toString() || ""} onValueChange={v => { setSelectedSubType(Number(v)); setSelectedPayout(null); setSelectedDigit(null); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); setSwipeNineSingleDigit(false); }}>
+                          <SelectTrigger><SelectValue placeholder="เลือกชนิดหวย" /></SelectTrigger>
                           <SelectContent>
-                            {subTypes.map((s) => (
-                              <SelectItem key={s.lottery_sub_type_id} value={s.lottery_sub_type_id.toString()}>{s.sub_type_name}</SelectItem>
-                            ))}
+                            {subTypes.map((s) => (<SelectItem key={s.lottery_sub_type_id} value={s.lottery_sub_type_id.toString()}>{s.sub_type_name}</SelectItem>))}
                           </SelectContent>
                         </Select>
                       )}
                     </div>
                     <div>
                       <label className="text-sm font-medium">จำนวนหลัก</label>
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-1 flex-wrap">
                         {digitOptions.map((d) => (
-                          <Button key={d} type="button" variant={selectedDigit === d ? "default" : "outline"} onClick={() => { setSelectedDigit(d); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); }}>
+                          <Button key={d} type="button" variant={selectedDigit === d ? "default" : "outline"} onClick={() => { setSelectedDigit(d); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); setSwipeNineSingleDigit(false); }}>
                             {d} ตัว
                           </Button>
                         ))}
                       </div>
                     </div>
                   </div>
+
                   {selectedDigit && (
                     <div>
                       <label className="text-sm font-medium">เลือกประเภท/รูปแบบ <span className="text-xs text-muted-foreground">(เลือกได้หลายแบบ)</span></label>
-                      <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 ? 'animate-shake border-2 border-red-400 bg-red-50' : ''}`}>
+                      <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 && selectedDigit ? 'animate-shake border-2 border-red-400 bg-red-50 p-2 rounded' : 'p-2'}`}>
                         {filteredTypes.map((type) => (
-                          // DEBUG LOG: Inspect type_number
-                          (type.digit_number === 3 && console.log(`LotteryTicketPage - 3-digit type render: ID=${type.id}, TypeNumber='${type.type_number}', IsTengMatch=${type.type_number === "เต็ง"}`)),
-                          
-                          <label key={type.id} className="flex items-center gap-1 border rounded px-2 py-1 cursor-pointer bg-white dark:bg-zinc-900 shadow-sm">
+                          <label key={type.id} className="flex items-center gap-1 border rounded px-2 py-1 cursor-pointer bg-white dark:bg-zinc-900 shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-800 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 dark:has-[:checked]:bg-blue-900/30">
                             <input
                               type="checkbox"
                               checked={selectedTypes.includes(type.id)}
                               onChange={() => handleTypeToggle(type.id)}
                               disabled={
-                                (permuteThreeDigits && selectedDigit === 3 && type.type_number === "เต็ง") ||
-                                (permuteThreeDigits && selectedDigit === 3 && type.type_number === "โต๊ด")
+                                (permuteThreeDigits && selectedDigit === 3 && (type.type_number === "เต็ง" || type.type_number === "โต๊ด"))
                               }
                               className="accent-blue-600"
                             />
@@ -906,144 +1027,80 @@ export default function LotteryTicketPage() {
                       </div>
                     </div>
                   )}
-                  {/* Number operation options */}
+
                   {selectedDigit === 2 && (
                     <div className="mt-3">
                       <label className="text-sm font-medium">รูปแบบเลข 2 ตัว</label>
-                      <RadioGroup
-                        value={twoDigitOperation}
-                        onValueChange={(value: string) => setTwoDigitOperation(value as 'none' | 'reverse' | 'swipeFront' | 'swipeBack')}
-                        className="flex flex-wrap gap-x-4 gap-y-2 mt-1"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="none" id="op-none" />
-                          <label htmlFor="op-none" className="text-sm cursor-pointer">ไม่มี</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="reverse" id="op-reverse" />
-                          <label htmlFor="op-reverse" className="text-sm cursor-pointer">กลับเลข (เช่น 12 → 21)</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="swipeFront" id="op-swipeFront" />
-                          <label htmlFor="op-swipeFront" className="text-sm cursor-pointer">รูดหน้า (เช่น 1 → 10-19)</label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="swipeBack" id="op-swipeBack" />
-                          <label htmlFor="op-swipeBack" className="text-sm cursor-pointer">รูดหลัง (เช่น 1 → 01-91)</label>
-                        </div>
+                      <RadioGroup value={twoDigitOperation} onValueChange={(value) => setTwoDigitOperation(value as any)} className="flex flex-wrap gap-x-4 gap-y-2 mt-1 items-center">
+                        {/* Radio items here */}
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" /><label htmlFor="op-none" className="text-sm cursor-pointer">ไม่มี</label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" /><label htmlFor="op-reverse" className="text-sm cursor-pointer">กลับเลข</label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" /><label htmlFor="op-swipeFront" className="text-sm cursor-pointer">รูดหน้า</label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" /><label htmlFor="op-swipeBack" className="text-sm cursor-pointer">รูดหลัง</label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" /><label htmlFor="op-swipe19" className="text-sm cursor-pointer">รูด19</label></div>
                       </RadioGroup>
                     </div>
                   )}
                   {selectedDigit === 3 && (
                     <div className="flex items-center gap-2 mt-3">
-                      <input
-                        type="checkbox"
-                        checked={permuteThreeDigits}
-                        onChange={e => handlePermuteThreeDigitsChange(e.target.checked)}
-                        id="permuteThreeDigits"
-                        className="accent-blue-600 h-4 w-4"
-                      />
-                      <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer">
-                        รูด 6 (เช่น 123 → 123, 132, 213, 231, 312, 321)
-                      </label>
+                      <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="accent-blue-600 h-4 w-4"/>
+                      <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer">รูด 6 (โต๊ด)</label>
                     </div>
                   )}
                   {selectedDigit === 1 && (
-                    <div className="flex items-center gap-2 mt-3">
-                      <input
-                        type="checkbox"
-                        checked={swipeNineSingleDigit}
-                        onChange={e => setSwipeNineSingleDigit(e.target.checked)}
-                        id="swipeNineSingleDigit"
-                        className="accent-blue-600 h-4 w-4"
-                      />
-                      <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer">
-                        รูด 9 (เพิ่มหมายเลข 1-9)
-                      </label>
+                     <div className="flex items-center gap-2 mt-3">
+                      <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="accent-blue-600 h-4 w-4"/>
+                      <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer">รูด 9 (เพิ่ม 1-9 อัตโนมัติ)</label>
                     </div>
                   )}
+
                   <div>
                     <div className="flex justify-between items-center mb-1">
                       <label className="text-sm font-medium">หมายเลขหวย <span className="text-xs text-muted-foreground">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span></label>
                       {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
-                       !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack')) && (
-                          <Button type="button" variant="outline" size="sm" onClick={() => setIsNumberDrawerOpen(true)}>
-                            เลือกจากชุดตัวเลข
-                          </Button>
+                       !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) && 
+                       !swipeNineSingleDigit && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setIsNumberDrawerOpen(true)}>เลือกจากชุดตัวเลข</Button>
                         )}
                     </div>
                     <Textarea
                       rows={3}
                       placeholder={
-                        selectedDigit
-                          ? selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack')
-                            ? `กรอกหมายเลข 1 หลัก สำหรับรูดหน้า/หลัง (เช่น 1 2 3)`
-                            : `กรอกหมายเลข ${selectedDigit} หลัก (เช่น ${"1".repeat(selectedDigit)} ${"2".repeat(selectedDigit)})`
-                          : "เลือกจำนวนหลักก่อน"
+                        swipeNineSingleDigit && selectedDigit === 1 ? "เลข 1-9 จะถูกเพิ่มอัตโนมัติ" :
+                        !selectedDigit ? "เลือกจำนวนหลักก่อน" :
+                        (selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) ? `กรอกหมายเลข 1 หลัก สำหรับรูด (เช่น 1 2 3)` :
+                        `กรอกหมายเลข ${selectedDigit} หลัก (เช่น ${"1".repeat(selectedDigit)} ${"2".repeat(selectedDigit)})`
                       }
                       value={numberInput}
-                      onChange={e => setNumberInput(e.target.value)}
-                      disabled={!selectedDigit }
+                      onChange={e => debouncedSetNumberInput(e.target.value)}
+                      disabled={!selectedDigit || (swipeNineSingleDigit && selectedDigit === 1)}
                     />
                   </div>
+
                   <div>
                     <label className="text-sm font-medium">จำนวนเงิน (บาท)</label>
                     {selectedTypes.length > 1 ? (
                       <>
-                        <div className="flex gap-2 mb-2">
-                          <Input
-                            type="number"
-                            min={1}
-                            placeholder="ใส่จำนวนเงินเดียวกันทุกประเภท"
-                            value={fillAllAmount}
-                            onChange={e => setFillAllAmount(e.target.value)}
-                            className="w-40"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
+                        <div className="flex gap-2 mb-2 items-center">
+                          <Input type="number" min={1} placeholder="ใส่ทั้งหมด" value={fillAllAmount} onChange={e => setFillAllAmount(e.target.value)} className="w-32"/>
+                          <Button type="button" variant="outline" size="sm"
                             onClick={() => {
-                              if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) {
-                                toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง");
-                                return;
-                              }
-                              const newAmounts: Record<number, string> = {};
-                              selectedTypes.forEach(typeId => {
-                                newAmounts[typeId] = fillAllAmount;
-                              });
-                              setAmounts(newAmounts);
+                              if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) { toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง"); return; }
+                              const newAmts: Record<number, string> = {};
+                              selectedTypes.forEach(typeId => { newAmts[typeId] = fillAllAmount; });
+                              setAmounts(newAmts);
                             }}
-                          >
-                            ใส่จำนวนเงินเท่ากันทุกประเภท
-                          </Button>
+                          >ใช้ยอดนี้</Button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
                           {selectedTypes.map(typeId => {
                             const type = filteredTypes.find(t => t.id === typeId);
                             return (
                               <div key={typeId}>
                                 <label className="text-xs font-medium text-muted-foreground">{type?.type_number || "-"}</label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={amounts[typeId] || ""}
-                                  onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })}
-                                  placeholder="จำนวนเงิน"
-                                  disabled={!selectedDigit}
-                                />
-                                <div className="flex gap-1 mt-2 flex-wrap">
-                                  {[5, 10, 20, 50, 100].map((quickAmount) => (
-                                    <Button
-                                      key={quickAmount}
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-7 w-12 px-2"
-                                      onClick={() => setAmounts({ ...amounts, [typeId]: quickAmount.toString() })}
-                                    >
-                                      {quickAmount}
-                                    </Button>
-                                  ))}
+                                <Input type="number" min={1} value={amounts[typeId] || ""} onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })} placeholder="จำนวนเงิน" disabled={!selectedDigit}/>
+                                <div className="flex gap-1 mt-1 flex-wrap">
+                                  {[5, 10, 20, 50, 100].map(qAmt => (<Button key={qAmt} type="button" variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => setAmounts(prev => ({ ...prev, [typeId]: qAmt.toString() }))}>{qAmt}</Button>))}
                                 </div>
                               </div>
                             );
@@ -1052,166 +1109,69 @@ export default function LotteryTicketPage() {
                       </>
                     ) : (
                       <div>
-                        <Input
-                          type="number"
-                          min={1}
-                          placeholder="เช่น 20"
-                          value={amount}
-                          onChange={e => setAmount(e.target.value)}
-                          disabled={!selectedDigit}
-                        />
+                        <Input type="number" min={1} placeholder="เช่น 20" value={amount} onChange={e => setAmount(e.target.value)} disabled={!selectedDigit || selectedTypes.length === 0}/>
                         <div className="flex gap-1 mt-1 flex-wrap ">
-                          {[5, 10, 20, 50, 100].map((quickAmount) => (
-                            <Button
-                              key={quickAmount}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 w-12 px-2"
-                              onClick={() => setAmount(quickAmount.toString())}
-                            >
-                              {quickAmount}
-                            </Button>
-                          ))}
+                          {[5, 10, 20, 50, 100].map(qAmt => (<Button key={qAmt} type="button" variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => setAmount(qAmt.toString())}>{qAmt}</Button>))}
                         </div>
                       </div>
                     )}
                   </div>
+                  
                   <div className="mb-4">
                     <label className="text-sm font-medium">วันที่ออกรางวัล</label>
                     <div className="mt-1">
-                      {initialState.draw ? (
+                      {selectedDraw ? (
                         <div className="py-2 px-3 rounded bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200">
-                          {format(initialState.draw.date, 'd MMM yyyy', { locale: th })}
-                          <span className="ml-2 text-xs">
-                            เวลาออก: {initialState.draw.schedule.drawing_time}
-                          </span>
+                          {format(selectedDraw.date, 'd MMM yy', { locale: th })}
+                          <span className="ml-2 text-xs">({selectedDraw.schedule.drawing_time})</span>
+                          <span className="ml-2 text-xs text-red-600">ปิดรับใน: {countdownText}</span>
                         </div>
                       ) : (
-                        <div className="text-sm text-red-500">
-                          ไม่พบข้อมูลวันที่ออกรางวัล กรุณากลับไปเลือกจากหน้าแรก
-                        </div>
+                         initialState.subType && availableDraws.length === 0 && !loading ? 
+                         <div className="text-sm text-orange-600 py-2">ไม่มีรอบรางวัลสำหรับหวยประเภทนี้ในขณะนี้ หรือหมดเวลาแล้ว</div> :
+                         <div className="text-sm text-gray-500 py-2">{initialState.subType ? "กำลังโหลดรอบรางวัล..." : "กรุณาเลือกชนิดหวยเพื่อดูรอบรางวัล"}</div>
                       )}
                     </div>
                   </div>
+
                   <div className="flex gap-2 justify-end">
-                    <Button
-                      type="button"
-                      onClick={handleAddTicket}
-                      disabled={!canAdd}
-                      className="px-6"
-                    >
-                      เพิ่มรายการ
-                    </Button>
+                    <Button type="button" onClick={handleAddTicket} disabled={!canAdd || loading} className="px-6">เพิ่มรายการ</Button>
                   </div>
                 </form>
               </CardContent>
             </Card>
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
-            >
+
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}>
               <Card className="mb-8 shadow-xl border-0 w-full">
-                <CardHeader>
-                  <CardTitle className="text-md text-gray-400">รายการที่เลือก</CardTitle>
-                </CardHeader>
-                <CardContent >
+                <CardHeader><CardTitle className="text-md text-gray-500 dark:text-gray-400">รายการที่เลือก</CardTitle></CardHeader>
+                <CardContent>
                   {ticketList.length === 0 ? (
                     <div className="text-center text-muted-foreground py-6">ยังไม่มีรายการ</div>
                   ) : (
                     <>
-                      <div className="mb-4 p-3 rounded-lg bg-[#f8fafc] border border-[#e0e7ef] shadow-sm">
+                      <div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+                        {/* Header info for the bill */}
                         <div className="flex flex-wrap justify-between items-center border-b border-dashed pb-1 mb-1 gap-2">
-                          <span className="font-bold text-[15px] text-[#d32f2f] flex items-center gap-1">
-                            <svg className="inline-block w-4 h-4 text-[#d32f2f]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
-                            หวย {subTypeObj?.sub_type_name || '-'}
-                          </span>
-                          <span className="text-[13px] text-gray-700 flex items-center gap-1">
-                            <svg className="inline-block w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
-                            บิล: {billNumber}
-                          </span>
-                          <span className="text-[13px] text-gray-700 flex items-center gap-1">
-                            <svg className="inline-block w-4 h-4 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 3v4"/><path d="M8 3v4"/></svg>
-                            ปิดรับใน:  <span className="ml-1 text-red-600 font-bold">{countdownText}</span>
-                          </span>
+                          <span className="font-bold text-[15px] text-red-600 dark:text-red-400 flex items-center gap-1">หวย {subTypeObj?.sub_type_name || '-'}</span>
+                          <span className="text-[13px] text-gray-700 dark:text-gray-300">บิล: {billNumber}</span>
                         </div>
-                        <div className="flex flex-wrap justify-between items-center gap-2">
-                          <span className="text-gray-600 flex items-center gap-1">
-                            <svg className="inline-block w-4 h-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                            งวด: {selectedDrawDate ? format(selectedDrawDate, 'd MMMM yyyy', { locale: th }) : '-'} (เวลา {selectedDraw?.schedule.drawing_time || '-'})
-                          </span>
-                          <span className="text-gray-600 flex items-center gap-1">
-                            <svg className="inline-block w-4 h-4 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 8-4 8-4s8 0 8 4"/></svg>
-                            ผู้ซื้อ: {user?.user_metadata?.name || 'ไม่มีชื่อ'}
-                          </span>
+                        <div className="flex flex-wrap justify-between items-center gap-2 mt-1">
+                           <span className="text-gray-600 dark:text-gray-400 text-sm">งวด: {selectedDrawDate ? format(selectedDrawDate, 'd MMM yy', { locale: th }) : '-'} (เวลา {selectedDraw?.schedule.drawing_time || '-'})</span>
+                           <span className="text-gray-600 dark:text-gray-400 text-sm">ผู้ซื้อ: {user?.user_metadata?.name || user?.email || 'ไม่ระบุ'}</span>
                         </div>
-                        <div className="flex flex-wrap justify-between items-center mt-1 gap-2">
-                          <span className="text-[12px] text-[#5d4037] bg-[#fff8e1] px-2 py-1 rounded flex items-center gap-1">
-                          <svg className="inline-block w-4 h-4 text-green-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 8-4 8-4s8 0 8 4"/></svg>
-                            ชื่อบิล: {billName || '-'}
-                          </span>
-                          <span className="text-right text-[12px] bg-[#fff8e1] px-2 py-1 rounded text-[#5d4037] flex items-center gap-1">
-                            <svg className="inline-block w-4 h-4 text-orange-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
-                            วันที่ซื้อ: {format(new Date(), 'd MMM yy HH:mm น.', { locale: th })}
-                          </span>
+                         <div className="flex flex-wrap justify-between items-center mt-1 gap-2">
+                           <span className="text-[12px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700/50 px-2 py-0.5 rounded">ชื่อบิล: {billName || '-'}</span>
+                           <span className="text-right text-[12px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700/50 px-2 py-0.5 rounded">ซื้อเมื่อ: {format(new Date(), 'dMMM yy HH:mm', { locale: th })}</span>
                         </div>
                       </div>
-                      <div className="space-y-6">
-                        {/* Group tickets by digit_number and numbers */}
-                        {(() => {
-                          // 1. สร้าง group: digit_number + typeLabels + amounts (เรียงตามลำดับ label)
-                          // 2. นำ ticket มารวมกันตามหมายเลขที่ตรงกัน
-                          // 3. แสดงผลแต่ละ group
-                          return (
-                            <AnimatePresence>
-                              {Array.from(groups.values()).map((group, idx) => {
-                                const allLabels = group.typeLabels;
-                                const groupTotal = allLabels.reduce((sum, label) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
-                                return (
-                                  <div
-                                    key={idx}
-                                    className="flex flex-row items-center bg-[#f8fafc] border border-[#e0e7ef] rounded-lg px-2 py-1 mb-2 gap-2 shadow-sm hover:bg-[#f1f5f9] transition-colors"
-                                    style={{ minHeight: 38 }}
-                                  >
-                                    {/* Left: group info */}
-                                    <div className="flex flex-col items-center justify-center min-w-[60px] max-w-[80px] text-center flex-shrink-0">
-                                      <div className="text-[11px] font-bold text-[#d32f2f] leading-tight">{group.digit_number} ตัว</div>
-                                      <div className="text-[11px] text-[#e53935] leading-tight">{allLabels.join(' x ')}</div>
-                                      <div className="text-[11px] text-gray-700 leading-tight">{allLabels.map(label => group.amounts[label] ?? 0).join(' x ')}</div>
-                                      <div className="text-[10px] text-gray-400 leading-tight">รวม {groupTotal.toLocaleString()} ฿</div>
-                                    </div>
-                                    {/* Right: numbers */}
-                                    <div className="flex-1 flex items-center min-h-8 max-h-16 overflow-y-auto">
-                                      <textarea
-                                        value={group.numbers.join('  ')}
-                                        readOnly
-                                        rows={1}
-                                        className="rounded-md p-1 w-full h-auto min-h-7 max-h-12 text-[11px] leading-tight resize-none bg-white border border-[#e0e7ef] focus-visible:ring-1 focus-visible:ring-blue-400"
-                                        style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}
-                                      />
-                                      <button
-                                        className="ml-2 text-red-500 hover:text-red-700 transition-colors flex-shrink-0"
-                                        title="ลบกลุ่มนี้"
-                                        onClick={() => handleRemoveGroup(group)}
-                                        style={{ padding: 2 }}
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </AnimatePresence>
-                          );
-                        })()}
+                      <div className="space-y-2"> {/* Reduced space for tighter packing */}
+                        <TicketListGroupComponent groupsMap={groups} handleRemoveGroupFn={handleRemoveGroup} />
                       </div>
-                      <div className="flex justify-end mt-4 text-lg font-semibold text-green-600">
+                      <div className="flex justify-end mt-4 text-lg font-semibold text-green-600 dark:text-green-400">
                         ยอดรวมทั้งหมด: {(() => {
-                          // รวมยอดทุก group แบบเดียวกับ LotteryPurchasePage
                           let total = 0;
                           Array.from(groups.values()).forEach((group: Grouped) => {
-                            const allLabels = group.typeLabels;
+                            const allLabels = group.typeLabels || [];
                             total += allLabels.reduce((sum: number, label: string) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
                           });
                           return total.toLocaleString();
@@ -1223,22 +1183,9 @@ export default function LotteryTicketPage() {
               </Card>
             </motion.div>
             <div className="flex justify-end">
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading || ticketList.length === 0 || isSubmitting}
-                className="px-8 py-2 text-lg min-w-[170px]"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    <span>กำลังดำเนินการ...</span>
-                  </>
-                ) : loading ? (
-                  "กำลังโหลดข้อมูล..."
-                ) : (
-                  "ยืนยันซื้อ"
-                )}
+              <Button type="button" onClick={handleSubmit} disabled={loading || ticketList.length === 0 || isSubmitting} className="px-8 py-2 text-lg min-w-[170px]">
+                {isSubmitting ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span>กำลังดำเนินการ...</span></>) : 
+                 loading ? ("กำลังโหลด...") : ("ยืนยันซื้อ")}
               </Button>
             </div>
           </motion.div>
@@ -1246,38 +1193,17 @@ export default function LotteryTicketPage() {
       </SidebarProvider>
       <ConfirmationDialog />
       {(() => {
-        const isSwipeInputMode = selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack');
-        const shouldRenderDrawer = selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && !isSwipeInputMode;
-        
+        const isSwipeInputMode = selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19');
+        const shouldRenderDrawer = selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && !isSwipeInputMode && !swipeNineSingleDigit;
         if (!shouldRenderDrawer) return null;
-
-        let useReverseForDrawer = false;
-        if (selectedDigit === 2 && twoDigitOperation === 'reverse') useReverseForDrawer = true;
-        else if (selectedDigit === 3 && permuteThreeDigits) useReverseForDrawer = true;
-
-        return (<NumberSelectionDrawer
-            isOpen={isNumberDrawerOpen}
-            onOpenChange={setIsNumberDrawerOpen}
-            onApplyNumbers={handleApplyNumbersFromDrawer}
-            maxDigits={selectedDigit as 1 | 2 | 3}
-            initialUseReverseNumbers={useReverseForDrawer} />);
+        let useReverseForDrawer = (selectedDigit === 2 && twoDigitOperation === 'reverse') || (selectedDigit === 3 && permuteThreeDigits);
+        return (<NumberSelectionDrawer isOpen={isNumberDrawerOpen} onOpenChange={setIsNumberDrawerOpen} onApplyNumbers={handleApplyNumbersFromDrawer} maxDigits={selectedDigit as 1 | 2 | 3} initialUseReverseNumbers={useReverseForDrawer} />);
       })()}
-      {isLoadingPrint && ( 
-        <SpectacularLoader message="กำลังเตรียมข้อมูลสำหรับพิมพ์..." baseColor="green" />
-      )}
+      {isLoadingPrint && (<SpectacularLoader message="กำลังเตรียมข้อมูลสำหรับพิมพ์..." baseColor="green" />)}
       <style jsx global>{`
-@keyframes shake {
-  0% { transform: translateX(0); }
-  20% { transform: translateX(-6px); }
-  40% { transform: translateX(6px); }
-  60% { transform: translateX(-4px); }
-  80% { transform: translateX(4px); }
-  100% { transform: translateX(0); }
-}
-.animate-shake {
-  animation: shake 0.5s;
-}
-`}</style>
+        @keyframes shake { 0% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } 100% { transform: translateX(0); } }
+        .animate-shake { animation: shake 0.5s; }
+      `}</style>
     </DirectionProvider>
   );
-} 
+}

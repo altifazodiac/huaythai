@@ -102,7 +102,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           },
           {
             title: "จัดการผลสลาก",
-            url: "/admin/lottery",
+            url: "/admin/lottery-results",
           },
           {
             title: "จัดการผู้ใช้",

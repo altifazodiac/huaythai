@@ -119,6 +119,8 @@
   body {
     @apply bg-background text-foreground;
     font-family:var(--font-kanit), sans-serif;
+    -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   }
 }
 @layer utilities {
@@ -178,4 +180,14 @@
 
 .gentle-bounce {
   animation: gentle-bounce 1.2s cubic-bezier(.45,1.6,.45,1) both;
+}
+@keyframes progress-indeterminate {
+  0% { left: -40%; width: 40%; }
+  100% { left: 100%; width: 40%; }
+}
+.progress-indeterminate-bar {
+  position: absolute;
+  height: 100%;
+  background: #3b82f6;
+  animation: progress-indeterminate 1.2s infinite linear;
 }

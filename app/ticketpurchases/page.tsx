@@ -111,7 +111,7 @@ export default function LotteryPurchasePage() {
       if (user) {
         setUser(user);
       } else {
-        router.push("/signup");
+        router.push("/login");
       }
     };
     fetchUserData();
