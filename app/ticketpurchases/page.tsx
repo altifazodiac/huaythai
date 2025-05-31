@@ -96,6 +96,7 @@ export default function LotteryPurchasePage() {
   const [tickets, setTickets] = useState<LotteryTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<string>("user");
 
   // Filter states
   const [filterBillNumber, setFilterBillNumber] = useState("");
@@ -116,6 +117,19 @@ export default function LotteryPurchasePage() {
     };
     fetchUserData();
   }, [router, supabase]);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+      const { data: roleRow } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setRole(roleRow?.role || "user");
+    };
+    fetchUserRole();
+  }, [user, supabase]);
 
   // Fetch lottery tickets
   useEffect(() => {
@@ -142,9 +156,11 @@ export default function LotteryPurchasePage() {
               )
             )
           `)
-          .eq('user_id', user.id)
           .is('deleted_at', null)
           .order('created_at', { ascending: false });
+        if (role !== "admin") {
+          query = query.eq('user_id', user.id);
+        }
         if (filterBillNumber) {
           query = query.ilike('bill_number', `%${filterBillNumber}%`);
         }
@@ -162,7 +178,7 @@ export default function LotteryPurchasePage() {
       }
     };
     fetchTickets();
-  }, [user, supabase, filterBillNumber, filterDate]);
+  }, [user, supabase, filterBillNumber, filterDate, role]);
 
   // Function to create groups from ticket items (same logic as in your original code)
   const createGroups = (ticketItems: TicketDisplayItem[]) => {

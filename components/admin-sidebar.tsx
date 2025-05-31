@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldCheck,
   Ticket,
+  Trash,
   Users,
 } from "lucide-react"
 import Link from "next/link"
@@ -33,12 +34,12 @@ export function AdminSidebar({ className, ...props }: AdminSidebarProps) {
   const navItems = [
     {
       title: "แดชบอร์ด",
-      href: "/admin",
+      href: "/admin/AdminDashboardPage",
       icon: LayoutDashboard,
     },
     {
       title: "จัดการผลสลาก",
-      href: "/admin/lottery",
+      href: "/admin/lottery-results" ,
       icon: CalendarDays,
     },
     {
@@ -48,8 +49,17 @@ export function AdminSidebar({ className, ...props }: AdminSidebarProps) {
       icon: CalendarDays,
     },
     {
-      title: "จัดการตั๋ว",
+      title: "จัดการบิลหวย",
       href: "/admin/tickets",
+      icon: Ticket,
+    },
+     
+    { title: "รายการที่ลบ", 
+      href: "/admin/lottery-ticket" ,
+      icon: Trash,
+    },
+    { title: "จัดการประเภทหวย", 
+      href: "/admin/lotterysubtype" ,
       icon: Ticket,
     },
     {
@@ -59,7 +69,7 @@ export function AdminSidebar({ className, ...props }: AdminSidebarProps) {
     },
     {
       title: "รายงาน",
-      href: "/admin/reports",
+      href: "/admin/lottery-managesummary",
       icon: BarChart3,
     },
     {

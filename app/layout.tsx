@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Kanit } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'sonner'
-import { TicketSubTypeProvider } from "../components/contexts/TicketSubTypeContext";
 import { ThemeProvider } from "@/components/theme-provider"
 
 const geistSans = Geist({
@@ -43,9 +42,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
         <Toaster position="top-right" />
-        <TicketSubTypeProvider>
+       
           {children}
-        </TicketSubTypeProvider>
+        
         </ThemeProvider>
       </body>
     </html>

@@ -310,7 +310,7 @@ return (
                       <TableHead>เลขบิล</TableHead>
                       <TableHead>วันที่ออกรางวัล</TableHead>
                       <TableHead>ยอดซื้อ</TableHead>
-                      <TableHead>เงินรางวัล</TableHead>
+                      <TableHead>ยอดที่ถูกรางวัล</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

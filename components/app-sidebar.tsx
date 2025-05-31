@@ -50,160 +50,51 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { setTheme } = useTheme();
+  const { role, loading } = useUserRole();
 
-  // This is sample data.
-  const data = {
-    user: {
-      name: "shadcn",
-      email: "m@example.com",
-      avatar: "/avatars/shadcn.jpg",
+  // เมนูสำหรับ user ทุกคน
+  const userNav = [
+    {
+      title: "รายการหวย",
+      url: "#",
+      icon: SquareTerminal,
+      isActive: true,
+      items: [
+        { title: "รายการหวยทั้งหมด", url: "/" },
+        { title: "รายการซื้อ", url: "/ticketpurchases" },
+        { title: "ตรวจผลหวย", url: "/lottery-ticketresults" },
+        { title: "การจ่ายรางวัล", url: "/lottery-summary" },
+      ],
     },
-    teams: [
-      {
-        name: "หวยออนไลน์",
-        logo: GalleryVerticalEnd,
-        plan: "HuayOnline",
-      },
-      {
-        name: "มาเฟียพารวย",
-        logo: AudioWaveform,
-        plan: "Startup",
-      },
-      {
-        name: "หวยเศรษฐี",
-        logo: Command,
-        plan: "Free",
-      },
-    ],
-    mainNav: [
-      {
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: HomeIcon,
-        isActive: true,
-        items: [
-          {
-            title: "Dashboard",
-            url: "/dashboard",
-          },
-        ],
-      },
-      {
-        title: "ผู้ดูแลระบบ",
-        url: "/admin",
-        icon: ShieldCheck,
-        items: [
-          {
-            title: "แดชบอร์ด",
-            url: "/admin",
-          },
-          {
-            title: "จัดการผลสลาก",
-            url: "/admin/lottery-results",
-          },
-          {
-            title: "จัดการผู้ใช้",
-            url: "/admin/users",
-          },
-          {
-            title: "รายงาน",
-            url: "/admin/reports",
-          },
-          {
-            title: "รายการที่ลบ",
-            url: "/admin/lottery-ticket",
-          },
-          {
-            title: "จัดการชนิดย่อยของหวย",
-            url: "/admin/lotterysubtype",
-          },
-        ],
-      },
-    ] as NavItem[],
-    navMain: [
-      {
-        title: "รายการหวย",
-        url: "#",
-        icon: SquareTerminal,
-        isActive: true,
-        items: [
-          {
-            title: "รายการหวยทั้งหมด",
-            url: "/",
-          },
-        
-          {
-            title: "รายการซื้อ",
-            url: "/ticketpurchases",
-          },
-          {
-            title: "ตรวจผลหวย",
-            url: "/lottery-ticketresults",
-          },
-      
-          {
-            title: "การจ่ายรางวัล",
-            url: "/lottery-summary",
-          },
-          
-        ],
-      },
-     
-      {
-        title: "Settings",
-        url: "#",
-        icon: Settings2,
-        items: [
-          {
-            title: "General",
-            url: "#",
-          },
-          {
-            title: "Team",
-            url: "#",
-          },
-          {
-            title: "Billing",
-            url: "#",
-          },
-          {
-            title: "Limits",
-            url: "#",
-          },
-        ],
-      },
-    ] as NavItem[],
-    projects: [
-      {
-        name: "Design Engineering",
-        url: "#",
-        icon: Frame,
-      },
-      {
-        name: "Sales & Marketing",
-        url: "#",
-        icon: PieChart,
-      },
-      {
-        name: "Travel",
-        url: "#",
-        icon: Map,
-      },
-    ],
-  }
+    
+  ];
+
+  // เมนูสำหรับ admin เท่านั้น
+  const adminNav = [
+    {
+      title: "ผู้ดูแลระบบ",
+      url: "/admin",
+      icon: ShieldCheck,
+      items: [
+        { title: "จัดการระบบ", url: "/admin/dashboard" }
+       
+      ],
+    },
+  ];
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={[]} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.mainNav as NavItem[]} />
-        <NavMain items={data.navMain as NavItem[]} />
-        <NavProjects projects={data.projects} />
+        <NavMain items={userNav} />
+        {role === "admin" && <NavMain items={adminNav} />}
+        <NavProjects projects={[]} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

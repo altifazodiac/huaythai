@@ -67,7 +67,6 @@ export function NavUser() {
     await supabase.auth.signOut();
     toast.success("ออกจากระบบสำเร็จ!", {
       position: "top-right",
-      autoClose: 3000,
     });
     router.push("/login");
   };
@@ -115,12 +114,7 @@ export function NavUser() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
+             
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
