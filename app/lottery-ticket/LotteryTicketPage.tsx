@@ -656,71 +656,52 @@ export default function LotteryTicketPage() {
   const { allTypeLabels, groups } = useMemo(() => {
     const calculatedAllTypeLabels: Record<number, string[]> = {};
     payouts.forEach(p => {
-        if (!p.type_number) return;
-        if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
-        if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
-            calculatedAllTypeLabels[p.digit_number].push(p.type_number);
-        }
+      if (!p.type_number) return;
+      if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
+      if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
+        calculatedAllTypeLabels[p.digit_number].push(p.type_number);
+      }
     });
 
-    // Apply specific ordering for display if needed (e.g., เต็ง then โต๊ด)
+    // จัดเรียง typeLabels ตามที่ต้องการ
     Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
-        const digit = Number(digitStr);
-        const labels = calculatedAllTypeLabels[digit];
-        if (!labels) return;
-        let ordered = [...labels]; // Default to original order from DB or payout fetch
-        if (digit === 3 || digit === 4) { // Example for 3/4 digits
-            if (labels.includes("เต็ง") && labels.includes("โต๊ด")) {
-                ordered = ordered.filter(l => l !== "เต็ง" && l !== "โต๊ด");
-                ordered.unshift("โต๊ด"); ordered.unshift("เต็ง");
-            } else if (labels.includes("บน") && labels.includes("โต๊ด")) {
-                 ordered = ordered.filter(l => l !== "บน" && l !== "โต๊ด");
-                 ordered.unshift("โต๊ด"); ordered.unshift("บน");
-            }
-        } else if (digit === 2) { // Example for 2 digits
-            if (labels.includes("บน") && labels.includes("ล่าง")) {
-                 ordered = ordered.filter(l => l !== "บน" && l !== "ล่าง");
-                 ordered.unshift("ล่าง"); ordered.unshift("บน");
-            }
-        }
-        calculatedAllTypeLabels[digit] = Array.from(new Set(ordered)); // Ensure unique if manual ordering adds duplicates
+      const digit = Number(digitStr);
+      const labels = calculatedAllTypeLabels[digit];
+      if (!labels) return;
+      let ordered = [...labels];
+      if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) {
+        ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")];
+      }
+      calculatedAllTypeLabels[digit] = Array.from(new Set(ordered));
     });
-
 
     const calculatedGroups: Map<string, Grouped> = new Map();
+
     ticketList.forEach(item => {
-        const digit = item.payout.digit_number;
-        const itemTypeLabel = item.payout.type_number || "-";
-        const subTypeId = item.subType.lottery_sub_type_id;
+      const digit = item.payout.digit_number;
+      const subTypeId = item.subType.lottery_sub_type_id;
+      const numbersKey = item.numbers.join(",");
+      const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [item.payout.type_number || "-"];
+      const groupKey = `${subTypeId}|${digit}|${numbersKey}`;
 
-        const canonicalLabelOrderForKey = calculatedAllTypeLabels[digit] || [itemTypeLabel];
-        const amountsPattern = canonicalLabelOrderForKey.map(label =>
-            label === itemTypeLabel ? item.amount : 0
-        ).join(',');
-
-        const groupKey = `${subTypeId}|${digit}|${canonicalLabelOrderForKey.join(',')}|${amountsPattern}`;
-
-        if (!calculatedGroups.has(groupKey)) {
-            const groupAmounts: Record<string, number> = {};
-            canonicalLabelOrderForKey.forEach(label => {
-                groupAmounts[label] = (label === itemTypeLabel ? item.amount : 0);
-            });
-
-            calculatedGroups.set(groupKey, {
-                digit_number: digit,
-                numbers: [],
-                typeLabels: canonicalLabelOrderForKey,
-                amounts: groupAmounts,
-                typeOrder: canonicalLabelOrderForKey,
-                uniqueKey: item.uniqueKey,
-                _inferredPivotForSort: null,
-            });
-        }
-
-        const group = calculatedGroups.get(groupKey)!;
-        item.numbers.forEach(numStr => {
-            group.numbers.push(numStr);
+      if (!calculatedGroups.has(groupKey)) {
+        // สร้าง amounts เริ่มต้นเป็น 0 ทุก typeLabel
+        const groupAmounts: Record<string, number> = {};
+        canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; });
+        calculatedGroups.set(groupKey, {
+          digit_number: digit,
+          numbers: [...item.numbers],
+          typeLabels: canonicalTypeLabels,
+          amounts: groupAmounts,
+          typeOrder: canonicalTypeLabels,
+          uniqueKey: item.uniqueKey,
+          _inferredPivotForSort: null,
         });
+      }
+      // เพิ่ม amount ให้ typeLabel ที่ตรง
+      const group = calculatedGroups.get(groupKey)!;
+      const label = item.payout.type_number || "-";
+      group.amounts[label] = (group.amounts[label] || 0) + item.amount;
     });
 
     return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
