@@ -43,7 +43,7 @@ import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
 import SpectacularLoader from "@/components/ui/SpectacularLoader"; // Import the new loader
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import debounce from "lodash.debounce";
-import { Progress } from "@/components/ui/progress"
+
 interface LotterySubType {
   lottery_sub_type_id: number;
   sub_type_name: string;
@@ -176,7 +176,6 @@ export default function LotteryTicketPage() {
   const [billName, setBillName] = useState("");
   const [isLoadingPrint, setIsLoadingPrint] = useState(false);
   const [countdownText, setCountdownText] = useState("");
-  const [progress, setProgress] = useState(0);
 
   const debouncedSetNumberInput = useRef(debounce((val: string) => setNumberInput(val), 200)).current;
 
@@ -533,8 +532,6 @@ export default function LotteryTicketPage() {
     }
     try {
       setIsSubmitting(true);
-      setProgress(10); // Start
-
       const drawDateForCheck = new Date(selectedDraw.date); drawDateForCheck.setHours(0, 0, 0, 0);
       const todayForCheck = new Date(); todayForCheck.setHours(0, 0, 0, 0);
 
@@ -586,13 +583,11 @@ export default function LotteryTicketPage() {
       toast.success("บันทึกการซื้อสำเร็จ!");
       router.push(`/print-ticket?bill_number=${encodeURIComponent(ticket.bill_number)}`);
       
-      setProgress(60);
     } catch (error: any) {
       console.error('Error saving ticket:', error);
       toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
       setIsSubmitting(false);
-      setProgress(0); // Reset after done
     }
   }
   
@@ -618,78 +613,43 @@ export default function LotteryTicketPage() {
   }, [selectedSubType, selectedDigit, selectedTypes, numberInput, amount, amounts, swipeNineSingleDigit]);
 
 
-  const arraysEqual = (a: string[], b: string[]) =>
-    a.length === b.length && a.every((v, i) => v === b[i]);
-
   async function handleRemoveGroup(groupToRemove: Grouped) {
-    // This function needs to identify which TicketItems in ticketList correspond to the displayed group
-    // The uniqueKey on the group might be from the first item that formed it.
-    // The most reliable way is to filter ticketList based on properties that define the group.
-    // However, with the new grouping key (including itemSpecificKeyPart), a group is more granular.
-    // If group.uniqueKey is the uniqueKey of the specific TicketItem(s) primarily defining this group.
-    
+    // สร้าง groupKey แบบเดียวกับ useMemo
+    const digit = groupToRemove.digit_number;
+    const typeLabels = groupToRemove.typeLabels;
+    const amountsPattern = typeLabels.map(label => groupToRemove.amounts[label] ?? 0).join(',');
+    const subTypeId = ticketList.find(item => item.payout.digit_number === digit && typeLabels.includes(item.payout.type_number || "-") && item.numbers.some(n => groupToRemove.numbers.includes(n)))?.subType.lottery_sub_type_id;
+    const groupKey = `${subTypeId}|${digit}|${typeLabels.join(',')}|${amountsPattern}`;
+
     setTicketList(prevList => prevList.filter(item => {
-        // A more robust check would be if item.uniqueKey was part of the group's identity,
-        // or if the group itself held a list of original ticketItem uniqueKeys.
-        // For now, if uniqueKey on group is from ONE item, this removes that one item.
-        // If group numbers are aggregated from multiple items (less likely with new key), this is complex.
-
-        // Let's assume group._inferredPivotForSort and group.digit_number, and matching numbers define the group.
-        // And the type/amount define which items within the ticketList are part of this displayed group.
-        // The handleRemoveGroup function was passed a 'group' which is a 'Grouped' object.
-        // We need to remove all TicketItems that contributed to this 'groupToRemove'.
-        
-        // Reconstruct key parts for the item, similar to how groups are keyed in useMemo
-        const itemDigit = item.payout.digit_number;
-        if (itemDigit !== groupToRemove.digit_number) return true; // Keep, different digit number
-
-        // Check if this item's numbers are all within the group's numbers
-        // (or if group numbers are a direct reflection of one item's numbers with new granular key)
-        const itemIsExactGroup = arraysEqual(item.numbers, groupToRemove.numbers);
-
-        if (!itemIsExactGroup) return true; // Keep, numbers don't match this group
-
-        // Check type and amount
-        // A group has typeLabels and amounts. An item has one payout.type_number and item.amount.
-        // The groupToRemove.typeLabels and groupToRemove.amounts should reflect this.
-        // With the new granular key, groupToRemove.typeLabels likely has 1 entry.
-        if (!groupToRemove.typeLabels.includes(item.payout.type_number || "-")) return true; // Keep
-        if (groupToRemove.amounts[item.payout.type_number || "-"] !== item.amount) return true; // Keep
-
-        // If item matches the group's defining properties (numbers, type, amount for that type)
-        // and pivot matches if it's a swipe19 group
-        let itemPivotD: string | null = null;
-        if (itemDigit === 2 && item.numbers.length === 19) {
-            itemPivotD = inferSwipe19Pivot(item.numbers);
-        }
-        if (groupToRemove._inferredPivotForSort !== itemPivotD) return true; // Keep, different pivot status
-
-        // If all checks pass, this item belongs to the group, so filter it out (return false)
-        return false; 
+      const itemTypeLabel = item.payout.type_number || "-";
+      const itemLabelOrder = typeLabels;
+      const itemAmountsPattern = itemLabelOrder.map(label => label === itemTypeLabel ? item.amount : 0).join(',');
+      const itemGroupKey = `${item.subType.lottery_sub_type_id}|${item.payout.digit_number}|${itemLabelOrder.join(',')}|${itemAmountsPattern}`;
+      return itemGroupKey !== groupKey;
     }));
 
-
     if (user && selectedDraw) { // Log removal
-        try {
-          await supabase.from('lottery_ticket_remove_logs').insert({
-            user_id: user.id,
-            bill_number: billNumber,
-            group_info: { // Log relevant info about the removed group
-                digit_number: groupToRemove.digit_number,
-                numbers: groupToRemove.numbers,
-                typeLabels: groupToRemove.typeLabels,
-                amounts: groupToRemove.amounts,
-                pivot: groupToRemove._inferredPivotForSort
-            },
-            removed_at: new Date().toISOString(),
-            reason: 'user removed group',
-            draw_date: selectedDraw.date.toISOString(),
-            close_time: selectedDraw.schedule.close_time,
-            schedule_id: selectedDraw.schedule.schedule_id,
-          });
-        } catch (e: unknown) {
-          console.error('Error logging remove group:', e);
-        }
+      try {
+        await supabase.from('lottery_ticket_remove_logs').insert({
+          user_id: user.id,
+          bill_number: billNumber,
+          group_info: {
+            digit_number: groupToRemove.digit_number,
+            numbers: groupToRemove.numbers,
+            typeLabels: groupToRemove.typeLabels,
+            amounts: groupToRemove.amounts,
+            pivot: groupToRemove._inferredPivotForSort
+          },
+          removed_at: new Date().toISOString(),
+          reason: 'user removed group',
+          draw_date: selectedDraw.date.toISOString(),
+          close_time: selectedDraw.schedule.close_time,
+          schedule_id: selectedDraw.schedule.schedule_id,
+        });
+      } catch (e: unknown) {
+        console.error('Error logging remove group:', e);
+      }
     }
   }
 
@@ -734,30 +694,18 @@ export default function LotteryTicketPage() {
         const subTypeId = item.subType.lottery_sub_type_id;
 
         const canonicalLabelOrderForKey = calculatedAllTypeLabels[digit] || [itemTypeLabel];
-        let groupAmounts: Record<string, number> = {};
-        let canMerge = true;
-        canonicalLabelOrderForKey.forEach(label => {
-            const found = ticketList.find(t =>
-                t.subType.lottery_sub_type_id === subTypeId &&
-                t.payout.digit_number === digit &&
-                t.payout.type_number === label
-            );
-            if (found) {
-                groupAmounts[label] = found.amount;
-            } else {
-                groupAmounts[label] = 0;
-                canMerge = false;
-            }
-        });
+        const amountsPattern = canonicalLabelOrderForKey.map(label =>
+            label === itemTypeLabel ? item.amount : 0
+        ).join(',');
 
-        const amountsArr = Object.values(groupAmounts);
-        if (amountsArr.every(a => a === amountsArr[0])) {
-            canMerge = true;
-        }
-
-        const groupKey = `${subTypeId}|${digit}|${canonicalLabelOrderForKey.join(',')}|${Object.values(groupAmounts).join('x')}`;
+        const groupKey = `${subTypeId}|${digit}|${canonicalLabelOrderForKey.join(',')}|${amountsPattern}`;
 
         if (!calculatedGroups.has(groupKey)) {
+            const groupAmounts: Record<string, number> = {};
+            canonicalLabelOrderForKey.forEach(label => {
+                groupAmounts[label] = (label === itemTypeLabel ? item.amount : 0);
+            });
+
             calculatedGroups.set(groupKey, {
                 digit_number: digit,
                 numbers: [],
@@ -771,9 +719,7 @@ export default function LotteryTicketPage() {
 
         const group = calculatedGroups.get(groupKey)!;
         item.numbers.forEach(numStr => {
-            if (!group.numbers.includes(numStr)) {
-                group.numbers.push(numStr);
-            }
+            group.numbers.push(numStr);
         });
     });
 
@@ -800,10 +746,7 @@ export default function LotteryTicketPage() {
         <div className="space-y-4">
           <div className="text-sm">
             <p className="font-medium mb-2">รายการที่เลือก:</p>
-            <div
-              className="overflow-x-auto max-h-[40vh] overflow-y-auto mb-4"
-              style={{ maxHeight: '40vh', overflowY: 'auto', marginBottom: '1rem' }}
-            >
+            <div className="overflow-x-auto">
               <table className="min-w-full text-xs border border-gray-200 rounded">
                 <thead>
                   <tr className="bg-gray-50">
@@ -816,7 +759,7 @@ export default function LotteryTicketPage() {
                 </thead>
                 <tbody>
                   {ticketList.map((item, index) => (
-                    <tr key={item.uniqueKey + "_" + index} className="border-b">{/* Use more robust key */}
+                    <tr key={item.uniqueKey + "_" + index} className="border-b">
                       <td className="px-2 py-1">{item.subType.sub_type_name} - {item.payout.type_number}</td>
                       <td className="px-2 py-1">{item.numbers.join(', ')}</td>
                       <td className="px-2 py-1 text-right">{item.amount.toLocaleString()}</td>
@@ -833,13 +776,6 @@ export default function LotteryTicketPage() {
           </div>
         </div>
         <DialogFooter>
-          {isSubmitting && (
-            <div className="w-full mb-2">
-              <div className="relative w-full h-2 bg-gray-200 rounded overflow-hidden">
-                <div className="progress-indeterminate-bar"></div>
-              </div>
-            </div>
-          )}
           <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
           <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px]">
             {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
@@ -855,7 +791,7 @@ export default function LotteryTicketPage() {
       if (supabaseUser) {
         setUser(supabaseUser);
       } else {
-        router.push("/login");
+        router.push("/signup");
       }
     };
     fetchUserData();

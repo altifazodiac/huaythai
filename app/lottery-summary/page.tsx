@@ -15,6 +15,15 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DirectionProvider } from "@radix-ui/react-direction";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+} from "@/components/ui/table";
 
 
 interface LotteryTicket {
@@ -145,14 +154,20 @@ const LotterySummaryPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
-      year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' // Ensure UTC if dates are stored as such
-    });
+    const d = new Date(dateString);
+    const day = d.getUTCDate().toString().padStart(2, '0');
+    const month = (d.getUTCMonth() + 1).toString().padStart(2, '0');
+    const year = d.getUTCFullYear();
+    return `${day}/${month}/${year}`;
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
+
+  // รวมยอดซื้อและเงินรางวัล
+  const totalAmount = filteredData.reduce((sum, item) => sum + item.total_amount, 0);
+  const totalPrize = filteredData.reduce((sum, item) => sum + item.total_prize, 0);
 
 return (
   <DirectionProvider dir="ltr">
@@ -180,9 +195,9 @@ return (
           <div className="container mx-auto">
             <header className="mb-4 text-center">
               <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 dark:from-purple-600 dark:via-pink-400 dark:to-red-400">
-                Lottery Summary
+                สรุปผลสลากกินแบ่งรัฐบาล
               </h1>
-              <p className="text-xs text-muted-foreground mt-1">View and filter your lottery ticket history and winnings.</p>
+              <p className="text-xs text-muted-foreground mt-1">ดูและกรองประวัติการซื้อสลากและเงินรางวัลของคุณ</p>
             </header>
 
             {/* Filter Section */}
@@ -190,7 +205,7 @@ return (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
                 {/* Bill Number Filter */}
                 <div>
-                  <label htmlFor="billNumber" className="block text-xs font-medium text-muted-foreground mb-0.5">Bill Number</label>
+                  <label htmlFor="billNumber" className="block text-xs font-medium text-muted-foreground mb-0.5">เลขบิล</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
                       <SearchIcon className="h-4 w-4 text-muted-foreground" />
@@ -200,14 +215,14 @@ return (
                       id="billNumber"
                       value={billNumberFilter}
                       onChange={(e) => setBillNumberFilter(e.target.value)}
-                      placeholder="e.g., BN1001"
+                      placeholder="เช่น 123456"
                       className="w-full pl-8 pr-2 py-1 bg-input border border-border rounded focus:ring-primary focus:border-primary text-xs text-foreground placeholder:text-xs placeholder-muted-foreground"
                     />
                   </div>
                 </div>
                 {/* Draw Date Filter */}
                 <div>
-                  <label htmlFor="drawDate" className="block text-xs font-medium text-muted-foreground mb-0.5">Draw Date</label>
+                  <label htmlFor="drawDate" className="block text-xs font-medium text-muted-foreground mb-0.5">วันที่ออกรางวัล</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
                       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
@@ -223,40 +238,40 @@ return (
                 </div>
                 {/* Total Amount Filter */}
                 <div className="flex flex-col gap-1">
-                  <label className="block text-xs font-medium text-muted-foreground mb-0.5">Amount (Min/Max)</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-0.5">ยอดซื้อ (ต่ำสุด/สูงสุด)</label>
                   <div className="flex space-x-1">
                     <input
                       type="number"
                       value={minAmountFilter}
                       onChange={(e) => setMinAmountFilter(e.target.value)}
-                      placeholder="Min"
+                      placeholder="ต่ำสุด"
                       className="w-1/2 p-1 bg-input border border-border rounded focus:ring-primary focus:border-primary text-xs placeholder:text-xs placeholder-muted-foreground"
                     />
                     <input
                       type="number"
                       value={maxAmountFilter}
                       onChange={(e) => setMaxAmountFilter(e.target.value)}
-                      placeholder="Max"
+                      placeholder="สูงสุด"
                       className="w-1/2 p-1 bg-input border border-border rounded focus:ring-primary focus:border-primary text-xs placeholder:text-xs placeholder-muted-foreground"
                     />
                   </div>
                 </div>
                 {/* Total Prize Filter */}
                 <div className="flex flex-col gap-1">
-                  <label className="block text-xs font-medium text-muted-foreground mb-0.5">Prize (Min/Max)</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-0.5">เงินรางวัล (ต่ำสุด/สูงสุด)</label>
                   <div className="flex space-x-1">
                     <input
                       type="number"
                       value={minPrizeFilter}
                       onChange={(e) => setMinPrizeFilter(e.target.value)}
-                      placeholder="Min"
+                      placeholder="ต่ำสุด"
                       className="w-1/2 p-1 bg-input border border-border rounded focus:ring-primary focus:border-primary text-xs placeholder:text-xs placeholder-muted-foreground"
                     />
                     <input
                       type="number"
                       value={maxPrizeFilter}
                       onChange={(e) => setMaxPrizeFilter(e.target.value)}
-                      placeholder="Max"
+                      placeholder="สูงสุด"
                       className="w-1/2 p-1 bg-input border border-border rounded focus:ring-primary focus:border-primary text-xs placeholder:text-xs placeholder-muted-foreground"
                     />
                   </div>
@@ -268,12 +283,12 @@ return (
                   className="flex items-center px-2 py-1 bg-destructive hover:bg-destructive/80 text-xs text-white rounded shadow transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-destructive focus:ring-opacity-50"
                 >
                   <XIcon className="h-4 w-4 mr-1" />
-                  Clear
+                  ล้างตัวกรอง
                 </button>
               </div>
             </div>
 
-            {/* Data Cards / Results */}
+            {/* Data Table / Results */}
             {isLoading && (
               <div className="flex justify-center items-center h-64">
                 <motion.div
@@ -287,58 +302,49 @@ return (
             {error && <p className="text-center text-destructive text-lg">{error}</p>}
 
             {!isLoading && !error && (
-              <motion.div
-                layout
-                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-              >
-                <AnimatePresence>
-                  {filteredData.length > 0 ? (
-                    filteredData.map((item, index) => (
-                      <motion.div
-                        key={`${item.bill_number},${item.draw_date}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                        transition={{ duration: 0.3, delay: index * 0.03 }}
-                        className={`bg-card border border-border rounded-lg shadow-md p-4 flex flex-col gap-2 transition-colors duration-300 hover:scale-[1.03] hover:shadow-lg ${
-                          item.total_prize > 0
-                            ? "ring-2 ring-green-400/60 dark:ring-green-500/40"
-                            : "ring-1 ring-muted"
-                        }`}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableCaption>ประวัติการซื้อสลากและเงินรางวัล</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>เลขบิล</TableHead>
+                      <TableHead>วันที่ออกรางวัล</TableHead>
+                      <TableHead>ยอดซื้อ</TableHead>
+                      <TableHead>เงินรางวัล</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.length > 0 ? (
+                      filteredData.map((item) => (
+                        <TableRow key={`${item.bill_number},${item.draw_date}`} className={item.total_prize > 0 ? "bg-green-50 dark:bg-green-900/20" : ""}>
+                          <TableCell>{item.bill_number}</TableCell>
+                          <TableCell>{formatDate(item.draw_date)}</TableCell>
+                          <TableCell>{formatCurrency(item.total_amount)}</TableCell>
+                          <TableCell className={item.total_prize > 0 ? "text-green-600 font-bold" : "text-red-500 font-bold"}>
+                            {formatCurrency(item.total_prize)}{item.total_prize > 0 && <span className="ml-1">🎉</span>}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          <FilterIcon className="inline h-6 w-6 mr-2 align-middle" />ไม่พบข้อมูล ลองปรับตัวกรองใหม่
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {/* Total Row */}
+                    {filteredData.length > 0 && (
+                      <TableRow
+                        className="bg-yellow-100 dark:bg-yellow-900/40"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-muted-foreground">Bill</span>
-                          <span className="text-xs text-muted-foreground">{formatDate(item.draw_date)}</span>
-                        </div>
-                        <div className="text-lg font-bold text-primary truncate">{item.bill_number}</div>
-                        <div className="flex justify-between items-center mt-2">
-                          <span className="text-xs text-muted-foreground">Spent</span>
-                          <span className="text-sm font-semibold">{formatCurrency(item.total_amount)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground">Prize</span>
-                          <span className={`text-sm font-bold ${
-                            item.total_prize > 0 ? "text-green-500" : "text-red-500"
-                          }`}>
-                            {formatCurrency(item.total_prize)}
-                            {item.total_prize > 0 && <span className="ml-1">🎉</span>}
-                          </span>
-                        </div>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5 }}
-                      className="col-span-full flex flex-col items-center justify-center py-16"
-                    >
-                      <FilterIcon className="h-12 w-12 text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">No results found. Try adjusting your filters.</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+                        <TableCell colSpan={2} className="text-right font-bold">รวมทั้งหมด</TableCell>
+                        <TableCell className="font-bold">{formatCurrency(totalAmount)}</TableCell>
+                        <TableCell className="font-bold text-green-600">{formatCurrency(totalPrize)}</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             )}
 
             <footer className="text-center mt-12 text-sm text-muted-foreground">

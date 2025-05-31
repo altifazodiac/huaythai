@@ -6,6 +6,7 @@ import { th } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose } from "@/components/ui/drawer";
 
 interface RemoveLog {
   id: number;
@@ -43,6 +44,8 @@ export default function RemoveLogsPage() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<RemoveLog | null>(null);
 
   async function fetchLogs() {
     setLoading(true);
@@ -98,6 +101,22 @@ export default function RemoveLogsPage() {
       alert('เกิดข้อผิดพลาดในการกู้คืน');
     }
     setRestoringId(null);
+  }
+
+  function formatGroupInfo(groupInfo: any): string {
+    if (!groupInfo) return "-";
+    let result = "";
+    if (groupInfo.amounts) {
+      result += `จำนวนเงิน: ${Object.entries(groupInfo.amounts).map(([k, v]) => `${k}: ${v}`).join(", ")}` + "\n";
+    }
+    if (groupInfo.numbers && Array.isArray(groupInfo.numbers)) {
+      result += `เลขที่ซื้อ: ${groupInfo.numbers.join(", ")}` + "\n";
+    }
+    if (groupInfo.typeLabels && Array.isArray(groupInfo.typeLabels)) {
+      result += `ประเภท: ${groupInfo.typeLabels.join(", ")}` + "\n";
+    }
+    // เพิ่ม field อื่นๆ ตามต้องการ
+    return result.trim() || JSON.stringify(groupInfo, null, 2);
   }
 
   useEffect(() => {
@@ -169,8 +188,10 @@ export default function RemoveLogsPage() {
                       <td className="px-2 py-1">{log.bill_number}</td>
                       <td className="px-2 py-1">{log.draw_date ? format(new Date(log.draw_date), 'd MMM yyyy', { locale: th }) : '-'}</td>
                       <td className="px-2 py-1">{log.close_time || '-'}</td>
-                      <td className="px-2 py-1 max-w-[200px] overflow-x-auto">
-                        <pre className="whitespace-pre-wrap text-xs">{JSON.stringify(log.group_info, null, 2)}</pre>
+                      <td className="px-2 py-1 max-w-[200px] text-center">
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedLog(log); setDrawerOpen(true); }}>
+                          ดูรายละเอียด
+                        </Button>
                       </td>
                       <td className="px-2 py-1">{log.reason}</td>
                     </tr>
@@ -243,6 +264,24 @@ export default function RemoveLogsPage() {
           </div>
         </CardContent>
       </Card>
+      <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>รายละเอียดรายการ</DrawerTitle>
+            <DrawerDescription>
+              ข้อมูลรายละเอียด
+            </DrawerDescription>
+            {selectedLog && (
+              <div className="whitespace-pre-wrap text-sm mt-2">
+                {formatGroupInfo(selectedLog.group_info)}
+              </div>
+            )}
+            <DrawerClose asChild>
+              <Button className="mt-4">ปิด</Button>
+            </DrawerClose>
+          </DrawerHeader>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 } 
