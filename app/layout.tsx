@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Kanit } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'sonner'
 import { ThemeProvider } from "@/components/theme-provider"
+import UserHeader from "@/components/UserHeader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,9 +43,8 @@ export default function RootLayout({
             disableTransitionOnChange
           >
         <Toaster position="top-right" />
-       
+        <UserHeader />
           {children}
-        
         </ThemeProvider>
       </body>
     </html>

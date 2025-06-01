@@ -88,8 +88,8 @@ export function AdminSidebar({ className, ...props }: AdminSidebarProps) {
       icon: Database,
     },
     {
-      title: "สิทธิ์การเข้าถึง",
-      href: "/admin/permissions",
+      title: "เติมเครดิต",
+      href: "/admin/credit-topup",
       icon: ShieldCheck,
     },
     {

@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DirectionProvider } from "@radix-ui/react-direction";
-import { Loader2, Trash2 } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
+import { Loader2, Trash2, TicketIcon, Hash, Tag, FileText, ListChecks, DollarSign, Calendar } from "lucide-react";
+import { Calendar as UiCalendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,7 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useSearchParams, useRouter } from "next/navigation";
 import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
-import SpectacularLoader from "@/components/ui/SpectacularLoader"; // Import the new loader
+import SpectacularLoader from "@/components/ui/SpectacularLoader";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import debounce from "lodash.debounce";
 
@@ -240,7 +240,6 @@ export default function LotteryTicketPage() {
       return;
     }
 
-    // Determine expected input length for numbers based on operation
     const isSwipeModeForSingleDigitInput = selectedDigit === 2 &&
         (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19');
     const expectedInputLength = isSwipeModeForSingleDigitInput ? 1 : selectedDigit;
@@ -249,16 +248,14 @@ export default function LotteryTicketPage() {
       .replace(/\n|,/g, " ")
       .split(" ")
       .map((n) => n.trim())
-      .filter(n => n.length > 0); // Filter empty strings first
+      .filter(n => n.length > 0); 
 
     if (selectedDigit === 1 && swipeNineSingleDigit) {
-        // If swipeNineSingleDigit is active, rawNumbersFromInput is ignored and replaced.
         rawNumbersFromInput = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
     } else {
-        // Validate each raw number based on expected length and digits only
         rawNumbersFromInput = rawNumbersFromInput.filter((n) => {
             const isValid = n.length === expectedInputLength && /^\d+$/.test(n);
-            if (!isValid && !swipeNineSingleDigit) { // Don't toast if swipeNine will override
+            if (!isValid && !swipeNineSingleDigit) { 
                  toast.error(`หมายเลข '${n}' ไม่ถูกต้องสำหรับ ${expectedInputLength} หลัก`);
             }
             return isValid;
@@ -270,7 +267,6 @@ export default function LotteryTicketPage() {
          return;
     }
 
-
     let allNewTickets: TicketItem[] = [];
     const processingTimestampKey = Date.now().toString();
 
@@ -278,20 +274,19 @@ export default function LotteryTicketPage() {
         let singleRawNumProcessedNumbers: string[] = [];
 
         if (selectedDigit === 1 && swipeNineSingleDigit) {
-            // rawNum here is one of "1" through "9"
             singleRawNumProcessedNumbers.push(rawNum);
         } else if (selectedDigit === 2) {
             switch (twoDigitOperation) {
                 case 'reverse':
                     if (rawNum.length === 2) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
                     break;
-                case 'swipeFront': // rawNum is 1 digit
+                case 'swipeFront': 
                     if (rawNum.length === 1) for (let i = 0; i <= 9; i++) singleRawNumProcessedNumbers.push(rawNum + i.toString());
                     break;
-                case 'swipeBack': // rawNum is 1 digit
+                case 'swipeBack': 
                     if (rawNum.length === 1) for (let i = 0; i <= 9; i++) singleRawNumProcessedNumbers.push(i.toString() + rawNum);
                     break;
-                case 'swipe19': // rawNum is 1 digit
+                case 'swipe19': 
                     if (rawNum.length === 1) {
                         const D = rawNum;
                         const part1_endingWithD: string[] = [];
@@ -306,8 +301,7 @@ export default function LotteryTicketPage() {
                         }
                         const allNums = [...part1_endingWithD, ...part2_startingWithD];
                         const uniqueNums = Array.from(new Set(allNums));
-
-                        // --- กรองเลข double ที่เคยถูกใช้ใน ticketList ออกเท่านั้น ---
+                        
                         const usedDoubles = new Set<string>();
                         ticketList.forEach(item => {
                           if (item.payout.digit_number === 2) {
@@ -334,15 +328,14 @@ export default function LotteryTicketPage() {
             }
         } else if (selectedDigit === 3 && permuteThreeDigits) {
             if (rawNum.length === 3) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
-        } else { // Includes 1-digit 'none', and other non-handled selectedDigit cases
+        } else { 
             if (rawNum.length === selectedDigit) singleRawNumProcessedNumbers.push(rawNum);
         }
         
-        singleRawNumProcessedNumbers = Array.from(new Set(singleRawNumProcessedNumbers)); // Ensure unique numbers per rawNum processing
-
+        singleRawNumProcessedNumbers = Array.from(new Set(singleRawNumProcessedNumbers)); 
 
         if (singleRawNumProcessedNumbers.length === 0) {
-            return; // Skip if this rawNum yielded no valid numbers
+            return; 
         }
         
         const uniqueKeyForThisSet = `${processingTimestampKey}_${rawNumIndex}_${Math.random().toString(36).slice(2, 8)}`;
@@ -355,8 +348,6 @@ export default function LotteryTicketPage() {
             });
             if (!typeAmountsAreValid) {
                 toast.error("กรุณากรอกจำนวนเงินให้ถูกต้องสำหรับทุกประเภทที่เลือก (เมื่อประมวลผลเลขชุด)");
-                // Decide if to `return` from forEach or break outer processing
-                // For now, assume it might skip adding for this rawNum if amounts are bad for multi-type
                 return; 
             }
             selectedTypes.forEach((typeId) => {
@@ -372,7 +363,6 @@ export default function LotteryTicketPage() {
         } else if (selectedTypes.length === 1) {
             if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
                 toast.error("กรุณากรอกจำนวนเงินให้ถูกต้อง (เมื่อประมวลผลเลขชุด)");
-                // Skip for this rawNum if amount is bad for single-type
                 return;
             }
             const typeId = selectedTypes[0];
@@ -385,18 +375,11 @@ export default function LotteryTicketPage() {
                 uniqueKey: uniqueKeyForThisSet,
             });
         }
-    }); // End of rawNumbersFromInput.forEach
+    }); 
 
     if (allNewTickets.length > 0) {
         setTicketList(prevList => [...prevList, ...allNewTickets]);
         setNumberInput("");
-        // Consider resetting amount/amounts and selectedTypes carefully based on desired UX
-        // setAmount(""); 
-        // setAmounts({});
-        // setSelectedTypes([]); 
-        // setTwoDigitOperation('none');
-        // setPermuteThreeDigits(false);
-        // setSwipeNineSingleDigit(false);
         toast.success("เพิ่มรายการใหม่สำเร็จ!");
     } else if (rawNumbersFromInput.length > 0) {
         toast.warning("ไม่มีรายการถูกเพิ่ม อาจเกิดจากข้อมูลไม่ถูกต้องหรือซ้ำซ้อน");
@@ -424,7 +407,7 @@ export default function LotteryTicketPage() {
     setNumberInput(combinedNumbers.join(" "));
   }
 
-  function handleRemoveTicket(idx: number) { // This removes by index, might need update if group removal is main way
+  function handleRemoveTicket(idx: number) { 
     setTicketList(ticketList.filter((_, i) => i !== idx));
   }
 
@@ -489,9 +472,8 @@ export default function LotteryTicketPage() {
       if (drawDate < today) {
         toast.error("วันที่ออกรางวัลที่เลือกหมดอายุแล้ว กรุณาเลือกใหม่");
         setAvailableDraws([]); setSelectedDraw(null); setSelectedDrawDate(undefined);
-        // Potentially clear initialState.draw or redirect
-        router.replace('/lottery-ticket'); // Clear query params
-        fetchAvailableDraws(); // Try to fetch new ones if subType selected
+        router.replace('/lottery-ticket'); 
+        fetchAvailableDraws(); 
         return;
       }
       setAvailableDraws([normalizeDraw(initialState.draw)]);
@@ -504,7 +486,7 @@ export default function LotteryTicketPage() {
     } else {
       setAvailableDraws([]); setSelectedDraw(null); setSelectedDrawDate(undefined);
     }
-  }, [selectedSubType, initialState.draw]); // supabase, router in deps if used inside fetch
+  }, [selectedSubType, initialState.draw]); 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -551,7 +533,7 @@ export default function LotteryTicketPage() {
         .insert({
           user_id: user.id, draw_date: localDrawDate, draw_time: selectedDraw.schedule.drawing_time,
           close_time: formattedCloseTime, bill_number: billNumber, bill_name: billName,
-          total_amount: ticketList.reduce((sum, item) => sum + (item.amount * item.numbers.length), 0), // Sum based on items, not groups for accuracy
+          total_amount: ticketList.reduce((sum, item) => sum + (item.amount * item.numbers.length), 0), 
           status: 'pending'
         }).select().single();
 
@@ -575,10 +557,8 @@ export default function LotteryTicketPage() {
         throw updateError;
       }
 
-      setTicketList([]); // setSelectedDrawDate(new Date()); // Don't reset draw date, user might continue for same draw
-      setBillName(""); // Reset bill name for next bill
-      // billNumber will auto-generate a new one if page reloads or component re-mounts.
-      // For SPA, might need to explicitly generate new billNumber: setBillNumber(Math.floor...);
+      setTicketList([]); 
+      setBillName(""); 
       setConfirmDialogOpen(false);
       toast.success("บันทึกการซื้อสำเร็จ!");
       router.push(`/print-ticket?bill_number=${encodeURIComponent(ticket.bill_number)}`);
@@ -601,7 +581,7 @@ export default function LotteryTicketPage() {
     const hasValidRawNumbers = (selectedDigit === 1 && swipeNineSingleDigit) || validRawNumbers.length > 0;
 
     return (
-      !!selectedSubType && // subTypeObj is derived, use selectedSubType
+      !!selectedSubType && 
       !!selectedDigit &&
       selectedTypes.length > 0 &&
       hasValidRawNumbers &&
@@ -614,7 +594,6 @@ export default function LotteryTicketPage() {
 
 
   async function handleRemoveGroup(groupToRemove: Grouped) {
-    // สร้าง groupKey แบบเดียวกับ useMemo
     const digit = groupToRemove.digit_number;
     const typeLabels = groupToRemove.typeLabels;
     const amountsPattern = typeLabels.map(label => groupToRemove.amounts[label] ?? 0).join(',');
@@ -629,7 +608,7 @@ export default function LotteryTicketPage() {
       return itemGroupKey !== groupKey;
     }));
 
-    if (user && selectedDraw) { // Log removal
+    if (user && selectedDraw) { 
       try {
         await supabase.from('lottery_ticket_remove_logs').insert({
           user_id: user.id,
@@ -663,7 +642,6 @@ export default function LotteryTicketPage() {
       }
     });
 
-    // จัดเรียง typeLabels ตามที่ต้องการ
     Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
       const digit = Number(digitStr);
       const labels = calculatedAllTypeLabels[digit];
@@ -685,7 +663,6 @@ export default function LotteryTicketPage() {
       const groupKey = `${subTypeId}|${digit}|${numbersKey}`;
 
       if (!calculatedGroups.has(groupKey)) {
-        // สร้าง amounts เริ่มต้นเป็น 0 ทุก typeLabel
         const groupAmounts: Record<string, number> = {};
         canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; });
         calculatedGroups.set(groupKey, {
@@ -698,7 +675,6 @@ export default function LotteryTicketPage() {
           _inferredPivotForSort: null,
         });
       }
-      // เพิ่ม amount ให้ typeLabel ที่ตรง
       const group = calculatedGroups.get(groupKey)!;
       const label = item.payout.type_number || "-";
       group.amounts[label] = (group.amounts[label] || 0) + item.amount;
@@ -710,10 +686,10 @@ export default function LotteryTicketPage() {
 
   const ConfirmationDialog = () => (
     <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-      <DialogContent>
+      <DialogContent className="bg-white dark:bg-slate-800">
         <DialogHeader>
-          <DialogTitle>ยืนยันการซื้อหวย</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-slate-800 dark:text-slate-100">ยืนยันการซื้อหวย</DialogTitle>
+          <DialogDescription className="text-slate-600 dark:text-slate-400">
             {selectedDraw ? (
               <>
                 <span>วันที่: {format(selectedDraw.date, 'PPP', { locale: th })}</span><br />
@@ -726,39 +702,39 @@ export default function LotteryTicketPage() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="text-sm">
-            <p className="font-medium mb-2">รายการที่เลือก:</p>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs border border-gray-200 rounded">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-2 py-1 border-b text-left">ประเภท</th>
-                    <th className="px-2 py-1 border-b text-left">หมายเลข</th>
-                    <th className="px-2 py-1 border-b text-right">จำนวนเงิน/เลข</th>
-                    <th className="px-2 py-1 border-b text-right">จำนวนเลข</th>
-                    <th className="px-2 py-1 border-b text-right">รวม</th>
+            <p className="font-medium mb-2 text-slate-700 dark:text-slate-300">รายการที่เลือก:</p>
+            <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-md">
+              <table className="min-w-full text-xs">
+                <thead >
+                  <tr className="bg-slate-50 dark:bg-slate-700">
+                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-left text-slate-600 dark:text-slate-300">ประเภท</th>
+                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-left text-slate-600 dark:text-slate-300">หมายเลข</th>
+                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-right text-slate-600 dark:text-slate-300">จำนวนเงิน/เลข</th>
+                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-right text-slate-600 dark:text-slate-300">จำนวนเลข</th>
+                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-right text-slate-600 dark:text-slate-300">รวม</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="text-slate-700 dark:text-slate-300">
                   {ticketList.map((item, index) => (
-                    <tr key={item.uniqueKey + "_" + index} className="border-b">
-                      <td className="px-2 py-1">{item.subType.sub_type_name} - {item.payout.type_number}</td>
-                      <td className="px-2 py-1">{item.numbers.join(', ')}</td>
-                      <td className="px-2 py-1 text-right">{item.amount.toLocaleString()}</td>
-                      <td className="px-2 py-1 text-right">{item.numbers.length}</td>
-                      <td className="px-2 py-1 text-right">{(item.amount * item.numbers.length).toLocaleString()}</td>
+                    <tr key={item.uniqueKey + "_" + index} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
+                      <td className="px-2 py-1.5">{item.subType.sub_type_name} - {item.payout.type_number}</td>
+                      <td className="px-2 py-1.5">{item.numbers.join(', ')}</td>
+                      <td className="px-2 py-1.5 text-right">{item.amount.toLocaleString()}</td>
+                      <td className="px-2 py-1.5 text-right">{item.numbers.length}</td>
+                      <td className="px-2 py-1.5 text-right">{(item.amount * item.numbers.length).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
-          <div className="text-right font-medium mt-2">
+          <div className="text-right font-medium mt-2 text-slate-800 dark:text-slate-200">
             ยอดรวม: {ticketList.reduce((sum, item) => sum + item.amount * item.numbers.length, 0).toLocaleString()} บาท
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
-          <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px]">
+          <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">ยกเลิก</Button>
+          <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-blue-600 hover:bg-blue-700 text-white">
             {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
           </Button>
         </DialogFooter>
@@ -768,7 +744,7 @@ export default function LotteryTicketPage() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const { data: { user: supabaseUser } } = await supabase.auth.getUser(); // Renamed to avoid conflict
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser(); 
       if (supabaseUser) {
         setUser(supabaseUser);
       } else {
@@ -779,7 +755,7 @@ export default function LotteryTicketPage() {
   }, [router, supabase]);
 
   useEffect(() => {
-    function getCountdownText(currentSelectedDraw: AvailableDraw | null) { // Renamed param
+    function getCountdownText(currentSelectedDraw: AvailableDraw | null) { 
       if (!currentSelectedDraw) return "-";
       const now = new Date();
       const [h, m, s] = currentSelectedDraw.schedule.close_time.split(":");
@@ -789,7 +765,6 @@ export default function LotteryTicketPage() {
       if (diff <= 0) return "หมดเวลา";
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      // const seconds = Math.floor((diff % (1000 * 60)) / 1000); // Seconds not shown in example
       return `${hours > 0 ? hours + ' ชม. ' : ''}${minutes} นาที`;
     }
     if (!selectedDraw) {
@@ -800,20 +775,17 @@ export default function LotteryTicketPage() {
       const text = getCountdownText(selectedDraw);
       setCountdownText(text);
       if (text === "หมดเวลา") {
-        // toast.info("หมดเวลารับซื้อสำหรับรอบนี้แล้ว"); // Inform user
-        // fetchAvailableDraws(); // Optionally fetch next available draws
-        router.push("/"); // Or redirect to a page indicating closure
+        router.push("/"); 
       }
-    }, 1000 * 30); // Update every 30s is enough for minutes display
+    }, 1000 * 30); 
     return () => clearInterval(timer);
-  }, [selectedDraw, router]); // Added router to deps
+  }, [selectedDraw, router]); 
 
   const TicketListGroupComponent = React.memo(({ groupsMap, handleRemoveGroupFn }: { groupsMap: Map<any, Grouped>, handleRemoveGroupFn: (group: Grouped) => void }) => {
     return (
       <AnimatePresence>
         {Array.from(groupsMap.values()).map((group, idx) => {
           const allLabelsInGroup: string[] = group.typeLabels || [];
-          // Calculate group total based on its numbers and amounts for its typeLabels
           const groupTotal = allLabelsInGroup.reduce((sum: number, label: string) => {
                 const amountForLabel = group.amounts[label] ?? 0;
                 return sum + (amountForLabel * group.numbers.length);
@@ -821,38 +793,38 @@ export default function LotteryTicketPage() {
 
           return (
             <motion.div
-              key={group.uniqueKey + "_" + idx} // Use a more stable key if group.uniqueKey is reliable
+              key={group.uniqueKey + "_" + idx} 
               initial={{ opacity: 0, y: -10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.98 }}
               transition={{ duration: 0.3 }}
-              className="flex flex-row items-start bg-[#f8fafc] border border-[#e0e7ef] rounded-lg px-2 py-2 mb-2 gap-2 shadow-sm hover:bg-[#f1f5f9] transition-colors"
+              className="flex flex-row items-start bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 mb-2 gap-3 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
             >
-              <div className="flex flex-col items-center justify-start min-w-[70px] max-w-[90px] text-center flex-shrink-0 pt-1">
-                <div className="text-[11px] font-bold text-[#d32f2f] leading-tight">{group.digit_number} ตัว</div>
-                <div className="text-[10px] text-[#e53935] leading-tight break-words">
+              <div className="flex flex-col items-center justify-start min-w-[80px] max-w-[100px] text-center flex-shrink-0 pt-1">
+                <div className="text-sm font-bold text-blue-600 dark:text-blue-400 leading-tight">{group.digit_number} ตัว</div>
+                <div className="text-xs text-slate-600 dark:text-slate-300 leading-tight break-words">
                     {group.typeLabels.join(' x ')}
                     {group._inferredPivotForSort ? ` (รูด19:${group._inferredPivotForSort})` : ''}
                 </div>
-                <div className="text-[10px] text-gray-700 leading-tight break-words">
+                <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight break-words">
                     {group.typeLabels.map(label => group.amounts[label] ?? 0).join(' x ')}
                 </div>
-                <div className="text-[10px] text-gray-400 leading-tight mt-0.5">รวม {groupTotal.toLocaleString()} ฿</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight mt-0.5">รวม {groupTotal.toLocaleString()} ฿</div>
               </div>
               <div className="flex-1 flex items-start min-h-8">
                 <Textarea
                   value={group.numbers.join('  ')}
                   readOnly
-                  rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))} // Auto rows based on content
-                  className="rounded-md p-1 w-full text-[11px] leading-tight resize-none bg-white border border-[#e0e7ef] focus-visible:ring-1 focus-visible:ring-blue-400"
+                  rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))} 
+                  className="rounded-md p-1.5 w-full text-xs leading-snug resize-none bg-slate-50 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500 placeholder-slate-400 dark:placeholder-slate-500"
                   style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit', minHeight: '28px' }}
                 />
                  <button
-                  className="ml-2 text-red-500 hover:text-red-700 transition-colors flex-shrink-0 p-1 mt-0.5"
+                  className="ml-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors flex-shrink-0 p-1.5 mt-0.5 rounded-md hover:bg-red-100 dark:hover:bg-red-800/50"
                   title="ลบกลุ่มนี้"
-                  onClick={() => handleRemoveGroupFn(group)} // Changed prop name
+                  onClick={() => handleRemoveGroupFn(group)} 
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" /> {/* Increased size slightly */}
                 </button>
               </div>
             </motion.div>
@@ -869,260 +841,418 @@ export default function LotteryTicketPage() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 bg-white dark:bg-slate-900 border-b dark:border-slate-700">
             <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+              <SidebarTrigger className="-ml-1 text-slate-600 dark:text-slate-300" />
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 bg-slate-300 dark:bg-slate-600" />
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="/">หน้าหลัก</BreadcrumbLink>
+                    <BreadcrumbLink href="/" className="text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100">หน้าหลัก</BreadcrumbLink>
                   </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbSeparator className="hidden md:block text-slate-400 dark:text-slate-500" />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>ซื้อหวย</BreadcrumbPage>
+                    <BreadcrumbPage className="text-slate-700 dark:text-slate-200 font-medium">ซื้อหวย</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
           </header>
-          {loading && (<SpectacularLoader message="กำลังโหลดข้อมูล..." baseColor="sky" />)}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-6 lg:px-8 py-6"
-          >
-            <Card className="mb-8 shadow-xl border-0">
-              <CardHeader className="h-32 mb-2 bg-gradient-to-r from-yellow-400 via-orange-400 to-pink-400 rounded-t-xl shadow-lg flex flex-col items-center justify-center py-8">
-                <div className="flex flex-col items-center ">
-                  <span className="text-4xl md:text-5xl lg:text-6xl drop-shadow font-extrabold">🎫</span>
-                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-white drop-shadow">ซื้อหวย</h1>
-                  <span className="text-base md:text-lg text-white/90 font-medium">เพิ่มรายการซื้อหวยของคุณได้ที่นี่</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="text-sm font-medium">เลขบิล (Bill Number)</label>
-                    <Input value={billNumber} readOnly className="bg-gray-100 cursor-not-allowed" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">ชื่อบิล (Bill Name)</label>
-                    <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" />
-                  </div>
-                </div>
-                <form className="space-y-4" onSubmit={(e) => e.preventDefault()}> {/* Changed to preventDefault, submit via button explicitly */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-50 dark:bg-slate-900 min-h-[calc(100vh-4rem)] py-6"> {/* Page Background */}
+            {loading && (<SpectacularLoader message="กำลังโหลดข้อมูล..." baseColor="sky" />)}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-6 lg:px-8"
+            >
+              <Card className="mb-8 shadow-lg border-0 rounded-xl bg-white dark:bg-slate-800">
+                <CardHeader className="h-20 bg-blue-800 dark:bg-blue-700 rounded-t-xl shadow-lg flex flex-col items-start justify-center">
+                <div className="flex items-center space-x-3">
+                  <TicketIcon className="w-12 h-12 text-blue-100" /> 
+                  <span className="text-xl md:text-2xl font-bold text-white">สร้างรายการหวย</span></div>
+                  <span className="text-sm text-blue-100 dark:text-blue-200 font-medium">กรอกรายละเอียดเพื่อเพิ่มรายการซื้อหวยของคุณ</span>
+                </CardHeader>
+                <CardContent className="p-4 md:p-6">  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"> 
                     <div>
-                      <label className="text-sm font-medium">ชนิดหวย</label>
-                      {initialState.subType ? (
-                        <div className="py-2 px-3 rounded bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200">
-                          {subTypes.find(s => s.lottery_sub_type_id === initialState.subType)?.sub_type_name || "-"}
-                        </div>
-                      ) : (
-                        <Select value={selectedSubType?.toString() || ""} onValueChange={v => { setSelectedSubType(Number(v)); setSelectedPayout(null); setSelectedDigit(null); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); setSwipeNineSingleDigit(false); }}>
-                          <SelectTrigger><SelectValue placeholder="เลือกชนิดหวย" /></SelectTrigger>
-                          <SelectContent>
-                            {subTypes.map((s) => (<SelectItem key={s.lottery_sub_type_id} value={s.lottery_sub_type_id.toString()}>{s.sub_type_name}</SelectItem>))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                        <Hash className="w-4 h-4 text-blue-800" />
+                        เลขบิล (Bill Number)
+                      </label>
+                      <Input value={billNumber} readOnly className="bg-slate-100 dark:bg-slate-700 cursor-not-allowed border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="text-sm font-medium">จำนวนหลัก</label>
-                      <div className="flex gap-2 mt-1 flex-wrap">
-                        {digitOptions.map((d) => (
-                          <Button key={d} type="button" variant={selectedDigit === d ? "default" : "outline"} onClick={() => { setSelectedDigit(d); setSelectedTypes([]); setTwoDigitOperation('none'); setPermuteThreeDigits(false); setSwipeNineSingleDigit(false); }}>
-                            {d} ตัว
-                          </Button>
-                        ))}
-                      </div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                        <Tag className="w-4 h-4 text-blue-800" />
+                        ชื่อบิล (Bill Name)
+                      </label>
+                      <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500" />
                     </div>
                   </div>
-
-                  {selectedDigit && (
-                    <div>
-                      <label className="text-sm font-medium">เลือกประเภท/รูปแบบ <span className="text-xs text-muted-foreground">(เลือกได้หลายแบบ)</span></label>
-                      <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 && selectedDigit ? 'animate-shake border-2 border-red-400 bg-red-50 p-2 rounded' : 'p-2'}`}>
-                        {filteredTypes.map((type) => (
-                          <label key={type.id} className="flex items-center gap-1 border rounded px-2 py-1 cursor-pointer bg-white dark:bg-zinc-900 shadow-sm hover:bg-gray-50 dark:hover:bg-zinc-800 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 dark:has-[:checked]:bg-blue-900/30">
-                            <input
-                              type="checkbox"
-                              checked={selectedTypes.includes(type.id)}
-                              onChange={() => handleTypeToggle(type.id)}
-                              disabled={
-                                (permuteThreeDigits && selectedDigit === 3 && (type.type_number === "เต็ง" || type.type_number === "โต๊ด"))
-                              }
-                              className="accent-blue-600"
-                            />
-                            {type.type_number || "-"} <span className="text-xs text-muted-foreground">(จ่าย {type.price_paid})</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedDigit === 2 && (
-                    <div className="mt-3">
-                      <label className="text-sm font-medium">รูปแบบเลข 2 ตัว</label>
-                      <RadioGroup value={twoDigitOperation} onValueChange={(value) => setTwoDigitOperation(value as any)} className="flex flex-wrap gap-x-4 gap-y-2 mt-1 items-center">
-                        {/* Radio items here */}
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" /><label htmlFor="op-none" className="text-sm cursor-pointer">ไม่มี</label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" /><label htmlFor="op-reverse" className="text-sm cursor-pointer">กลับเลข</label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" /><label htmlFor="op-swipeFront" className="text-sm cursor-pointer">รูดหน้า</label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" /><label htmlFor="op-swipeBack" className="text-sm cursor-pointer">รูดหลัง</label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" /><label htmlFor="op-swipe19" className="text-sm cursor-pointer">รูด19</label></div>
-                      </RadioGroup>
-                    </div>
-                  )}
-                  {selectedDigit === 3 && (
-                    <div className="flex items-center gap-2 mt-3">
-                      <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="accent-blue-600 h-4 w-4"/>
-                      <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer">รูด 6 (โต๊ด)</label>
-                    </div>
-                  )}
-                  {selectedDigit === 1 && (
-                     <div className="flex items-center gap-2 mt-3">
-                      <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="accent-blue-600 h-4 w-4"/>
-                      <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer">รูด 9 (เพิ่ม 1-9 อัตโนมัติ)</label>
-                    </div>
-                  )}
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-sm font-medium">หมายเลขหวย <span className="text-xs text-muted-foreground">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span></label>
-                      {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
-                       !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) && 
-                       !swipeNineSingleDigit && (
-                          <Button type="button" variant="outline" size="sm" onClick={() => setIsNumberDrawerOpen(true)}>เลือกจากชุดตัวเลข</Button>
-                        )}
-                    </div>
-                    <Textarea
-                      rows={3}
-                      placeholder={
-                        swipeNineSingleDigit && selectedDigit === 1 ? "เลข 1-9 จะถูกเพิ่มอัตโนมัติ" :
-                        !selectedDigit ? "เลือกจำนวนหลักก่อน" :
-                        (selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) ? `กรอกหมายเลข 1 หลัก สำหรับรูด (เช่น 1 2 3)` :
-                        `กรอกหมายเลข ${selectedDigit} หลัก (เช่น ${"1".repeat(selectedDigit)} ${"2".repeat(selectedDigit)})`
-                      }
-                      value={numberInput}
-                      onChange={e => debouncedSetNumberInput(e.target.value)}
-                      disabled={!selectedDigit || (swipeNineSingleDigit && selectedDigit === 1)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium">จำนวนเงิน (บาท)</label>
-                    {selectedTypes.length > 1 ? (
-                      <>
-                        <div className="flex gap-2 mb-2 items-center">
-                          <Input type="number" min={1} placeholder="ใส่ทั้งหมด" value={fillAllAmount} onChange={e => setFillAllAmount(e.target.value)} className="w-32"/>
-                          <Button type="button" variant="outline" size="sm"
+                  <form className="space-y-6" onSubmit={(e) => e.preventDefault()}> 
+                   <AnimatePresence mode="wait">
+                    <motion.div
+                      key="digit-section"
+                      initial={{ opacity: 0, y: 24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 24 }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                    >
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                        <FileText className="w-4 h-4 text-blue-800" />
+                        จำนวนหลัก
+                      </label>
+                        <div className="flex gap-2 mt-1 flex-wrap">
+                          {digitOptions.map((d) => (
+                            <Button 
+                              key={d} 
+                              type="button" 
                             onClick={() => {
-                              if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) { toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง"); return; }
-                              const newAmts: Record<number, string> = {};
-                              selectedTypes.forEach(typeId => { newAmts[typeId] = fillAllAmount; });
-                              setAmounts(newAmts);
+                              setSelectedDigit(d);
+                              setSelectedTypes([]);
+                              setTwoDigitOperation('none');
+                              setPermuteThreeDigits(false);
+                              setSwipeNineSingleDigit(false);
                             }}
-                          >ใช้ยอดนี้</Button>
+                              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors
+                                ${selectedDigit === d 
+                                  ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600' 
+                                : 'bg-blue-50 border border-blue-100 text-blue-800 hover:bg-blue-250'
+                                }`}
+                            >
+                              {d} ตัว
+                            </Button>
+                          ))}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3">
-                          {selectedTypes.map(typeId => {
-                            const type = filteredTypes.find(t => t.id === typeId);
-                            return (
-                              <div key={typeId}>
-                                <label className="text-xs font-medium text-muted-foreground">{type?.type_number || "-"}</label>
-                                <Input type="number" min={1} value={amounts[typeId] || ""} onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })} placeholder="จำนวนเงิน" disabled={!selectedDigit}/>
-                                <div className="flex gap-1 mt-1 flex-wrap">
-                                  {[5, 10, 20, 50, 100].map(qAmt => (<Button key={qAmt} type="button" variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => setAmounts(prev => ({ ...prev, [typeId]: qAmt.toString() }))}>{qAmt}</Button>))}
-                                </div>
-                              </div>
-                            );
-                          })}
+                    </motion.div>
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit && (
+                      <motion.div
+                        key={`type-checkboxes-${selectedDigit}`}
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                      >
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                          <ListChecks className="w-4 h-4 text-blue-800" />
+                          เลือกประเภท/รูปแบบ <span className="text-xs text-slate-500 dark:text-slate-400">(เลือกได้หลายแบบ)</span>
+                        </label>
+                        <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 && selectedDigit ? 'animate-shake border-2 border-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-md' : 'p-2'}`}>
+                          {filteredTypes.map((type) => (
+                            <label 
+                              key={type.id} 
+                              className={`flex items-center gap-1.5 border rounded-md px-3 py-1.5 cursor-pointer shadow-sm transition-all
+                                ${selectedTypes.includes(type.id) 
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 dark:border-blue-600 ring-1 ring-blue-500' 
+                                  : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedTypes.includes(type.id)}
+                                onChange={() => handleTypeToggle(type.id)}
+                                disabled={(permuteThreeDigits && selectedDigit === 3 && (type.type_number === "เต็ง" || type.type_number === "โต๊ด"))}
+                                className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"
+                              />
+                              <span className="text-slate-800 dark:text-slate-200 text-sm">{type.type_number || "-"}</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">(จ่าย {type.price_paid})</span>
+                            </label>
+                          ))}
                         </div>
-                      </>
-                    ) : (
-                      <div>
-                        <Input type="number" min={1} placeholder="เช่น 20" value={amount} onChange={e => setAmount(e.target.value)} disabled={!selectedDigit || selectedTypes.length === 0}/>
-                        <div className="flex gap-1 mt-1 flex-wrap ">
-                          {[5, 10, 20, 50, 100].map(qAmt => (<Button key={qAmt} type="button" variant="outline" size="sm" className="h-6 px-2 text-xs" onClick={() => setAmount(qAmt.toString())}>{qAmt}</Button>))}
-                        </div>
-                      </div>
+                      </motion.div>
                     )}
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label className="text-sm font-medium">วันที่ออกรางวัล</label>
-                    <div className="mt-1">
-                      {selectedDraw ? (
-                        <div className="py-2 px-3 rounded bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-gray-200">
-                          {format(selectedDraw.date, 'd MMM yy', { locale: th })}
-                          <span className="ml-2 text-xs">({selectedDraw.schedule.drawing_time})</span>
-                          <span className="ml-2 text-xs text-red-600">ปิดรับใน: {countdownText}</span>
-                        </div>
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit === 2 && (
+                      <motion.div
+                        key="two-digit-ops"
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="mt-3"
+                      >
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">รูปแบบเลข 2 ตัว</label>
+                        <RadioGroup value={twoDigitOperation} onValueChange={(value) => setTwoDigitOperation(value as any)} className="flex flex-wrap gap-x-4 gap-y-2 mt-1 items-center">
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-none" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">ไม่มี</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-reverse" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-swipeFront" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหน้า</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-swipeBack" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหลัง</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-swipe19" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด19</label></div>
+                        </RadioGroup>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit === 3 && (
+                      <motion.div
+                        key="three-digit-ops"
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="flex items-center gap-2 mt-3"
+                      >
+                        <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"/>
+                        <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด 6 (โต๊ด)</label>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit === 1 && (
+                      <motion.div
+                        key="one-digit-ops"
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="flex items-center gap-2 mt-3"
+                      >
+                        <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"/>
+                        <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด 9 (เพิ่ม 1-9 อัตโนมัติ)</label>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit && (
+                      <motion.div
+                        key={`number-input-${selectedDigit}`}
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                      >
+                      <div className="flex justify-between items-center mb-1">
+                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                            <Hash className="w-4 h-4 text-blue-800" />
+                            หมายเลขหวย <span className="text-xs text-slate-500 dark:text-slate-400">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span>
+                          </label>
+                        {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
+                         !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) && 
+                         !swipeNineSingleDigit && (
+                              <Button type="button" size="sm" onClick={() => setIsNumberDrawerOpen(true)} className="rounded-full text-xs px-3 py-1 border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/30">เลือกจากชุดตัวเลข</Button>
+                          )}
+                      </div>
+                      <Textarea
+                        rows={3}
+                        placeholder={
+                          swipeNineSingleDigit && selectedDigit === 1 ? "เลข 1-9 จะถูกเพิ่มอัตโนมัติ" :
+                          !selectedDigit ? "เลือกจำนวนหลักก่อน" :
+                          (selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) ? `กรอกหมายเลข 1 หลัก สำหรับรูด (เช่น 1 2 3)` :
+                          `กรอกหมายเลข ${selectedDigit} หลัก (เช่น ${"1".repeat(selectedDigit)} ${"2".repeat(selectedDigit)})`
+                        }
+                        value={numberInput}
+                        onChange={e => debouncedSetNumberInput(e.target.value)}
+                        disabled={!selectedDigit || (swipeNineSingleDigit && selectedDigit === 1)}
+                        className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+                      />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit && (
+                      <motion.div
+                        key={`amount-input-${selectedDigit}`}
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                      >
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                          <DollarSign className="w-4 h-4 text-blue-800" />
+                          จำนวนเงิน (บาท)
+                        </label>
+                      {selectedTypes.length > 1 ? (
+                        <>
+                          <div className="flex gap-2 mb-3 items-center"> {/* Increased mb */}
+                              <Input type="number" min={1} placeholder="ใส่ทั้งหมด" value={fillAllAmount} onChange={e => setFillAllAmount(e.target.value)} className="w-32 text-blue-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"/>
+                            <Button type="button" size="sm"
+                              onClick={() => {
+                                if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) { toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง"); return; }
+                                const newAmts: Record<number, string> = {};
+                                selectedTypes.forEach(typeId => { newAmts[typeId] = fillAllAmount; });
+                                setAmounts(newAmts);
+                              }}
+                              className="px-4 py-1.5 text-sm rounded-md border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                            >ใช้ยอดนี้</Button>
+                          </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">  
+                            {selectedTypes.map(typeId => {
+                              const type = filteredTypes.find(t => t.id === typeId);
+                              return (
+                                <div key={typeId}>
+                                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{type?.type_number || "-"}</label>
+                                  <Input type="number" min={1} value={amounts[typeId] || ""} onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })} placeholder="จำนวนเงิน" disabled={!selectedDigit} className="mt-0.5 border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"/>
+                                    <div className="flex gap-1 mt-1.5 flex-wrap">  
+                                      {[5, 10, 20, 50, 100].map(qAmt => (
+                                        <Button
+                                          key={qAmt}
+                                          type="button"
+                                          size="sm"
+                                          className="h-7 px-3 text-xs rounded-full bg-white border border-blue-800 text-blue-800 hover:bg-blue-50"
+                                          onClick={() => setAmount(qAmt.toString())}
+                                        >
+                                          {qAmt}
+                                        </Button>
+                                      ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       ) : (
-                         initialState.subType && availableDraws.length === 0 && !loading ? 
-                         <div className="text-sm text-orange-600 py-2">ไม่มีรอบรางวัลสำหรับหวยประเภทนี้ในขณะนี้ หรือหมดเวลาแล้ว</div> :
-                         <div className="text-sm text-gray-500 py-2">{initialState.subType ? "กำลังโหลดรอบรางวัล..." : "กรุณาเลือกชนิดหวยเพื่อดูรอบรางวัล"}</div>
+                        <div>
+                          <Input type="number" min={1} placeholder="เช่น 20" value={amount} onChange={e => setAmount(e.target.value)} disabled={!selectedDigit || selectedTypes.length === 0} className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"/>
+                            <div className="flex gap-1 mt-1.5 flex-wrap">  
+                              {[5, 10, 20, 50, 100].map(qAmt => (
+                                <Button
+                                  key={qAmt}
+                                  type="button"
+                                  size="sm"
+                                  className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-blue-800 hover:bg-blue-50"
+                                  onClick={() => setAmount(qAmt.toString())}
+                                >
+                                  {qAmt}
+                                </Button>
+                              ))}
+                          </div>
+                        </div>
                       )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence mode="wait">
+                    {selectedDigit && (
+                      <motion.div
+                        key={`draw-date-${selectedDigit}`}
+                        initial={{ opacity: 0, y: 24 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 24 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="mb-4"
+                      >
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                          <Calendar className="w-4 h-4 text-blue-800" />
+                          วันที่ออกรางวัล
+                        </label>
+                        {selectedDraw ? (
+                          <div className="py-2.5 px-3 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                            {format(selectedDraw.date, 'd MMM yy', { locale: th })}
+                            <span className="ml-2 text-xs">({selectedDraw.schedule.drawing_time})</span>
+                            <span className="ml-2 text-xs text-red-600 dark:text-red-400">ปิดรับใน: {countdownText}</span>
+                          </div>
+                        ) : (
+                           initialState.subType && availableDraws.length === 0 && !loading ? 
+                           <div className="text-sm text-orange-600 py-2">ไม่มีรอบรางวัลสำหรับหวยประเภทนี้ในขณะนี้ หรือหมดเวลาแล้ว</div> :
+                           <div className="text-sm text-slate-500 dark:text-slate-400 py-2">{initialState.subType ? "กำลังโหลดรอบรางวัล..." : "กรุณาเลือกชนิดหวยเพื่อดูรอบรางวัล"}</div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                    <div className="flex gap-2 justify-end pt-2"> {/* Added pt */}
+                      <Button 
+                        type="button" 
+                        onClick={handleAddTicket} 
+                        disabled={!canAdd || loading} 
+                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
+                      >
+                        เพิ่มรายการ
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-end">
-                    <Button type="button" onClick={handleAddTicket} disabled={!canAdd || loading} className="px-6">เพิ่มรายการ</Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}>
-              <Card className="mb-8 shadow-xl border-0 w-full">
-                <CardHeader><CardTitle className="text-md text-gray-500 dark:text-gray-400">รายการที่เลือก</CardTitle></CardHeader>
-                <CardContent>
-                  {ticketList.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-6">ยังไม่มีรายการ</div>
-                  ) : (
-                    <>
-                      <div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
-                        {/* Header info for the bill */}
-                        <div className="flex flex-wrap justify-between items-center border-b border-dashed pb-1 mb-1 gap-2">
-                          <span className="font-bold text-[15px] text-red-600 dark:text-red-400 flex items-center gap-1">หวย {subTypeObj?.sub_type_name || '-'}</span>
-                          <span className="text-[13px] text-gray-700 dark:text-gray-300">บิล: {billNumber}</span>
-                        </div>
-                        <div className="flex flex-wrap justify-between items-center gap-2 mt-1">
-                           <span className="text-gray-600 dark:text-gray-400 text-sm">งวด: {selectedDrawDate ? format(selectedDrawDate, 'd MMM yy', { locale: th }) : '-'} (เวลา {selectedDraw?.schedule.drawing_time || '-'})</span>
-                           <span className="text-gray-600 dark:text-gray-400 text-sm">ผู้ซื้อ: {user?.user_metadata?.name || user?.email || 'ไม่ระบุ'}</span>
-                        </div>
-                         <div className="flex flex-wrap justify-between items-center mt-1 gap-2">
-                           <span className="text-[12px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700/50 px-2 py-0.5 rounded">ชื่อบิล: {billName || '-'}</span>
-                           <span className="text-right text-[12px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-700/50 px-2 py-0.5 rounded">ซื้อเมื่อ: {format(new Date(), 'dMMM yy HH:mm', { locale: th })}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2"> {/* Reduced space for tighter packing */}
-                        <TicketListGroupComponent groupsMap={groups} handleRemoveGroupFn={handleRemoveGroup} />
-                      </div>
-                      <div className="flex justify-end mt-4 text-lg font-semibold text-green-600 dark:text-green-400">
-                        ยอดรวมทั้งหมด: {(() => {
-                          let total = 0;
-                          Array.from(groups.values()).forEach((group: Grouped) => {
-                            const allLabels = group.typeLabels || [];
-                            total += allLabels.reduce((sum: number, label: string) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
-                          });
-                          return total.toLocaleString();
-                        })()} ฿
-                      </div>
-                    </>
-                  )}
+                  </form>
                 </CardContent>
               </Card>
+
+              <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}>
+                <Card className="mb-8 shadow-lg border-0 rounded-xl w-full bg-white dark:bg-slate-800">
+                  <CardHeader className="border-b dark:border-slate-700 p-5">
+                    <CardTitle className="text-lg font-semibold text-slate-800 dark:text-slate-200">รายการที่เลือก</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 md:p-6"> 
+                    {ticketList.length === 0 ? (
+                    <div className="text-center text-slate-500 dark:text-slate-400 py-8">
+                      <FileText className="inline w-6 h-6 mr-2 text-blue-400" />
+                      ยังไม่มีรายการ
+                    </div>  
+                    ) : (
+                      <>
+                        <div className="mb-4 p-4 rounded-lg bg-slate-100/50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700">
+                          <div className="flex flex-wrap justify-between items-center border-b border-dashed border-slate-300 dark:border-slate-600 pb-2 mb-2 gap-2">
+                            <span className="font-semibold text-md text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                            <TicketIcon className="w-5 h-5" />
+                              หวย {subTypeObj?.sub_type_name || '-'}
+                            </span>
+                          <span className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                            <Hash className="w-4 h-4" />
+                            บิล: {billNumber}
+                          </span>
+                          </div>
+                          <div className="flex flex-wrap justify-between items-center gap-2 mt-1">
+                          <span className="text-slate-600 dark:text-slate-400 text-sm flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            งวด: {selectedDrawDate ? format(selectedDrawDate, 'd MMM yy', { locale: th }) : '-'} (เวลา {selectedDraw?.schedule.drawing_time || '-'})
+                          </span>
+                          <span className="text-slate-600 dark:text-slate-400 text-sm flex items-center gap-1">
+                            <Tag className="w-4 h-4" />
+                            ผู้ซื้อ: {user?.user_metadata?.name || user?.email || 'ไม่ระบุ'}
+                          </span>
+                          </div>
+                           <div className="flex flex-wrap justify-between items-center mt-1.5 gap-2">
+                          <span className="text-xs text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-600/50 px-2 py-1 rounded-full flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            ชื่อบิล: {billName || '-'}
+                          </span>
+                          <span className="text-right text-xs text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-600/50 px-2 py-1 rounded-full flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            ซื้อเมื่อ: {format(new Date(), 'dMMM yy HH:mm', { locale: th })}
+                          </span>
+                          </div>
+                        </div>
+                      <div className="space-y-2.5">
+                          <TicketListGroupComponent groupsMap={groups} handleRemoveGroupFn={handleRemoveGroup} />
+                        </div>
+                      <div className="flex justify-end mt-6 text-xl font-bold text-blue-600 dark:text-blue-400 items-center gap-2">
+                        <DollarSign className="w-6 h-6" />
+                          ยอดรวมทั้งหมด: {(() => {
+                            let total = 0;
+                            Array.from(groups.values()).forEach((group: Grouped) => {
+                              const allLabels = group.typeLabels || [];
+                              total += allLabels.reduce((sum: number, label: string) => sum + (group.amounts[label] ?? 0) * group.numbers.length, 0);
+                            });
+                            return total.toLocaleString();
+                          })()} ฿
+                        </div>
+                      </>
+                    
+                    )}
+
+                  </CardContent>
+                </Card>
+              </motion.div>
+              <div className="flex justify-end pb-6"> {/* Added pb for spacing if it's the last element */}
+                <Button 
+                  type="button" 
+                  onClick={handleSubmit} 
+                  disabled={loading || ticketList.length === 0 || isSubmitting} 
+                  className="px-10 py-3 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md min-w-[180px] flex items-center justify-center disabled:opacity-60"
+                >
+                  {isSubmitting ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span>กำลังดำเนินการ...</span></>) : 
+                   loading ? ("กำลังโหลด...") : ("ยืนยันการสั่งซื้อ")}
+                </Button>
+              </div>
             </motion.div>
-            <div className="flex justify-end">
-              <Button type="button" onClick={handleSubmit} disabled={loading || ticketList.length === 0 || isSubmitting} className="px-8 py-2 text-lg min-w-[170px]">
-                {isSubmitting ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span>กำลังดำเนินการ...</span></>) : 
-                 loading ? ("กำลังโหลด...") : ("ยืนยันซื้อ")}
-              </Button>
-            </div>
-          </motion.div>
+          </div>
         </SidebarInset>
       </SidebarProvider>
       <ConfirmationDialog />

@@ -76,25 +76,26 @@ export default function FilterBar({ countries, onFilterChange }: FilterBarProps)
   // ปุ่ม filter ทั้งหมด
   const filterButtons = (
     <div className="flex flex-wrap gap-2">
-      <Button
+      <Button  className="border border-blue-800"
         variant={filterOpen === null ? "default" : "outline"}
         onClick={() => handleFilterOpen(null)}
       >ทั้งหมด</Button>
-      <Button
+      <Button  className="border border-blue-800"
         variant={filterOpen === true ? "default" : "outline"}
         onClick={() => handleFilterOpen(true)}
       >เปิดรับ</Button>
-      <Button
+      <Button  className="border border-blue-800"
         variant={filterOpen === false ? "default" : "outline"}
         onClick={() => handleFilterOpen(false)}
       >ปิดรับ</Button>
       <div className="w-px h-6 bg-gray-300 mx-2" />
-      <Button
+      <Button  className="border border-blue-800"
         variant={filterCountry === "all" ? "default" : "outline"}
         onClick={() => handleFilterCountry("all")}
       >ทุกประเทศ</Button>
       {countries.map(code => (
         <Button
+          className="border border-blue-800"
           key={code}
           variant={filterCountry === code ? "default" : "outline"}
           onClick={() => handleFilterCountry(code)}

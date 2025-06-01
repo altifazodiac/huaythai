@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
@@ -8,9 +8,11 @@ import FilterBar from "@/components/lottery/FilterBar";
 import { countryFlagImg } from "@/lib/utils/flags";
 import BouncingCard from "@/components/lottery/BouncingCard";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles, Clock, Globe, Calendar, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import { parseThaiDayOfWeek } from "@/lib/utils/date-utils";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { motion } from "framer-motion";
 
 function isOpenNow(schedule: any): boolean {
   if (!schedule || !schedule.open_time || !schedule.close_time) {
@@ -118,6 +120,12 @@ function dayOfWeekToEn(day: string): string {
   return day.split(",").map(d_2 => map[d_2.trim()] || d_2.trim()).join(",");
 }
 
+type LotteryType = {
+  lottery_type_id: number;
+  type_name: string;
+  // ...field อื่นๆ
+};
+
 export default function LotteryTypeGrid({
   grouped,
   schedules,
@@ -131,7 +139,16 @@ export default function LotteryTypeGrid({
   const [filterCountry, setFilterCountry] = useState<string>("all");
   const [loadingCardId, setLoadingCardId] = useState<string | null>(null);
   const router = useRouter();
- 
+  const [types, setTypes] = useState<LotteryType[]>([]);
+
+  useEffect(() => {
+    const fetchTypes = async () => {
+      const { data } = await supabase.from("lottery_types").select("*");
+      setTypes(data || []);
+    };
+    fetchTypes();
+  }, []);
+
   // filter logic
   const filteredGrouped = useMemo(() => {
     return grouped.map(group => ({
@@ -159,13 +176,30 @@ export default function LotteryTypeGrid({
         }}
       />
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        {filteredGrouped.map(group => (
+        <h2 className="text-2xl font-semibold flex items-center gap-2 text-blue-800 dark:text-white ">
+          <Sparkles className="text-yellow-200" /> ประเภทหวยทั้งหมด!
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-white mb-2 ml-4 mt-[-14px]">คลิกที่ประเภทหวยเพื่อดูรายละเอียดการออกรางวัล</p>
+        {filteredGrouped.map((group, idx) => (
           <div key={group.lottery_type_id} className="mb-8">
-            <h2 className="text-xl  text-white font-bold mb-4 flex items-center p-3 rounded-t-lg shooting-star-bg bg-gradient-to-br from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 border-slate-700">
-              <Icon icon="mdi:flag" className="w-6 h-6 mr-2 flex-shrink-0 text-white" />
-              {group.type_name}
-            </h2>
-            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            <motion.div
+              initial={{ opacity: 0, y: -30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: idx * 0.1, type: "spring", bounce: 0.3 }}
+              viewport={{ once: true, amount: 0.5 }}
+              className="
+                bg-white dark:bg-zinc-900
+                rounded-2xl
+                shadow
+                border border-gray-200 dark:border-zinc-700
+                flex items-center gap-3
+                px-5 py-3 mb-4
+              "
+            >
+              <Icon icon="mdi:flag" className="w-7 h-7 text-blue-500" />
+              <span className="font-bold text-lg text-blue-700 dark:text-white">{group.type_name}</span>
+            </motion.div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {group.subTypes.map((sub: any, idx: number) => {
                 const schedule = schedules.find(s => s.lottery_sub_type_id === sub.lottery_sub_type_id);
                 const scheduleEn = schedule
@@ -203,46 +237,72 @@ export default function LotteryTypeGrid({
                           router.push(`/lottery-ticket?subType=${sub.lottery_sub_type_id}&draw=${encodeURIComponent(JSON.stringify(availableDraw))}`);
                         }}
                       >
-                        <Card
-                          className={`min-h-[180px] flex flex-col items-center shadow-md border border-gray-200 max-w-xs w-full mx-auto bg-white dark:bg-zinc-900 transition-all duration-300 ease-in-out opacity-0 translate-y-4 animate-fadein ${isCurrentlyOpen ? 'cursor-pointer hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]' : 'opacity-70 cursor-default'}`}
-                          style={{
-                            animationDelay: `${idx * 80}ms`,
-                            animationFillMode: 'forwards',
-                          }}
+                        <motion.div
+                          initial={{ opacity: 0, y: 40 * ((idx % 2) ? 1 : -1), x: 40 * ((idx % 3) - 1) }}
+                          whileInView={{ opacity: 1, y: 0, x: 0 }}
+                          transition={{ duration: 0.7, delay: idx * 0.08, type: "spring", bounce: 0.3 }}
+                          viewport={{ once: true, amount: 0.2 }}
                         >
-                          <div
-                            className={
-                              `w-full text-center rounded-t-md ` +
-                              (isCurrentlyOpen
-                                ? "bg-green-600 text-white"
-                                : "bg-transparent text-gray-500 border-b border-gray-200")
-                            }
-                          >
-                            <h2 className="text-base font-semibold">
-                              {isCurrentlyOpen ? "เปิดรับ" : "ปิดรับแทง"}
-                            </h2>
-                          </div>
-                          <img
-                            src={countryFlagImg(sub.country_origin)}
-                            alt={sub.country_origin}
-                            className="w-full h-20 object-cover mb-1"
-                            loading="lazy"
-                          />
-                          <div className="font-bold text-lg md:text-md sm:text-sm mb-0.5 text-center line-clamp-2">{sub.sub_type_name}</div>
-                          <div className="text-xs text-gray-500 mb-0.5 text-center">{dayOfWeekTH(schedule?.day_of_week)}</div>
-                          <div className="text-xs mt-0.5 text-center mb-2">
-                            <div className="flex justify-center space-x-2">
-                              <span>เปิดรับ {schedule?.open_time?.slice(0,5) || "-"} น.</span>
-                              <span>ปิดรับ {schedule?.close_time?.slice(0,5) || "-"} น.</span>
+                          <Card
+  className={`
+    min-h-[180px] flex flex-col items-center
+    ${isCurrentlyOpen
+      ? 'animated-gradient-blue-bg text-white'
+      : 'bg-[#f4f8fd] text-gray-800'}
+    border border-gray-200
+    rounded-2xl shadow
+    transition-all duration-300
+    hover:scale-105 hover:shadow-lg
+    ${isCurrentlyOpen ? 'cursor-pointer' : 'opacity-100 cursor-default'}
+  `}
+  style={{
+    animationDelay: `${idx * 80}ms`,
+    animationFillMode: 'forwards',
+  }}
+>
+  <div className={`w-full text-center rounded-t-2xl ${isCurrentlyOpen ? 'bg-blue-900 text-white' : 'bg-[#f4f8fd] text-gray-800'} py-2 shadow-sm`}>
+    <h2 className="text-base font-semibold tracking-wide flex items-center justify-center gap-2">
+      <Ticket className="w-4 h-4" />
+      {isCurrentlyOpen ? "เปิดรับ" : "ปิดรับแทง"}
+    </h2>
+  </div>
+  <div className="w-full h-20 mb-1 animated-flag-light">
+    <img
+      src={countryFlagImg(sub.country_origin)}
+      alt={sub.country_origin}
+      className="w-full h-20 object-cover "
+      loading="lazy"
+      style={{ zIndex: 1, position: "relative" }}
+    />
+  </div>
+  <div className="font-bold text-base mb-0.5 text-center flex items-center justify-center gap-1">
+    <Globe className="w-4 h-4" />
+    {sub.sub_type_name}
+  </div>
+  <div className="text-xs mb-0.5 text-center flex items-center justify-center gap-1">
+    <Calendar className="w-4 h-4" />
+    {dayOfWeekTH(schedule?.day_of_week)}
+  </div>
+  <div className="text-xs mt-0.5 text-center mb-2">
+    <div className="flex justify-center space-x-2 items-center">
+      <span className="flex items-center gap-1">
+        <Clock className="w-3 h-3" />
+        เปิดรับ {schedule?.open_time?.slice(0,5) || "-"} น.
+      </span>
+      <span className="flex items-center gap-1">
+        <Clock className="w-3 h-3" />
+        ปิดรับ {schedule?.close_time?.slice(0,5) || "-"} น.
+      </span>
+    </div>
+    <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />
+  </div>
+</Card>
+                          {isLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-zinc-900/70 z-10 rounded-md">
+                              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
                             </div>
-                               <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />
-                          </div>
-                        </Card>
-                        {isLoading && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-zinc-900/70 z-10 rounded-md">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                          </div>
-                        )}
+                          )}
+                        </motion.div>
                       </div>
                     </div>
                   </BouncingCard>
