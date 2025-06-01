@@ -67,8 +67,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         { title: "รายการหวยทั้งหมด", url: "/" },
         { title: "รายการซื้อ", url: "/ticketpurchases" },
         { title: "ตรวจผลหวย", url: "/lottery-ticketresults" },
-        { title: "การจ่ายรางวัล", url: "/lottery-summary" },
-        { title: "ประวัติการสั่งซื้อ", url: "/transactions" },
+        { title: "สรุปรายการหวย", url: "/lottery-summary" },
+        { title: "ธุรกรรมเครดิต", url: "/transactions" },
       ],
     },
     

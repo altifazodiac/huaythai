@@ -252,3 +252,15 @@
 .animate-bounce-slow {
   animation: bounce-slow 2.8s infinite cubic-bezier(.4,0,.6,1);
 }
+@keyframes gradientBG {
+  0% { background-position: 0% 50% }
+  50% { background-position: 100% 50% }
+  100% { background-position: 0% 50% }
+}
+.animate-gradient-move {
+  background-size: 200% 200%;
+  animation: gradientBG 8s ease-in-out infinite;
+}
+.drop-shadow-glow {
+  filter: drop-shadow(0 0 8px #ffd700cc);
+}
