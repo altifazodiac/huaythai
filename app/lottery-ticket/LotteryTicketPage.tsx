@@ -528,41 +528,104 @@ export default function LotteryTicketPage() {
       const timeParts = selectedDraw.schedule.close_time.split(':');
       if (timeParts.length >= 2) formattedCloseTime = `${timeParts[0]}:${timeParts[1]}`;
 
-      const { data: ticket, error: ticketError } = await supabase
-        .from('lottery_tickets')
-        .insert({
-          user_id: user.id, draw_date: localDrawDate, draw_time: selectedDraw.schedule.drawing_time,
-          close_time: formattedCloseTime, bill_number: billNumber, bill_name: billName,
-          total_amount: ticketList.reduce((sum, item) => sum + (item.amount * item.numbers.length), 0), 
-          status: 'pending'
-        }).select().single();
+      const totalAmount = ticketList.reduce((sum, item) => sum + (item.amount * item.numbers.length), 0);
 
-      if (ticketError) throw ticketError;
+      // 1. Fetch current credit
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("credit_balance")
+        .eq("id", user.id)
+        .single();
 
-      const ticketItems = ticketList.map(item => ({
-        ticket_id: ticket.id, lottery_sub_type_id: item.subType.lottery_sub_type_id,
-        lottery_sub_number_id: item.payout.id, numbers: item.numbers, amount: item.amount
-      }));
+      if (profileError) throw profileError;
+      const currentCredit = profile?.credit_balance ?? 0;
 
-      const { error: itemsError } = await supabase.from('lottery_ticket_items').insert(ticketItems);
-      if (itemsError) {
-        await supabase.from('lottery_tickets').delete().eq('id', ticket.id);
-        throw itemsError;
+      if (currentCredit < totalAmount) {
+        toast.error("เครดิตของคุณไม่เพียงพอสำหรับการซื้อครั้งนี้");
+        setIsSubmitting(false);
+        setConfirmDialogOpen(false);
+        return;
       }
 
-      const { error: updateError } = await supabase.from('lottery_tickets').update({ status: 'confirmed' }).eq('id', ticket.id);
-      if (updateError) {
-        await supabase.from('lottery_ticket_items').delete().eq('ticket_id', ticket.id);
-        await supabase.from('lottery_tickets').delete().eq('id', ticket.id);
-        throw updateError;
+      // 2. Deduct credit and log transaction
+      const { error: txError } = await supabase.from("credit_transactions").insert([
+        {
+          user_id: user.id,
+          amount: -totalAmount,
+          transaction_type: "purchase",
+          description: `ซื้อหวย บิล ${billNumber}`,
+          related_bill_number: billNumber,
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      if (txError) throw txError;
+
+      const { error: updateCreditError } = await supabase
+        .from("profiles")
+        .update({ credit_balance: currentCredit - totalAmount })
+        .eq("id", user.id);
+      if (updateCreditError) throw updateCreditError;
+
+      // 3. Try to insert ticket and items
+      let ticket: { id: string } | null = null;
+      try {
+        const { data: ticketData, error: ticketError } = await supabase
+          .from('lottery_tickets')
+          .insert({
+            user_id: user.id, draw_date: localDrawDate, draw_time: selectedDraw.schedule.drawing_time,
+            close_time: formattedCloseTime, bill_number: billNumber, bill_name: billName,
+            total_amount: totalAmount, 
+            status: 'pending'
+          }).select().single();
+        if (ticketError) throw ticketError;
+        ticket = ticketData;
+        if (!ticket) throw new Error("Ticket creation failed");
+
+        const ticketItems = ticketList.map(item => ({
+          ticket_id: ticket!.id,
+          lottery_sub_type_id: item.subType.lottery_sub_type_id,
+          lottery_sub_number_id: item.payout.id,
+          numbers: item.numbers,
+          amount: item.amount
+        }));
+
+        const { error: itemsError } = await supabase.from('lottery_ticket_items').insert(ticketItems);
+        if (itemsError) throw itemsError;
+
+        const { error: updateError } = await supabase.from('lottery_tickets').update({ status: 'confirmed' }).eq('id', ticket!.id);
+        if (updateError) throw updateError;
+
+      } catch (err) {
+        // 4. Refund credit and log reversal transaction
+        await supabase.from("credit_transactions").insert([
+          {
+            user_id: user.id,
+            amount: totalAmount,
+            transaction_type: "refund",
+            description: `คืนเงิน (บิลล้มเหลว) ${billNumber}`,
+            related_bill_number: billNumber,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        await supabase
+          .from("profiles")
+          .update({ credit_balance: currentCredit })
+          .eq("id", user.id);
+
+        // Refresh credit in UI
+        if (typeof fetchUserData === "function") await fetchUserData();
+
+        throw err; // rethrow to show error toast
       }
 
+      // 5. Success: clear state, close dialog, refresh credit
       setTicketList([]); 
       setBillName(""); 
       setConfirmDialogOpen(false);
       toast.success("บันทึกการซื้อสำเร็จ!");
-      router.push(`/print-ticket?bill_number=${encodeURIComponent(ticket.bill_number)}`);
-      
+      if (typeof fetchUserData === "function") await fetchUserData();
+      router.push(`/print-ticket?bill_number=${encodeURIComponent(billNumber)}`);
+
     } catch (error: any) {
       console.error('Error saving ticket:', error);
       toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
@@ -742,17 +805,18 @@ export default function LotteryTicketPage() {
     </Dialog>
   );
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { user: supabaseUser } } = await supabase.auth.getUser(); 
-      if (supabaseUser) {
-        setUser(supabaseUser);
-      } else {
-        router.push("/signup");
-      }
-    };
-    fetchUserData();
+  const fetchUserData = useCallback(async () => {
+    const { data: { user: supabaseUser } } = await supabase.auth.getUser(); 
+    if (supabaseUser) {
+      setUser(supabaseUser);
+    } else {
+      router.push("/signup");
+    }
   }, [router, supabase]);
+
+  useEffect(() => {
+    fetchUserData();
+  }, [fetchUserData]);
 
   useEffect(() => {
     function getCountdownText(currentSelectedDraw: AvailableDraw | null) { 
@@ -999,7 +1063,7 @@ export default function LotteryTicketPage() {
                         className="flex items-center gap-2 mt-3"
                       >
                         <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"/>
-                        <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด 6 (โต๊ด)</label>
+                        <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข (รูด 6)</label>
                       </motion.div>
                     )}
                   </AnimatePresence>
