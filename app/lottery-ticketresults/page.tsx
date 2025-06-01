@@ -237,126 +237,157 @@ export default function LotteryTicketResultsPage() {
             </Breadcrumb>
           </div>
         </header>
- <div className="container w-full mx-auto p-2 sm:p-4 space-y-4">
-      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-        <Card className="border-none shadow-lg mb-2">
-          <CardHeader className="bg-gradient-to-r from-green-400 to-green-600 text-white rounded-t-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between shadow">
-            <div className="flex items-center gap-2 text-xl font-bold">
-              <FaCrown className="text-yellow-300 animate-bounce" />
-              บิลที่ถูกรางวัล
-            </div>
-            <div className="text-lg font-semibold mt-2 sm:mt-0 flex items-center">
-              <FaCoins className="text-yellow-200 mr-1" />
-              ยอดรวมรางวัล: <span className="text-yellow-200 ml-1">{totalPrize.toLocaleString()} ฿</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-2">
-            <div className="flex gap-2 mb-2 flex-wrap">
-              <Input placeholder="ค้นหาบิล..." value={filterBill} onChange={e => setFilterBill(e.target.value)} className="w-36 h-8 text-xs" />
-              <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-36 h-8 text-xs" />
-            </div>
-            {loading ? (
-              <div>กำลังโหลด...</div>
-            ) : filteredWinningTickets.length === 0 ? (
-              <div className="text-center text-muted-foreground py-4 text-xs">ไม่พบบิลที่ถูกรางวัล</div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {filteredWinningTickets.map((win, idx) => {
-                  const billInfo = winningBills.find(b => b.bill_number === win.bill_number);
-                  let paidAtThai = "";
-                  if (billInfo?.paid_at) {
-                    const zoned = toZonedTime(new Date(billInfo.paid_at), "Asia/Bangkok");
-                    paidAtThai = format(zoned, "d MMM yyyy HH:mm", { locale: th });
-                  }
-                  return (
-                    <motion.div key={win.bill_number} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: idx * 0.05 }}>
-                      <Card className="w-full border border-green-200 shadow-sm text-xs">
-                        <CardHeader className="bg-green-50 border-b border-green-200 p-2 rounded-t-md flex flex-col gap-1">
-                          <div className="flex flex-wrap justify-between items-center">
-                            <span className="font-bold text-green-700">{win.items[0]?.lottery_sub_types?.sub_type_name || '-'}</span>
-                            <span className="font-bold text-green-700 truncate">บิล: {win.bill_number} | {win.bill_name || '-'}</span>
-                          </div>
-                          <div className="flex flex-wrap justify-between items-center text-gray-600">
-                            <span>งวด: {format(new Date(win.draw_date), 'd MMM yyyy', { locale: th })}</span>
-                            <span>เวลา: {win.draw_time || '-'}</span>
-                          </div>
-                          <div className="font-semibold text-green-700">รวมรางวัลบิลนี้: <span className="text-yellow-600">{win.sum.toLocaleString()} ฿</span></div>
-                        </CardHeader>
-                        <CardContent className="p-2">
-                          <Table className="text-xs w-full">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>รางวัล</TableHead>
-                                <TableHead>เลขที่ออก</TableHead>
-                                <TableHead>เลขที่ซื้อถูก</TableHead>
-                                <TableHead>ประเภท</TableHead>
-                                <TableHead>ราคาจ่าย</TableHead>
-                                <TableHead>จำนวนเงินที่ซื้อ</TableHead>
-                                <TableHead>รางวัลที่ได้</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {win.items.map((item, idx2) => {
-                                const isTod = item.prize_code.includes('โต๊ด');
-                                const isWing = item.prize_code.includes('วิ่ง');
-                                const isStraight = !isTod && !isWing;
-                                const matchedNumbers = item.winning_number.split(',').map(s => s.trim()).filter(Boolean);
-                                let icon = isStraight ? <FaMedal className="text-green-500 mr-1 inline" /> : isTod ? <FaRandom className="text-yellow-500 mr-1 inline" /> : <FaRunning className="text-blue-500 mr-1 inline" />;
-                                return (
-                                  <TableRow key={item.id + '-' + idx2} className="bg-green-50/50">
-                                    <TableCell className="font-bold text-green-700">{icon}<Badge variant='outline'>{item.prize_code}</Badge></TableCell>
-                                    <TableCell>
-                                      {isTod || isWing ? (
-                                        <Badge className="bg-pink-500 text-white">{matchedNumbers.join(', ')}</Badge>
-                                      ) : (
-                                        <Badge className="bg-pink-500 text-white">{item.result.winning_number}</Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-pink-600 font-bold">{item.winning_number}</TableCell>
-                                    <TableCell>{item.lottery_sub_number?.type_number || '-'}</TableCell>
-                                    <TableCell>{item.lottery_sub_number?.price_paid || '-'}</TableCell>
-                                    <TableCell>{item.amount?.toLocaleString()} ฿</TableCell>
-                                    <TableCell className="flex items-center text-yellow-700 font-bold"><FaMoneyBillWave className="mr-1" />+{item.prize.toLocaleString()} ฿</TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
-                          <div className="flex justify-end mt-2">
-                            {billInfo?.status === 'pending' ? (
-                              <Button
-                                color="yellow"
-                                disabled={statusLoading === win.bill_number}
-                                onClick={async () => {
-                                  setStatusLoading(win.bill_number);
-                                  await supabase.from('lottery_winning_bills')
-                                    .update({ status: 'paid', paid_at: thaiNow })
-                                    .eq('bill_number', win.bill_number);
-                                  const { data } = await supabase.from('lottery_winning_bills').select('*');
-                                  setWinningBills(data || []);
-                                  setStatusLoading(null);
+        <div className="flex justify-center w-full min-h-[calc(100vh-64px)] items-start bg-[#f7fafd]">
+          <div className="w-full max-w-2xl px-2 sm:px-0 mt-8 space-y-6">
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <Card className="rounded-2xl shadow-lg border-none bg-white">
+                <CardHeader
+                  style={{
+                    background: 'linear-gradient(90deg,rgba(23, 70, 156, 1) 0%, rgba(8, 54, 138, 1) 50%, rgba(25, 59, 209, 1) 100%)',
+                    color: 'white',
+                    borderTopLeftRadius: '1rem',
+                    borderTopRightRadius: '1rem',
+                    padding: '1.25rem 1.5rem',
+                    boxShadow: '0 4px 24px 0 rgba(23, 70, 156, 0.10)'
+                  }}
+                  className="flex items-center gap-3"
+                >
+                  <FaCrown className="text-yellow-300 text-2xl" />
+                  <span className="text-lg font-bold">บิลที่ถูกรางวัล</span>
+                  <div className="ml-auto text-base font-semibold flex items-center">
+                    <FaCoins className="text-yellow-200 mr-1" />
+                    ยอดรวมรางวัล: <span className="text-yellow-200 ml-1">{totalPrize.toLocaleString()} ฿</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 bg-white rounded-b-2xl">
+                  <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                    <Input placeholder="ค้นหาบิล..." value={filterBill} onChange={e => setFilterBill(e.target.value)} className="w-full sm:w-40 h-9 text-sm rounded-lg border" />
+                    <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="w-full sm:w-40 h-9 text-sm rounded-lg border" />
+                  </div>
+                  {loading ? (
+                    <div>กำลังโหลด...</div>
+                  ) : filteredWinningTickets.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-4 text-xs">ไม่พบบิลที่ถูกรางวัล</div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {filteredWinningTickets.map((win, idx) => {
+                        const billInfo = winningBills.find(b => b.bill_number === win.bill_number);
+                        let paidAtThai = "";
+                        if (billInfo?.paid_at) {
+                          const zoned = toZonedTime(new Date(billInfo.paid_at), "Asia/Bangkok");
+                          paidAtThai = format(zoned, "d MMM yyyy HH:mm", { locale: th });
+                        }
+                        return (
+                          <motion.div
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.5, delay: idx * 0.08 }}
+                            key={win.bill_number}
+                          >
+                            <Card className="rounded-2xl border-none shadow bg-white">
+                              <CardHeader
+                                style={{
+                                  background: 'linear-gradient(90deg,rgba(23, 70, 156, 1) 0%, rgba(8, 54, 138, 1) 50%, rgba(25, 59, 209, 1) 100%)',
+                                  color: 'white',
+                                  borderTopLeftRadius: '1rem',
+                                  borderTopRightRadius: '1rem',
+                                  padding: '1.25rem 1.5rem',
+                                  boxShadow: '0 4px 24px 0 rgba(23, 70, 156, 0.10)'
                                 }}
+                                className="flex flex-col gap-1"
                               >
-                                {statusLoading === win.bill_number ? 'กำลังอัปเดต...' : 'รอจ่าย'}
-                              </Button>
-                            ) : (
-                              <Button color="green" disabled>
-                                จ่ายแล้ว {paidAtThai}
-                              </Button>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
-    </SidebarInset>
+                                <div className="flex flex-wrap justify-between items-center">
+                                  <span className="font-bold text-white">{win.items[0]?.lottery_sub_types?.sub_type_name || '-'}</span>
+                                  <span className="font-bold text-white truncate">บิล: {win.bill_number} | {win.bill_name || '-'}</span>
+                                </div>
+                                <div className="flex flex-wrap justify-between items-center text-gray-200 text-xs">
+                                  <span>งวด: {format(new Date(win.draw_date), 'd MMM yyyy', { locale: th })}</span>
+                                  <span>เวลา: {win.draw_time || '-'}</span>
+                                </div>
+                                <div className="font-semibold text-white">รวมรางวัลบิลนี้: <span className="text-yellow-200 ml-1">{win.sum.toLocaleString()} ฿</span></div>
+                              </CardHeader>
+                              <CardContent className="p-4 bg-white rounded-b-2xl">
+                                <Table className="rounded-xl overflow-hidden shadow border">
+                                  <TableHeader>
+                                    <TableRow className="bg-[#17469c]">
+                                      <TableHead className="text-white text-xs py-2">รางวัล</TableHead>
+                                      <TableHead className="text-white text-xs py-2">เลขที่ออก</TableHead>
+                                      <TableHead className="text-white text-xs py-2">เลขที่ซื้อถูก</TableHead>
+                                      <TableHead className="text-white text-xs py-2">ประเภท</TableHead>
+                                      <TableHead className="text-white text-xs py-2">ราคาจ่าย</TableHead>
+                                      <TableHead className="text-white text-xs py-2">จำนวนเงินที่ซื้อ</TableHead>
+                                      <TableHead className="text-white text-xs py-2">รางวัลที่ได้</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {win.items.map((item, idx2) => {
+                                      const isTod = item.prize_code.includes('โต๊ด');
+                                      const isWing = item.prize_code.includes('วิ่ง');
+                                      const isStraight = !isTod && !isWing;
+                                      const matchedNumbers = item.winning_number.split(',').map(s => s.trim()).filter(Boolean);
+                                      let icon = isStraight ? <FaMedal className="text-green-500 mr-1 inline" /> : isTod ? <FaRandom className="text-yellow-500 mr-1 inline" /> : <FaRunning className="text-blue-500 mr-1 inline" />;
+                                      return (
+                                        <motion.tr
+                                          initial={{ opacity: 0, x: 40 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{ duration: 0.4, delay: idx2 * 0.05 }}
+                                          key={item.id + '-' + idx2}
+                                          className="bg-[#E3EAFD] hover:bg-[#D1DBF5] transition text-xs"
+                                        >
+                                          <TableCell className="font-bold text-[#17469c]">{icon}<Badge variant='outline' className="bg-blue-100 text-[#17469c] font-bold rounded-full px-3 py-1 shadow text-xs">{item.prize_code}</Badge></TableCell>
+                                          <TableCell>
+                                            {isTod || isWing ? (
+                                              <Badge className="bg-pink-500 text-white text-xs">{matchedNumbers.join(', ')}</Badge>
+                                            ) : (
+                                              <Badge className="bg-pink-500 text-white text-xs">{item.result.winning_number}</Badge>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-pink-600 font-bold">{item.winning_number}</TableCell>
+                                          <TableCell>{item.lottery_sub_number?.type_number || '-'}</TableCell>
+                                          <TableCell>{item.lottery_sub_number?.price_paid || '-'}</TableCell>
+                                          <TableCell>{item.amount?.toLocaleString()} ฿</TableCell>
+                                          <TableCell className="flex items-center text-yellow-700 font-bold"><FaMoneyBillWave className="mr-1" />+{item.prize.toLocaleString()} ฿</TableCell>
+                                        </motion.tr>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                                <div className="flex justify-end mt-2">
+                                  {billInfo?.status === 'pending' ? (
+                                    <Button
+                                      className="bg-[#17469c] hover:bg-[#0e357a] text-white rounded-full px-6 py-2 shadow font-semibold text-sm"
+                                      disabled={statusLoading === win.bill_number}
+                                      onClick={async () => {
+                                        setStatusLoading(win.bill_number);
+                                        await supabase.from('lottery_winning_bills')
+                                          .update({ status: 'paid', paid_at: thaiNow })
+                                          .eq('bill_number', win.bill_number);
+                                        const { data } = await supabase.from('lottery_winning_bills').select('*');
+                                        setWinningBills(data || []);
+                                        setStatusLoading(null);
+                                      }}
+                                    >
+                                      {statusLoading === win.bill_number ? 'กำลังอัปเดต...' : 'รอจ่าย'}
+                                    </Button>
+                                  ) : (
+                                    <Button className="bg-green-500 text-white rounded-full px-6 py-2 shadow font-semibold text-sm" disabled>
+                                      จ่ายแล้ว {paidAtThai}
+                                    </Button>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+        </div>
+      </SidebarInset>
     </SidebarProvider>
     </DirectionProvider>
   );

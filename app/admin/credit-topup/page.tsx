@@ -3,6 +3,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { toast } from "sonner";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
 
 type User = {
   id: string;
@@ -16,6 +20,8 @@ export default function AdminCreditTopupPage() {
   const [selectedUser, setSelectedUser] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     // โหลดรายชื่อ user
@@ -26,6 +32,38 @@ export default function AdminCreditTopupPage() {
     };
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    // โหลดประวัติการเติมเครดิตเดือนล่าสุด
+    const fetchHistory = async () => {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      const { data, error } = await supabase
+        .from("credit_transactions")
+        .select("id, user_id, amount, created_at, profiles: user_id (name, email)")
+        .eq("transaction_type", "topup")
+        .gte("created_at", firstDay.toISOString())
+        .lte("created_at", lastDay.toISOString())
+        .order("created_at", { ascending: false });
+      if (!error) setHistory(data || []);
+    };
+    fetchHistory();
+  }, []);
+
+  // ฟิลเตอร์ข้อมูล
+  const filteredHistory = history.filter((item) => {
+    const user = item.profiles;
+    const searchLower = search.toLowerCase();
+    return (
+      (!search ||
+        (user?.name && user.name.toLowerCase().includes(searchLower)) ||
+        (user?.email && user.email.toLowerCase().includes(searchLower)) ||
+        (item.amount && item.amount.toString().includes(searchLower)) ||
+        (item.created_at && format(new Date(item.created_at), "dd/MM/yyyy HH:mm").includes(searchLower))
+      )
+    );
+  });
 
   const handleTopup = async () => {
     setLoading(true);
@@ -90,6 +128,42 @@ export default function AdminCreditTopupPage() {
       >
         {loading ? "กำลังเติม..." : "เติมเครดิต"}
       </button>
+      <div className="mb-8 mt-12">
+        <h2 className="text-xl font-semibold mb-2">ประวัติการเติมเครดิตเดือนนี้</h2>
+        <Input
+          placeholder="ค้นหาด้วยชื่อ, อีเมล, จำนวน, วันที่..."
+          className="mb-3"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>วันที่</TableHead>
+              <TableHead>ชื่อผู้ใช้</TableHead>
+              <TableHead>อีเมล</TableHead>
+              <TableHead className="text-right">จำนวน</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredHistory.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-8">ไม่พบข้อมูล</TableCell>
+              </TableRow>
+            ) : (
+              filteredHistory.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>{format(new Date(item.created_at), "dd/MM/yyyy HH:mm", { locale: th })}</TableCell>
+                  <TableCell>{item.profiles?.name || '-'}</TableCell>
+                  <TableCell>{item.profiles?.email || '-'}</TableCell>
+                  <TableCell className="text-right">{Number(item.amount).toLocaleString()}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+          <TableCaption>แสดงเฉพาะรายการเติมเครดิตของเดือนนี้</TableCaption>
+        </Table>
+      </div>
     </div>
   );
 }

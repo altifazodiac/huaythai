@@ -31,6 +31,16 @@ export default function UserHeader() {
       setLoading(false);
     };
     fetchUserAndCredit();
+
+    // ฟัง event
+    const handleCreditUpdated = () => {
+      fetchUserAndCredit();
+    };
+    window.addEventListener("credit-updated", handleCreditUpdated);
+
+    return () => {
+      window.removeEventListener("credit-updated", handleCreditUpdated);
+    };
   }, []);
 
   return (

@@ -185,7 +185,7 @@ return (
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>ซื้อหวย</BreadcrumbPage>
+                  <BreadcrumbPage>สรุปยอดขาย</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

@@ -625,6 +625,7 @@ export default function LotteryTicketPage() {
       toast.success("บันทึกการซื้อสำเร็จ!");
       if (typeof fetchUserData === "function") await fetchUserData();
       router.push(`/print-ticket?bill_number=${encodeURIComponent(billNumber)}`);
+      window.dispatchEvent(new Event("credit-updated"));
 
     } catch (error: any) {
       console.error('Error saving ticket:', error);
