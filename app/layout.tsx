@@ -3,7 +3,8 @@ import { Geist, Geist_Mono, Kanit } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'sonner'
 import { ThemeProvider } from "@/components/theme-provider"
-import UserHeader from "@/components/UserHeader";
+import { LoadingProvider } from "@/components/LoadingProvider";
+import AppLayoutClient from "@/components/AppLayoutClient";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,7 +23,7 @@ const kanit = Kanit({
 });
 
 export const metadata: Metadata = {
-  title: "หวยออนไลน์",
+  title: "หวยเศรษฐี 789",
   description: "เว็บหวยออนไลน์ที่ครบทุกชนิด",
 };
 
@@ -36,16 +37,19 @@ export default function RootLayout({
       <body
         className={`${kanit.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-         <ThemeProvider
+        <LoadingProvider>
+          <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-        <Toaster position="top-right" />
-        <UserHeader />
-          {children}
-        </ThemeProvider>
+            <Toaster position="top-right" />
+            <AppLayoutClient>
+              {children}
+            </AppLayoutClient>
+          </ThemeProvider>
+        </LoadingProvider>
       </body>
     </html>
   );

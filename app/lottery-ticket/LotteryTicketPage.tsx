@@ -655,34 +655,45 @@ export default function LotteryTicketPage() {
       )
     );
   }, [selectedSubType, selectedDigit, selectedTypes, numberInput, amount, amounts, swipeNineSingleDigit]);
-
-
   async function handleRemoveGroup(groupToRemove: Grouped) {
-    const digit = groupToRemove.digit_number;
-    const typeLabels = groupToRemove.typeLabels;
-    const amountsPattern = typeLabels.map(label => groupToRemove.amounts[label] ?? 0).join(',');
-    const subTypeId = ticketList.find(item => item.payout.digit_number === digit && typeLabels.includes(item.payout.type_number || "-") && item.numbers.some(n => groupToRemove.numbers.includes(n)))?.subType.lottery_sub_type_id;
-    const groupKey = `${subTypeId}|${digit}|${typeLabels.join(',')}|${amountsPattern}`;
-
+    const { digit_number, typeLabels, amounts, numbers } = groupToRemove;
+  
+    // Find the subTypeId from ticketList based on matching group attributes
+    const subTypeId = ticketList.find(item => 
+      item.payout.digit_number === digit_number && 
+      typeLabels.includes(item.payout.type_number || "-") && 
+      item.numbers.some(n => numbers.includes(n))
+    )?.subType.lottery_sub_type_id;
+  
+    if (!subTypeId) {
+      console.warn("Could not find subTypeId for group", groupToRemove);
+      toast.error("ไม่สามารถลบกลุ่มนี้ได้: ไม่พบข้อมูลประเภทหวย");
+      return;
+    }
+  
+    // Create a key based on core attributes
+    const groupKey = `${subTypeId}|${digit_number}|${typeLabels.sort().join(',')}`;
+  
+    // Filter out all items that match the group
     setTicketList(prevList => prevList.filter(item => {
       const itemTypeLabel = item.payout.type_number || "-";
-      const itemLabelOrder = typeLabels;
-      const itemAmountsPattern = itemLabelOrder.map(label => label === itemTypeLabel ? item.amount : 0).join(',');
-      const itemGroupKey = `${item.subType.lottery_sub_type_id}|${item.payout.digit_number}|${itemLabelOrder.join(',')}|${itemAmountsPattern}`;
-      return itemGroupKey !== groupKey;
+      const itemGroupKey = `${item.subType.lottery_sub_type_id}|${item.payout.digit_number}|${typeLabels.sort().join(',')}`;
+      const isSameAmount = amounts[itemTypeLabel] === item.amount;
+      return !(itemGroupKey === groupKey && isSameAmount && numbers.some(n => item.numbers.includes(n)));
     }));
-
-    if (user && selectedDraw) { 
+  
+    // Log the removal to Supabase if user and selectedDraw exist
+    if (user && selectedDraw) {
       try {
         await supabase.from('lottery_ticket_remove_logs').insert({
           user_id: user.id,
           bill_number: billNumber,
           group_info: {
-            digit_number: groupToRemove.digit_number,
-            numbers: groupToRemove.numbers,
-            typeLabels: groupToRemove.typeLabels,
-            amounts: groupToRemove.amounts,
-            pivot: groupToRemove._inferredPivotForSort
+            digit_number,
+            numbers,
+            typeLabels,
+            amounts,
+            pivot: groupToRemove._inferredPivotForSort,
           },
           removed_at: new Date().toISOString(),
           reason: 'user removed group',
@@ -692,10 +703,14 @@ export default function LotteryTicketPage() {
         });
       } catch (e: unknown) {
         console.error('Error logging remove group:', e);
+        toast.error("เกิดข้อผิดพลาดในการบันทึก log การลบกลุ่ม");
       }
     }
+  
+    toast.success("ลบกลุ่มสำเร็จ!");
   }
 
+ 
   const { allTypeLabels, groups } = useMemo(() => {
     const calculatedAllTypeLabels: Record<number, string[]> = {};
     payouts.forEach(p => {
@@ -705,7 +720,7 @@ export default function LotteryTicketPage() {
         calculatedAllTypeLabels[p.digit_number].push(p.type_number);
       }
     });
-
+  
     Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
       const digit = Number(digitStr);
       const labels = calculatedAllTypeLabels[digit];
@@ -716,34 +731,34 @@ export default function LotteryTicketPage() {
       }
       calculatedAllTypeLabels[digit] = Array.from(new Set(ordered));
     });
-
+  
     const calculatedGroups: Map<string, Grouped> = new Map();
-
+  
     ticketList.forEach(item => {
       const digit = item.payout.digit_number;
       const subTypeId = item.subType.lottery_sub_type_id;
-      const numbersKey = item.numbers.join(",");
-      const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [item.payout.type_number || "-"];
-      const groupKey = `${subTypeId}|${digit}|${numbersKey}`;
-
+      const typeLabel = item.payout.type_number || "-";
+      const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [typeLabel];
+      const groupKey = `${subTypeId}|${digit}|${canonicalTypeLabels.sort().join(',')}|${item.amount}`;
+  
       if (!calculatedGroups.has(groupKey)) {
         const groupAmounts: Record<string, number> = {};
         canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; });
         calculatedGroups.set(groupKey, {
           digit_number: digit,
-          numbers: [...item.numbers],
+          numbers: [],
           typeLabels: canonicalTypeLabels,
           amounts: groupAmounts,
           typeOrder: canonicalTypeLabels,
           uniqueKey: item.uniqueKey,
-          _inferredPivotForSort: null,
+          _inferredPivotForSort: inferSwipe19Pivot(item.numbers) || null,
         });
       }
       const group = calculatedGroups.get(groupKey)!;
-      const label = item.payout.type_number || "-";
-      group.amounts[label] = (group.amounts[label] || 0) + item.amount;
+      group.amounts[typeLabel] = item.amount; // Set the exact amount for this type
+      group.numbers = Array.from(new Set([...group.numbers, ...item.numbers]));
     });
-
+  
     return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
   }, [ticketList, payouts]);
 
@@ -811,7 +826,7 @@ export default function LotteryTicketPage() {
     if (supabaseUser) {
       setUser(supabaseUser);
     } else {
-      router.push("/signup");
+      router.push("/login");
     }
   }, [router, supabase]);
 
@@ -852,13 +867,13 @@ export default function LotteryTicketPage() {
         {Array.from(groupsMap.values()).map((group, idx) => {
           const allLabelsInGroup: string[] = group.typeLabels || [];
           const groupTotal = allLabelsInGroup.reduce((sum: number, label: string) => {
-                const amountForLabel = group.amounts[label] ?? 0;
-                return sum + (amountForLabel * group.numbers.length);
-            }, 0);
-
+            const amountForLabel = group.amounts[label] ?? 0;
+            return sum + (amountForLabel * group.numbers.length);
+          }, 0);
+  
           return (
             <motion.div
-              key={group.uniqueKey + "_" + idx} 
+              key={group.uniqueKey + "_" + idx}
               initial={{ opacity: 0, y: -10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -10, scale: 0.98 }}
@@ -868,11 +883,11 @@ export default function LotteryTicketPage() {
               <div className="flex flex-col items-center justify-start min-w-[80px] max-w-[100px] text-center flex-shrink-0 pt-1">
                 <div className="text-sm font-bold text-blue-600 dark:text-blue-400 leading-tight">{group.digit_number} ตัว</div>
                 <div className="text-xs text-slate-600 dark:text-slate-300 leading-tight break-words">
-                    {group.typeLabels.join(' x ')}
-                    {group._inferredPivotForSort ? ` (รูด19:${group._inferredPivotForSort})` : ''}
+                  {group.typeLabels.join(' x ')}
+                  {group._inferredPivotForSort ? ` (รูด19:${group._inferredPivotForSort})` : ''}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight break-words">
-                    {group.typeLabels.map(label => group.amounts[label] ?? 0).join(' x ')}
+                  {group.typeLabels.map(label => group.amounts[label] ?? 0).join(' x ')}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight mt-0.5">รวม {groupTotal.toLocaleString()} ฿</div>
               </div>
@@ -880,16 +895,16 @@ export default function LotteryTicketPage() {
                 <Textarea
                   value={group.numbers.join('  ')}
                   readOnly
-                  rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))} 
+                  rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))}
                   className="rounded-md p-1.5 w-full text-xs leading-snug resize-none bg-slate-50 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500 placeholder-slate-400 dark:placeholder-slate-500"
                   style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit', minHeight: '28px' }}
                 />
-                 <button
+                <button
                   className="ml-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors flex-shrink-0 p-1.5 mt-0.5 rounded-md hover:bg-red-100 dark:hover:bg-red-800/50"
                   title="ลบกลุ่มนี้"
-                  onClick={() => handleRemoveGroupFn(group)} 
+                  onClick={() => handleRemoveGroupFn(group)}
                 >
-                  <Trash2 className="w-4 h-4" /> {/* Increased size slightly */}
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </motion.div>
@@ -898,7 +913,6 @@ export default function LotteryTicketPage() {
       </AnimatePresence>
     );
   });
-  TicketListGroupComponent.displayName = 'TicketListGroupComponent';
 
 
   return (
@@ -1135,63 +1149,98 @@ export default function LotteryTicketPage() {
                           <DollarSign className="w-4 h-4 text-blue-800" />
                           จำนวนเงิน (บาท)
                         </label>
-                      {selectedTypes.length > 1 ? (
-                        <>
-                          <div className="flex gap-2 mb-3 items-center"> {/* Increased mb */}
-                              <Input type="number" min={1} placeholder="ใส่ทั้งหมด" value={fillAllAmount} onChange={e => setFillAllAmount(e.target.value)} className="w-32 text-blue-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"/>
-                            <Button type="button" size="sm"
-                              onClick={() => {
-                                if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) { toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง"); return; }
-                                const newAmts: Record<number, string> = {};
-                                selectedTypes.forEach(typeId => { newAmts[typeId] = fillAllAmount; });
-                                setAmounts(newAmts);
-                              }}
-                              className="px-4 py-1.5 text-sm rounded-md border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                            >ใช้ยอดนี้</Button>
-                          </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">  
-                            {selectedTypes.map(typeId => {
-                              const type = filteredTypes.find(t => t.id === typeId);
-                              return (
-                                <div key={typeId}>
-                                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400">{type?.type_number || "-"}</label>
-                                  <Input type="number" min={1} value={amounts[typeId] || ""} onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })} placeholder="จำนวนเงิน" disabled={!selectedDigit} className="mt-0.5 border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"/>
-                                    <div className="flex gap-1 mt-1.5 flex-wrap">  
-                                      {[5, 10, 20, 50, 100].map(qAmt => (
-                                        <Button
-                                          key={qAmt}
-                                          type="button"
-                                          size="sm"
-                                          className="h-7 px-3 text-xs rounded-full bg-white border border-blue-800 text-blue-800 hover:bg-blue-50"
-                                          onClick={() => setAmount(qAmt.toString())}
-                                        >
-                                          {qAmt}
-                                        </Button>
-                                      ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </>
-                      ) : (
-                        <div>
-                          <Input type="number" min={1} placeholder="เช่น 20" value={amount} onChange={e => setAmount(e.target.value)} disabled={!selectedDigit || selectedTypes.length === 0} className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"/>
-                            <div className="flex gap-1 mt-1.5 flex-wrap">  
-                              {[5, 10, 20, 50, 100].map(qAmt => (
-                                <Button
-                                  key={qAmt}
-                                  type="button"
-                                  size="sm"
-                                  className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-blue-800 hover:bg-blue-50"
-                                  onClick={() => setAmount(qAmt.toString())}
-                                >
-                                  {qAmt}
-                                </Button>
-                              ))}
-                          </div>
-                        </div>
-                      )}
+                        {selectedTypes.length > 1 ? (
+  <>
+    <div className="flex gap-2 mb-3 items-center">
+      <Input
+        type="number"
+        min={1}
+        placeholder="ใส่ทั้งหมด"
+        value={fillAllAmount}
+        onChange={e => setFillAllAmount(e.target.value)}
+        className="w-32 text-blue-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+      />
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => {
+          if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) {
+            toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง");
+            return;
+          }
+          const newAmts: Record<number, string> = {};
+          selectedTypes.forEach(typeId => {
+            newAmts[typeId] = fillAllAmount;
+          });
+          setAmounts(newAmts);
+        }}
+        className="px-4 py-1.5 text-sm rounded-md border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/30"
+      >
+        ใช้ยอดนี้
+      </Button>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">
+      {selectedTypes.map(typeId => {
+        const type = filteredTypes.find(t => t.id === typeId);
+        return (
+          <div key={typeId}>
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {type?.type_number || "-"}
+            </label>
+            <Input
+              type="number"
+              min={1}
+              value={amounts[typeId] || ""}
+              onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })}
+              placeholder="จำนวนเงิน"
+              disabled={!selectedDigit}
+              className="mt-0.5 border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+            />
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {[5, 10, 20, 50, 100].map(qAmt => (
+                <Button
+                  key={qAmt}
+                  type="button"
+                  size="sm"
+                  className="h-7 px-3 text-xs rounded-full bg-white border border-blue-800 text-blue-800 hover:bg-blue-50"
+                  onClick={() => setAmounts({ ...amounts, [typeId]: qAmt.toString() })} // Updated to setAmounts
+                >
+                  {qAmt}
+                </Button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </>
+) :  (
+  // Single-type input section (unchanged)
+  <div>
+    <Input
+      type="number"
+      min={1}
+      placeholder="เช่น 20"
+      value={amount}
+      onChange={e => setAmount(e.target.value)}
+      disabled={!selectedDigit || selectedTypes.length === 0}
+      className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+    />
+    <div className="flex gap-1 mt-1.5 flex-wrap">
+      {[5, 10, 20, 50, 100].map(qAmt => (
+        <Button
+          key={qAmt}
+          type="button"
+          size="sm"
+          className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-blue-800 hover:bg-blue-50"
+          onClick={() => setAmount(qAmt.toString())}
+        >
+          {qAmt}
+        </Button>
+      ))}
+    </div>
+  </div>
+)}
                       </motion.div>
                     )}
                   </AnimatePresence>

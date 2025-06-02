@@ -139,7 +139,7 @@ const LoginPage = () => {
       > {/* Added missing > here */}
         <motion.div variants={navItemVariants} className="flex items-center space-x-2">
           <Ticket className="h-8 w-8 text-blue-600" /> {/* โลโก้ตัวอย่าง */}
-          <span className="text-2xl font-bold text-gray-700">หวยออนไลน์</span> {/* ชื่อเว็บ/แอป */}
+          <span className="text-2xl font-bold text-gray-700">หวยเศรษฐี 789</span> {/* ชื่อเว็บ/แอป */}
         </motion.div>
         <motion.div variants={navItemVariants} className="flex items-center space-x-4 md:space-x-6">
           <a href="#" className="text-sm text-gray-600 hover:text-blue-600">ติดต่อเรา</a>

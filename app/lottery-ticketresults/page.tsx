@@ -24,6 +24,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { DirectionProvider } from "@radix-ui/react-direction";
 import { toZonedTime } from "date-fns-tz";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -72,6 +73,7 @@ interface LotteryResult {
 }
 
 export default function LotteryTicketResultsPage() {
+  useRequireAuth();
   const [tickets, setTickets] = useState<LotteryTicket[]>([]);
   const [results, setResults] = useState<LotteryResult[]>([]);
   const [loading, setLoading] = useState(true);

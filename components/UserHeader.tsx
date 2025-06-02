@@ -49,7 +49,7 @@ export default function UserHeader() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
       className="w-full bg-gradient-to-r from-blue-800 via-blue-900 to-blue-800 shadow-lg py-3 px-6 flex items-center justify-between rounded-b-xl z-50"
-      style={{ position: "sticky", top: 0 }}
+      style={{ position: "relative" }}
     >
       <div className="flex items-center gap-3">
         <motion.div

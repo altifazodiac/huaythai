@@ -11,22 +11,35 @@ export async function middleware(req: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // ตรวจสอบว่าผู้ใช้เข้าสู่ระบบหรือไม่และมีสิทธิ์ admin หรือไม่
+  // Allowlist: ไม่ต้อง login สำหรับ path เหล่านี้
+  const allowlist = [
+    "/login",
+    "/signup",
+    "/favicon.ico",
+    "/robots.txt",
+  ];
+  const isPublic =
+    allowlist.includes(req.nextUrl.pathname) ||
+    req.nextUrl.pathname.startsWith("/_next") ||
+    req.nextUrl.pathname.startsWith("/api") ||
+    req.nextUrl.pathname.startsWith("/public") ||
+    req.nextUrl.pathname.startsWith("/assets");
+
+  if (!isPublic && !session) {
+    return NextResponse.redirect(new URL("/login", req.url))
+  }
+
+  // ตรวจสอบสิทธิ์ admin เฉพาะ /admin
   if (req.nextUrl.pathname.startsWith("/admin")) {
     if (!session) {
-      // ถ้าไม่ได้เข้าสู่ระบบ ให้ redirect ไปยังหน้าเข้าสู่ระบบ
       return NextResponse.redirect(new URL("/login", req.url))
     }
-
-    // ตรวจสอบว่าผู้ใช้มีสิทธิ์ admin หรือไม่
     const { data: userRole } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", session.user.id)
       .single()
-
     if (!userRole || userRole.role !== "admin") {
-      // ถ้าไม่มีสิทธิ์ admin ให้ redirect ไปยังหน้าหลัก
       return NextResponse.redirect(new URL("/", req.url))
     }
   }
@@ -35,5 +48,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/(.*)"] // apply กับทุก route
 }

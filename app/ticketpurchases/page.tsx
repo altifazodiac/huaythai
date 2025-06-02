@@ -30,6 +30,8 @@ import {
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase/supabaseClient";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -85,6 +87,7 @@ type Grouped = {
 };
 
 export default function LotteryPurchasePage() {
+  useRequireAuth();
   const router = useRouter();
   const [supabase] = useState(() =>
     createClient(
@@ -130,6 +133,16 @@ export default function LotteryPurchasePage() {
     };
     fetchUserRole();
   }, [user, supabase]);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");
+      }
+    };
+    checkUser();
+  }, [router]);
 
   // Fetch lottery tickets
   useEffect(() => {

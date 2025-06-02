@@ -3,6 +3,7 @@ import { useEffect, Suspense } from "react"; // Ensure Suspense is imported
 import { useSearchParams } from "next/navigation";
 import { fetchTicketPurchase, handlePrint } from "@/lib/lottery-print";
 import { toast } from "sonner";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 // This component contains the actual client-side logic using searchParams
 function PrintTicketClientLogic() {
@@ -41,6 +42,7 @@ function PrintTicketClientLogic() {
 // This is the default export for the page.
 // It wraps the client-side logic component with Suspense.
 export default function PrintTicketPage() {
+  useRequireAuth();
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-screen">

@@ -10,6 +10,7 @@ import { CalendarIcon, SearchIcon } from "lucide-react"; // Need to install luci
 import { Badge } from "@/components/ui/badge"; // Need to install from shadcn/ui
 import { Skeleton } from "@/components/ui/skeleton"; // Need to install from shadcn/ui
 import { supabase } from "@/lib/supabase/supabaseClient";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 // 📌 Interfaces
 interface WinningTicket {
@@ -31,6 +32,7 @@ interface AggregatedWinnings {
 }
 
 export default function LotteryWinningsReportPage() {
+  useRequireAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [aggregatedData, setAggregatedData] = useState<Record<string, { name: string; sum_amount: number; sum_total: number; remain: number }[]>>({});
   const [isLoading, setIsLoading] = useState(true);

@@ -94,10 +94,10 @@ export function NavUser() {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-            side={isMobile ? "bottom" : "right"}
+            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg z-[9999]"
+            side={isMobile ? "top" : "right"}
             align="end"
-            sideOffset={4}
+            sideOffset={8}
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -118,13 +118,13 @@ export function NavUser() {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link href="/account">
+                <Link href="/">
                   <BadgeCheck />
                   Account
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/credit">
+                <Link href="/transactions">
                   <CreditCard />
                   Credit
                 </Link>

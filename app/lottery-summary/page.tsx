@@ -24,6 +24,7 @@ import {
   TableCell,
   TableCaption,
 } from "@/components/ui/table";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 
 interface LotteryTicket {
@@ -107,6 +108,8 @@ const LotterySummaryPage: React.FC = () => {
   const [minPrizeFilter, setMinPrizeFilter] = useState<string | number>('');
   const [maxPrizeFilter, setMaxPrizeFilter] = useState<string | number>('');
  
+  useRequireAuth();
+
   useEffect(() => {
     setIsLoading(true);
     setError(null);

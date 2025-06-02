@@ -166,6 +166,12 @@ export default function LotteryTypeGrid({
     }));
   }, [grouped, schedules, filterOpen, filterCountry, dayOfWeekToEn]);
 
+  // เพิ่มฟังก์ชันนี้ก่อน return
+  function isMonthlyDraw(schedule: any) {
+    // ตรวจสอบจาก day_of_week หรือ field อื่นๆ ที่ใช้แยกหวยไทย
+    return schedule?.day_of_week?.includes("ของเดือน");
+  }
+
   return (
     <>
       <FilterBar
@@ -294,7 +300,19 @@ export default function LotteryTypeGrid({
         ปิดรับ {schedule?.close_time?.slice(0,5) || "-"} น.
       </span>
     </div>
-    <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />
+    {/* เงื่อนไขใหม่: แสดง CountdownRow เฉพาะถ้าไม่ใช่หวยไทย หรือถ้าเป็นหวยไทยแต่วันนี้เป็นวันที่ 1 หรือ 16 */}
+    {!isMonthlyDraw(schedule)
+      ? <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />
+      : (
+        (() => {
+          const today = new Date().getDate();
+          if (today === 1 || today === 16) {
+            return <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />;
+          }
+          return null; // ไม่แสดง countdown
+        })()
+      )
+    }
   </div>
 </Card>
                           {isLoading && (

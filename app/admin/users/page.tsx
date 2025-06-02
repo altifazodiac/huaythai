@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useRequireAuth } from "@/hooks/use-require-auth";
 
 interface UserRow {
   id: string;
@@ -19,6 +21,9 @@ export default function AdminUserPage() {
   const [addEmail, setAddEmail] = useState("");
   const [addRole, setAddRole] = useState("user");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const router = useRouter();
+
+  useRequireAuth();
 
   useEffect(() => {
     const fetchUsers = async () => {
