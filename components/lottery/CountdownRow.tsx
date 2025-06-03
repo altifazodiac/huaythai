@@ -77,7 +77,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
       } else if (isCurrentlyOpen) {
         // --- ตรรกะสำหรับรายการรายสัปดาห์ - เมื่อกำลังเปิดรับ ---
         prefix = "ปิดรับใน";
-        color = "text-green-600";
+        color = "text-yellow-300";
 
         const openTimeOnToday = new Date(todayFull.getFullYear(), todayFull.getMonth(), todayFull.getDate(), openH, openM, 0);
         const closeTimeOnToday = new Date(todayFull.getFullYear(), todayFull.getMonth(), todayFull.getDate(), closeH, closeM, 0);
@@ -96,7 +96,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
       } else {
         // --- ตรรกะสำหรับรายการรายสัปดาห์ - เมื่อกำลังปิดรับ ---
         prefix = "รอบถัดไป";
-        color = "text-gray-600";
+        color = "text-red-400";
 
         const dayMap: { [key: string]: number } = { "sunday": 0, "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4, "friday": 5, "saturday": 6 };
         const englishDayNames = schedule.day_of_week.toLowerCase().split(',').map(d => d.trim());
@@ -187,7 +187,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
   // }
 
   return (
-    <div className="bg-gray-100 rounded-xl">
+    <div className="">
       <div className={`text-xs text-center mt-1 ${textColor}`}>
       {displayText}
     </div>
