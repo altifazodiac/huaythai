@@ -22,7 +22,8 @@ export const countryFlagImg = (country: string) => {
     "ญี่ปุ่น": "Japan.jpg",
     "เกาหลีใต้": "Korea.jpg",
     "อินเดีย": "India.jpg",
-    "ไทย": "Thai.jpg",
+    "ไทย": "Thailand.jpg",
+    "สลากกินแบ่งรัฐบาล": "Thai.jpg",
     "สหรัฐอเมริกา": "USA.jpg",
     "ฮ่องกง": "Hongkong.jpg",
     "เยอรมนี": "Germany.jpg",
@@ -35,6 +36,7 @@ export const countryFlagImg = (country: string) => {
     "คอสโทรีกา": "CostaRica.jpg",
     "จีน": "China.jpg",
     "อียิปต์": "Egypt.jpg",
+    "ธกส": "THS.jpg",
   };
   const filename = map[country] || "Unknown.jpg";
   return getFlagUrl(filename);
