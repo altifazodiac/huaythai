@@ -68,7 +68,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar
       className={`z-50 bg-gradient-to-b from-blue-800 to-blue-950 text-slate-200 shadow-xl transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`}
-      
       style={{ minHeight: '100vh' }}
       {...props}
     >
@@ -94,8 +93,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 px-3 py-2.5 rounded-lg
                 transition-all duration-200 ease-in-out
                 ${pathname === item.url 
-                  ? 'bg-blue-600 text-white font-medium shadow-md' // Active state: white text
-                  : 'text-blue-100 hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white focus:outline-none'} // Inactive: light blue text, white on hover
+                  ? 'bg-blue-600 text-white font-medium shadow-md'
+                  : 'text-blue-100 hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white focus:outline-none'}
                 relative group
               `}
               style={{ minHeight: '44px' }}
@@ -103,16 +102,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               {item.icon && (
                 <item.icon
                   className={`h-5 w-5 ${pathname === item.url
-                    ? 'text-blue-700 dark:text-white'
-                    : 'text-blue-600 dark:text-white'} ${collapsed ? '' : 'mr-0.5'}`}
+                    ? 'text-white'
+                    : 'text-blue-300'} ${collapsed ? '' : 'mr-0.5'}`}
                   strokeWidth={pathname === item.url ? 2.5 : 2}
                 />
               )}
               {!collapsed && (
                 <span className={`font-normal text-sm tracking-tight 
                   ${pathname === item.url
-                    ? 'text-blue-700 dark:text-white'
-                    : 'text-blue-600 dark:text-white'}`}>
+                    ? 'text-white'
+                    : 'text-blue-300'}`}>
                   {item.title}
                 </span>
               )}
@@ -175,7 +174,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarFooter className={`border-t border-blue-700/60 ${collapsed ? 'px-2' : 'px-3'} bg-transparent`}> {/* ENSURE THIS IS TRANSPARENT */}
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} py-3 w-full`}>
-          {!collapsed && <NavUser />} {/* Ensure NavUser component uses light text for "Admin admin@gmail.com" */}
+          {!collapsed && (
+            <div className="text-slate-100 font-medium text-sm">
+              Admin admin@gmail.com
+            </div>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-lg text-slate-300 hover:text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 data-[state=open]:bg-blue-700">

@@ -120,6 +120,9 @@ export default function LotteryTypeGrid({
   const [currentInfoIdx, setCurrentInfoIdx] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 640);
     handleResize();
@@ -169,6 +172,8 @@ export default function LotteryTypeGrid({
   function isMonthlyDraw(schedule: any) {
     return schedule?.day_of_week?.includes("ของเดือน");
   }
+
+  if (!mounted) return null;
 
   return (
     <>
@@ -278,7 +283,7 @@ export default function LotteryTypeGrid({
                               animationFillMode: 'forwards',
                             }}
                           >
-                            <div className={`w-full text-center rounded-t-xl ${isCurrentlyOpen ? 'bg-blue-900 text-[#ADFF2F]' : 'bg-[#f4f8fd] text-red-400'} py-1 shadow-sm`}>
+                            <div className={`w-full text-center rounded-t-xl bg-[#f4f8fd] text-red-400 py-1 shadow-sm`}>
                               <h2 className="text-sm font-semibold tracking-wide flex items-center justify-center gap-1.5">
                                 <Ticket className="w-3.5 h-3.5" />
                                 {isCurrentlyOpen ? "เปิดรับ" : "ปิดรับแทง"}

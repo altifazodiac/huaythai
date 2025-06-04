@@ -62,6 +62,16 @@ interface TicketItem {
   amount: number;
   uniqueKey: string;
 }
+interface Grouped {
+  digit_number: number;
+  numbers: string[];
+  typeLabels: string[]; // Should be derived from items in group, or canonical
+  amounts: Record<string, number>; // Aggregated amounts for typeLabels
+  typeOrder: string[]; // Canonical order for display
+  uniqueKey: string; // Unique key of the first item forming the group, or a new group-specific key
+  _inferredPivotForSort?: string | null; // For swipe19 sorting
+  _processedItemUniqueKeysForNumbers: Set<string>; // ฮ New: To track unique keys that contributed numbers
+}
 interface DisplayCardItemGroup {
   subTypeName: string;
   digitNumber: number;
@@ -239,152 +249,163 @@ export default function LotteryTicketPage() {
       toast.error("กรุณาเลือกชนิดหวย, จำนวนหลัก และประเภทก่อน");
       return;
     }
-
+  
     const isSwipeModeForSingleDigitInput = selectedDigit === 2 &&
-        (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19');
+      (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19');
     const expectedInputLength = isSwipeModeForSingleDigitInput ? 1 : selectedDigit;
-
+  
     let rawNumbersFromInput = numberInput
       .replace(/\n|,/g, " ")
       .split(" ")
       .map((n) => n.trim())
-      .filter(n => n.length > 0); 
-
+      .filter(n => n.length > 0);
+  
     if (selectedDigit === 1 && swipeNineSingleDigit) {
-        rawNumbersFromInput = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+      rawNumbersFromInput = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
     } else {
-        rawNumbersFromInput = rawNumbersFromInput.filter((n) => {
-            const isValid = n.length === expectedInputLength && /^\d+$/.test(n);
-            if (!isValid && !swipeNineSingleDigit) { 
-                 toast.error(`หมายเลข '${n}' ไม่ถูกต้องสำหรับ ${expectedInputLength} หลัก`);
-            }
-            return isValid;
-        });
+      rawNumbersFromInput = rawNumbersFromInput.filter((n) => {
+        const isValid = n.length === expectedInputLength && /^\d+$/.test(n);
+        if (!isValid && !swipeNineSingleDigit) {
+          toast.error(`หมายเลข '${n}' ไม่ถูกต้องสำหรับ ${expectedInputLength} หลัก`);
+        }
+        return isValid;
+      });
     }
-    
+  
     if (!rawNumbersFromInput.length && !(selectedDigit === 1 && swipeNineSingleDigit)) {
-         toast.error(`กรุณากรอกหมายเลข ${expectedInputLength} หลัก อย่างน้อย 1 หมายเลขที่ถูกต้อง`);
-         return;
+      toast.error(`กรุณากรอกหมายเลข ${expectedInputLength} หลัก อย่างน้อย 1 หมายเลขที่ถูกต้อง`);
+      return;
     }
-
+  
     let allNewTickets: TicketItem[] = [];
     const processingTimestampKey = Date.now().toString();
-
+    //ฮ Removed: const globalUsedDoubles = new Set<string>(); 
+  
     rawNumbersFromInput.forEach((rawNum, rawNumIndex) => {
-        let singleRawNumProcessedNumbers: string[] = [];
-
-        if (selectedDigit === 1 && swipeNineSingleDigit) {
-            singleRawNumProcessedNumbers.push(rawNum);
-        } else if (selectedDigit === 2) {
-            switch (twoDigitOperation) {
-                case 'reverse':
-                    if (rawNum.length === 2) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
-                    break;
-                case 'swipeFront': 
-                    if (rawNum.length === 1) for (let i = 0; i <= 9; i++) singleRawNumProcessedNumbers.push(rawNum + i.toString());
-                    break;
-                case 'swipeBack': 
-                    if (rawNum.length === 1) for (let i = 0; i <= 9; i++) singleRawNumProcessedNumbers.push(i.toString() + rawNum);
-                    break;
-                case 'swipe19': 
-                    if (rawNum.length === 1) {
-                        const D = rawNum;
-                        const part1_endingWithD: string[] = [];
-                        for (let i = 0; i <= 9; i++) part1_endingWithD.push(i.toString() + D);
-
-                        const part2_startingWithD: string[] = [];
-                        for (let i = 0; i <= 9; i++) {
-                            const currentNumStarting = D + i.toString();
-                            if (!part1_endingWithD.includes(currentNumStarting)) {
-                                part2_startingWithD.push(currentNumStarting);
-                            }
-                        }
-                        const allNums = [...part1_endingWithD, ...part2_startingWithD];
-                        const uniqueNums = Array.from(new Set(allNums));
-                        
-                        const usedDoubles = new Set<string>();
-                        ticketList.forEach(item => {
-                          if (item.payout.digit_number === 2) {
-                            item.numbers.forEach(num => {
-                              if (num.length === 2 && num[0] === num[1]) {
-                                usedDoubles.add(num);
-                              }
-                            });
-                          }
-                        });
-                        const filteredNums = uniqueNums.filter(num => {
-                          if (num.length === 2 && num[0] === num[1]) {
-                            return !usedDoubles.has(num);
-                          }
-                          return true;
-                        });
-                        singleRawNumProcessedNumbers.push(...filteredNums);
-                    }
-                    break;
-                case 'none':
-                default:
-                    if (rawNum.length === 2) singleRawNumProcessedNumbers.push(rawNum);
-                    break;
+      let singleRawNumProcessedNumbers: string[] = [];
+  
+      if (selectedDigit === 1 && swipeNineSingleDigit) {
+        singleRawNumProcessedNumbers.push(rawNum);
+      } else if (selectedDigit === 2) {
+        switch (twoDigitOperation) {
+          case 'reverse':
+            if (rawNum.length === 2) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
+            break;
+  
+          case 'swipeFront':
+            if (rawNum.length === 1) {
+              for (let i = 0; i <= 9; i++) {
+                singleRawNumProcessedNumbers.push(rawNum + i.toString());
+              }
             }
-        } else if (selectedDigit === 3 && permuteThreeDigits) {
-            if (rawNum.length === 3) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
-        } else { 
-            if (rawNum.length === selectedDigit) singleRawNumProcessedNumbers.push(rawNum);
-        }
-        
-        singleRawNumProcessedNumbers = Array.from(new Set(singleRawNumProcessedNumbers)); 
-
-        if (singleRawNumProcessedNumbers.length === 0) {
-            return; 
-        }
-        
-        const uniqueKeyForThisSet = `${processingTimestampKey}_${rawNumIndex}_${Math.random().toString(36).slice(2, 8)}`;
-
-        if (selectedTypes.length > 1) {
-            let typeAmountsAreValid = true;
-            selectedTypes.forEach((typeId) => {
-                const amt = amounts[typeId];
-                if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) typeAmountsAreValid = false;
-            });
-            if (!typeAmountsAreValid) {
-                toast.error("กรุณากรอกจำนวนเงินให้ถูกต้องสำหรับทุกประเภทที่เลือก (เมื่อประมวลผลเลขชุด)");
-                return; 
+            break;
+  
+          case 'swipeBack':
+            if (rawNum.length === 1) {
+              for (let i = 0; i <= 9; i++) {
+                singleRawNumProcessedNumbers.push(i.toString() + rawNum);
+              }
             }
-            selectedTypes.forEach((typeId) => {
-                const payout = payouts.find((p) => p.id === typeId)!;
-                allNewTickets.push({
-                    subType: subTypeObj,
-                    payout,
-                    numbers: [...singleRawNumProcessedNumbers],
-                    amount: Number(amounts[typeId]),
-                    uniqueKey: uniqueKeyForThisSet,
-                });
-            });
-        } else if (selectedTypes.length === 1) {
-            if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-                toast.error("กรุณากรอกจำนวนเงินให้ถูกต้อง (เมื่อประมวลผลเลขชุด)");
-                return;
+            break;
+  
+          case 'swipe19':
+            if (rawNum.length === 1) {
+              const D = rawNum;
+  
+              const part1: string[] = [];
+              for (let i = 0; i <= 9; i++) part1.push(i.toString() + D);
+  
+              const part2: string[] = [];
+              for (let i = 0; i <= 9; i++) {
+                const num = D + i.toString();
+                //ฮ Original check to prevent duplicates in part2 if already in part1 is fine for generating the 19 numbers.
+                if (!part1.includes(num)) part2.push(num);
+              }
+  
+              const uniqueNums = Array.from(new Set([...part1, ...part2])); // This Set is for swipe19 definition.
+  
+              //ฮ Removed filtering logic based on globalUsedDoubles
+              // const filtered = uniqueNums.filter(num => {
+              //   const isDouble = num.length === 2 && num[0] === num[1];
+              //   return !isDouble || !globalUsedDoubles.has(num);
+              // });
+  
+              // filtered.forEach(num => {
+              //   if (num.length === 2 && num[0] === num[1]) {
+              //     globalUsedDoubles.add(num);
+              //   }
+              // });
+  
+              singleRawNumProcessedNumbers.push(...uniqueNums); //ฮ Changed from filtered to uniqueNums
             }
-            const typeId = selectedTypes[0];
-            const payout = payouts.find((p) => p.id === typeId)!;
-            allNewTickets.push({
-                subType: subTypeObj,
-                payout,
-                numbers: [...singleRawNumProcessedNumbers],
-                amount: Number(amount),
-                uniqueKey: uniqueKeyForThisSet,
-            });
+            break;
+  
+          case 'none':
+          default:
+            if (rawNum.length === 2) singleRawNumProcessedNumbers.push(rawNum);
+            break;
         }
-    }); 
-
+  
+      } else if (selectedDigit === 3 && permuteThreeDigits) {
+        if (rawNum.length === 3) singleRawNumProcessedNumbers.push(...getPermutations(rawNum));
+      } else {
+        if (rawNum.length === selectedDigit) singleRawNumProcessedNumbers.push(rawNum);
+      }
+  
+      //ฮ Removed: singleRawNumProcessedNumbers = Array.from(new Set(singleRawNumProcessedNumbers));
+      if (singleRawNumProcessedNumbers.length === 0) return;
+  
+      const uniqueKeyForThisSet = `<span class="math-inline">\{processingTimestampKey\}\_</span>{rawNumIndex}_${Math.random().toString(36).slice(2, 8)}`;
+  
+      if (selectedTypes.length > 1) {
+        let typeAmountsAreValid = true;
+        selectedTypes.forEach((typeId) => {
+          const amt = amounts[typeId];
+          if (!amt || isNaN(Number(amt)) || Number(amt) <= 0) typeAmountsAreValid = false;
+        });
+        if (!typeAmountsAreValid) {
+          toast.error("กรุณากรอกจำนวนเงินให้ถูกต้องสำหรับทุกประเภทที่เลือก (เมื่อประมวลผลเลขชุด)");
+          return;
+        }
+  
+        selectedTypes.forEach((typeId) => {
+          const payout = payouts.find((p) => p.id === typeId)!;
+          allNewTickets.push({
+            subType: subTypeObj,
+            payout,
+            numbers: [...singleRawNumProcessedNumbers],
+            amount: Number(amounts[typeId]),
+            uniqueKey: uniqueKeyForThisSet,
+          });
+        });
+  
+      } else if (selectedTypes.length === 1) {
+        if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+          toast.error("กรุณากรอกจำนวนเงินให้ถูกต้อง (เมื่อประมวลผลเลขชุด)");
+          return;
+        }
+  
+        const typeId = selectedTypes[0];
+        const payout = payouts.find((p) => p.id === typeId)!;
+        allNewTickets.push({
+          subType: subTypeObj,
+          payout,
+          numbers: [...singleRawNumProcessedNumbers],
+          amount: Number(amount),
+          uniqueKey: uniqueKeyForThisSet,
+        });
+      }
+    });
+  
     if (allNewTickets.length > 0) {
-        setTicketList(prevList => [...prevList, ...allNewTickets]);
-        setNumberInput("");
-        toast.success("เพิ่มรายการใหม่สำเร็จ!");
+      setTicketList(prevList => [...prevList, ...allNewTickets]);
+      setNumberInput("");
+      toast.success("เพิ่มรายการใหม่สำเร็จ!");
     } else if (rawNumbersFromInput.length > 0) {
-        toast.warning("ไม่มีรายการถูกเพิ่ม อาจเกิดจากข้อมูลไม่ถูกต้องหรือซ้ำซ้อน");
+      toast.warning("ไม่มีรายการถูกเพิ่ม อาจเกิดจากข้อมูลไม่ถูกต้องหรือซ้ำซ้อน");
     }
   }
+  
 
   const handlePermuteThreeDigitsChange = (isChecked: boolean) => {
     setPermuteThreeDigits(isChecked);
@@ -402,8 +423,9 @@ export default function LotteryTicketPage() {
       .split(" ")
       .map((n) => n.trim())
       .filter((n) => n.length > 0);
-    
-    const combinedNumbers = Array.from(new Set([...currentNumbersArray, ...newNumbers]));
+  
+    //ฮ Original: const combinedNumbers = Array.from(new Set([...currentNumbersArray, ...newNumbers]));
+    const combinedNumbers = [...currentNumbersArray, ...newNumbers]; //ฮ Changed to allow duplicates
     setNumberInput(combinedNumbers.join(" "));
   }
 
@@ -710,57 +732,71 @@ export default function LotteryTicketPage() {
     toast.success("ลบกลุ่มสำเร็จ!");
   }
 
- 
-  const { allTypeLabels, groups } = useMemo(() => {
-    const calculatedAllTypeLabels: Record<number, string[]> = {};
-    payouts.forEach(p => {
-      if (!p.type_number) return;
-      if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
-      if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
-        calculatedAllTypeLabels[p.digit_number].push(p.type_number);
-      }
-    });
-  
-    Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
-      const digit = Number(digitStr);
-      const labels = calculatedAllTypeLabels[digit];
-      if (!labels) return;
-      let ordered = [...labels];
-      if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) {
-        ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")];
-      }
-      calculatedAllTypeLabels[digit] = Array.from(new Set(ordered));
-    });
-  
-    const calculatedGroups: Map<string, Grouped> = new Map();
-  
-    ticketList.forEach(item => {
-      const digit = item.payout.digit_number;
-      const subTypeId = item.subType.lottery_sub_type_id;
-      const typeLabel = item.payout.type_number || "-";
-      const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [typeLabel];
-      const groupKey = `${subTypeId}|${digit}|${canonicalTypeLabels.sort().join(',')}|${item.amount}`;
-  
-      if (!calculatedGroups.has(groupKey)) {
-        const groupAmounts: Record<string, number> = {};
-        canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; });
-        calculatedGroups.set(groupKey, {
-          digit_number: digit,
-          numbers: [],
-          typeLabels: canonicalTypeLabels,
-          amounts: groupAmounts,
-          typeOrder: canonicalTypeLabels,
-          uniqueKey: item.uniqueKey,
-          _inferredPivotForSort: inferSwipe19Pivot(item.numbers) || null,
-        });
-      }
-      const group = calculatedGroups.get(groupKey)!;
-      group.amounts[typeLabel] = item.amount; // Set the exact amount for this type
-      group.numbers = Array.from(new Set([...group.numbers, ...item.numbers]));
-    });
-  
-    return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
-  }, [ticketList, payouts]);
+ // ... inside export default function LotteryTicketPage()
+
+const { allTypeLabels, groups } = useMemo(() => {
+  const calculatedAllTypeLabels: Record<number, string[]> = {}; //
+  payouts.forEach(p => { //
+    if (!p.type_number) return; //
+    if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = []; //
+    if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) { //
+      calculatedAllTypeLabels[p.digit_number].push(p.type_number); //
+    }
+  });
+
+  Object.keys(calculatedAllTypeLabels).forEach(digitStr => { //
+    const digit = Number(digitStr); //
+    const labels = calculatedAllTypeLabels[digit]; //
+    if (!labels) return; //
+    let ordered = [...labels]; //
+    if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) { //
+      ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")]; //
+    }
+    calculatedAllTypeLabels[digit] = Array.from(new Set(ordered)); //
+  });
+
+  const calculatedGroups: Map<string, Grouped> = new Map(); //
+
+  ticketList.forEach(item => { //
+    const digit = item.payout.digit_number; //
+    const subTypeId = item.subType.lottery_sub_type_id; //
+    const typeLabel = item.payout.type_number || "-"; //
+    const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [typeLabel]; //
+    const groupKey = `<span class="math-inline">\{subTypeId\}\|</span>{digit}|<span class="math-inline">\{canonicalTypeLabels\.sort\(\)\.join\(','\)\}\|</span>{item.amount}`; //
+
+    if (!calculatedGroups.has(groupKey)) { //
+      const groupAmounts: Record<string, number> = {}; //
+      canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; }); //
+      calculatedGroups.set(groupKey, { //
+        digit_number: digit, //
+        numbers: [], // Initialized as empty //
+        typeLabels: canonicalTypeLabels, //
+        amounts: groupAmounts, //
+        typeOrder: canonicalTypeLabels, //
+        uniqueKey: item.uniqueKey, //
+        _inferredPivotForSort: inferSwipe19Pivot(item.numbers) || null, //
+        _processedItemUniqueKeysForNumbers: new Set<string>(), // ฮ New: Initialize the set
+      });
+    }
+    const group = calculatedGroups.get(groupKey)!; //
+    group.amounts[typeLabel] = item.amount;  //
+
+    // ฮ Changed logic for adding numbers to the group display:
+    // This ensures that for a given item.uniqueKey (representing one set of processed numbers from raw input),
+    // its numbers are added only once to this visual group.
+    // If another item with a *different* item.uniqueKey maps to the same visual group,
+    // its numbers will be added, preserving the behavior from the previous "remove all duplicates" request
+    // for distinct inputs.
+    if (!group._processedItemUniqueKeysForNumbers.has(item.uniqueKey)) {
+      group.numbers.push(...item.numbers); // This was the "ฮ Changed" line from the previous request
+      group._processedItemUniqueKeysForNumbers.add(item.uniqueKey);
+    }
+  });
+
+  return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups }; //
+}, [ticketList, payouts]); //
+
+// ... rest of the component
 
 
   const ConfirmationDialog = () => (
