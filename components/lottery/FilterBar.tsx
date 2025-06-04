@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetFooter
 import { Separator } from "@/components/ui/separator"; // เพิ่ม Separator
 import { Filter, CheckCircle, Circle, XCircle, Globe } from "lucide-react"; // เพิ่มไอคอน (ตัวอย่าง)
 import { countryFlagImg } from "@/lib/utils/flags"; // เพิ่ม import สำหรับ flag
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FilterBarProps {
   countries: string[];
@@ -62,38 +63,46 @@ export default function FilterBar({ countries, onFilterChange }: FilterBarProps)
 
   // ส่วนของ Filter buttons ที่จะใช้ทั้ง Desktop และ Mobile Sheet
   const filterControls = (
-    <div className="flex flex-wrap gap-1 sm:gap-2 items-center w-full    backdrop-blur-sm rounded-lg px-2 py-2   shadow-sm">
+    <div className="flex flex-wrap gap-1 sm:gap-2 items-center w-full backdrop-blur-sm rounded-lg px-2 py-2 shadow-sm ml-4">
       {/* Status Filters */}
       <div className="flex flex-row flex-wrap gap-1 items-center">
         <span className="text-xs font-medium text-muted-foreground mr-2">สถานะ:</span>
-        {statusFilters.map(f => (
-          <FilterButton
-            key={f.label}
-            label={f.label}
-            value={f.value}
-            isActive={filterOpen === f.value}
-            onClick={() => handleFilterOpenChange(f.value)}
-            icon={filterOpen === f.value ? f.icon : <Circle className="mr-1 h-3 w-3" />}
-          />
-        ))}
+        <Tabs value={filterOpen === null ? "all" : filterOpen ? "open" : "close"} onValueChange={val => handleFilterOpenChange(val === "all" ? null : val === "open")}
+          className="w-full">
+          <TabsList className="flex gap-1 bg-transparent p-0">
+            <TabsTrigger value="all">ทั้งหมด</TabsTrigger>
+            <TabsTrigger value="open">เปิดรับ</TabsTrigger>
+            <TabsTrigger value="close">ปิดรับ</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       {/* Country Filters */}
-      <div className="flex flex-row flex-wrap gap-1 items-center ml-4">
-        <span className="text-xs font-medium text-muted-foreground mr-2">ประเทศ:</span>
-        {countryFiltersList.map(c => (
-          <FilterButton
-            key={c.value}
-            label={c.label}
-            value={c.value}
-            isActive={filterCountry === c.value}
-            onClick={() => handleFilterCountryChange(c.value)}
-            flag={
-              c.value === "all"
-                ? <Globe className="mr-1 h-3 w-3 text-blue-400" />
-                : <img src={countryFlagImg(countryLabel[c.value] || c.value)} alt={c.label} className="mr-1 h-6 w-6 rounded-full object-cover border border-gray-200" />
-            }
-          />
-        ))}
+      <div className="flex flex-col w-full sm:w-auto h-full">
+        <span className="text-xs font-medium text-muted-foreground mb-1">ประเทศ:</span>
+        <Tabs value={filterCountry} onValueChange={handleFilterCountryChange} className="w-full">
+          <TabsList
+            className="flex flex-wrap gap-1 bg-transparent p-0 justify-center w-full"
+            style={{ marginTop: 0, marginBottom: 0 }}
+          >
+            {countryFiltersList.map(c => (
+              <TabsTrigger
+                key={c.value}
+                value={c.value}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
+                  data-[state=active]:bg-secondary data-[state=active]:text-primary
+                  data-[state=inactive]:bg-transparent data-[state=inactive]:text-muted-foreground
+                  transition-all"
+                style={{ minWidth: 70 }}
+              >
+                {c.value === "all"
+                  ? <Globe className="h-4 w-4 text-blue-400" />
+                  : <img src={countryFlagImg(countryLabel[c.value] || c.value)} alt={c.label} className="h-4 w-4 rounded-full object-cover" />
+                }
+                {c.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
     </div>
   );
@@ -112,17 +121,17 @@ export default function FilterBar({ countries, onFilterChange }: FilterBarProps)
               ค้นหา ({filterOpen !== null ? (filterOpen ? "เปิดรับ" : "ปิดรับ") : "ทั้งหมด"} / {filterCountry === "all" ? "ทุกประเทศ" : (countryLabel[filterCountry] || filterCountry)})
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-lg px-4 pb-6 pt-4 max-h-[80vh] overflow-y-auto">
-            <SheetHeader className="mb-4">
+          <SheetContent side="bottom" className="rounded-t-lg px-4 hoverflow-y-auto">
+            <SheetHeader className="">
               <SheetTitle className="text-center text-xl">ตัวกรองข้อมูล</SheetTitle>
               <SheetDescription className="text-center">
                 เลือกสถานะและประเทศที่ต้องการแสดง
               </SheetDescription>
             </SheetHeader>
-            <div className="space-y-6">
+            <div className="">
               {filterControls}
             </div>
-            <SheetFooter className="mt-6">
+            <SheetFooter className="mt-12">
               <Button className="w-full py-3 text-base" onClick={() => setIsSheetOpen(false)}>
                 แสดงผล
               </Button>

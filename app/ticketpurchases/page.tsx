@@ -418,7 +418,7 @@ export default function LotteryPurchasePage() {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>ตั๋วหวยของฉัน</BreadcrumbPage>
+                    <BreadcrumbPage>รายการบิลหวย</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -432,12 +432,11 @@ export default function LotteryPurchasePage() {
             className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-4 lg:px-6 py-4" // Reduced padding
           >
             {/* Header Card */}
-            <Card className="mb-6 shadow-lg border-0"> {/* Reduced margin-bottom */}
-              <CardHeader className="h-28 mb-1 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 rounded-t-lg shadow-md flex flex-col items-center justify-center py-6"> {/* Reduced height, padding, shadow, border-radius */}
+            <Card className="mb-6 shadow-lg border-0 w-full"> {/* Reduced margin-bottom */}
+              <CardHeader className="h-18 mb-1 animated-gradient-bg rounded-t-lg shadow-md flex flex-col items-center justify-center py-6"> {/* Reduced height, padding, shadow, border-radius */}
                 <div className="flex flex-col items-center">
-                  <span className="text-3xl md:text-4xl drop-shadow font-extrabold">🎟️</span> {/* Reduced font size */}
-                  <h1 className="text-xl md:text-2xl font-bold text-white drop-shadow">ตั๋วหวยของฉัน</h1> {/* Reduced font size */}
-                  <span className="text-sm md:text-base text-white/80 font-normal">รายการตั๋วหวยที่ซื้อแล้ว</span> {/* Reduced font size */}
+                 <h1 className="text-xl md:text-2xl font-bold text-white drop-shadow">รายการบิลหวย</h1> {/* Reduced font size */}
+                  <span className="text-sm md:text-base text-white/80 font-normal">สรุปรายการบิลหวยที่ซื้อแล้ว</span> {/* Reduced font size */}
                 </div>
               </CardHeader>
             </Card>
