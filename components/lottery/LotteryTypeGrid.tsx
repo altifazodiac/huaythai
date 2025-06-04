@@ -185,30 +185,17 @@ export default function LotteryTypeGrid({
         }}
       />
       <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <h2 className="text-2xl font-semibold flex items-center gap-2 text-blue-800 dark:text-white">
-          <Sparkles className="text-yellow-200" /> ประเภทหวยทั้งหมด!
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-white mb-2 ml-4 mt-[-14px]">
-          คลิกที่ประเภทหวยเพื่อดูรายละเอียดการออกรางวัล
-        </p>
-        {filteredGrouped.map((group, idx) => (
+         {filteredGrouped.map((group, idx) => (
           <div key={group.lottery_type_id} className="mb-8">
             <motion.div
-              initial={{ opacity: 0, y: -30 }}
+              initial={{ opacity: 0, y: -20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: idx * 0.1, type: "spring", bounce: 0.3 }}
-              viewport={{ once: true, amount: 0.5 }}
-              className="
-                bg-white dark:bg-zinc-900
-                rounded-2xl
-                shadow
-                border border-gray-200 dark:border-zinc-700
-                flex items-center gap-3
-                px-5 py-3 mb-4
-              "
+              transition={{ duration: 0.3, delay: idx * 0.05, type: "spring", bounce: 0.2 }}
+              viewport={{ once: true, amount: 0.3 }}
+              className="animated-gradient-bg border rounded-md flex items-center gap-3 px-2 py-1 mb-4"
             >
-              <Icon icon="mdi:flag" className="w-7 h-7 text-blue-500" />
-              <span className="font-bold text-lg text-blue-700 dark:text-white">{group.type_name}</span>
+              <Icon icon="mdi:flag" className="w-7 h-7 text-white dark:text-white" />
+              <span className="font-bold text-lg text-white dark:text-white">{group.type_name}</span>
             </motion.div>
             <div className="grid gap-3 grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {group.subTypes.map((sub: any, idx: number) => {
@@ -261,20 +248,19 @@ export default function LotteryTypeGrid({
                         }}
                       >
                         <motion.div
-                          initial={{ opacity: 0, y: 40 * ((idx % 2) ? 1 : -1), x: 40 * ((idx % 3) - 1) }}
+                          initial={{ opacity: 0, y: 20 * ((idx % 2) ? 1 : -1), x: 20 * ((idx % 3) - 1) }}
                           whileInView={{ opacity: 1, y: 0, x: 0 }}
-                          transition={{ duration: 0.7, delay: idx * 0.08, type: "spring", bounce: 0.3 }}
-                          viewport={{ once: true, amount: 0.2 }}
+                          transition={{ duration: 0.3, delay: idx * 0.03, type: "spring", bounce: 0.2 }}
+                          viewport={{ once: true, amount: 0.1 }}
                         >
                           <Card
                             className={`
                               min-h-[140px] flex flex-col items-center
                               ${isCurrentlyOpen
-                                ? 'animated-gradient-blue-bg text-white'
-                                : 'bg-[#f4f8fd] text-gray-800'}
-                              border border-gray-200
-                              rounded-xl shadow
-                              transition-all duration-300
+                                ? 'animated-gradient-bg text-white'
+                                : 'bg-gray-100/50 text-gray-800 dark:text-gray-500 dark:bg-white/10 backdrop-blur-md'}
+                              border 
+                              shadow-lg transition-all duration-300
                               hover:scale-105 hover:shadow-lg
                               ${isCurrentlyOpen ? 'cursor-pointer' : 'opacity-100 cursor-default'}
                             `}
@@ -283,7 +269,7 @@ export default function LotteryTypeGrid({
                               animationFillMode: 'forwards',
                             }}
                           >
-                            <div className={`w-full text-center rounded-t-xl bg-[#f4f8fd] text-red-400 py-1 shadow-sm`}>
+                            <div className={`w-full text-center rounded-t-sm dark:text-white py-1 shadow-sm`}>
                               <h2 className="text-sm font-semibold tracking-wide flex items-center justify-center gap-1.5">
                                 <Ticket className="w-3.5 h-3.5" />
                                 {isCurrentlyOpen ? "เปิดรับ" : "ปิดรับแทง"}
@@ -315,10 +301,10 @@ export default function LotteryTypeGrid({
                                   <AnimatePresence mode="wait">
                                     <motion.div
                                       key={currentInfoIdx}
-                                      initial={{ opacity: 0, y: 20 }}
+                                      initial={{ opacity: 0, y: 10 }}
                                       animate={{ opacity: 1, y: 0 }}
-                                      exit={{ opacity: 0, y: -20 }}
-                                      transition={{ duration: 0.4, ease: "easeInOut" }}
+                                      exit={{ opacity: 0, y: -10 }}
+                                      transition={{ duration: 0.2, ease: "easeInOut" }}
                                       className="min-h-[1.5em] flex items-center justify-center"
                                     >
                                       {infoItems[currentInfoIdx].icon}

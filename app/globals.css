@@ -195,7 +195,7 @@
   animation: progress-indeterminate 1.2s infinite linear;
 }
 .animated-gradient-bg {
-  background: linear-gradient(270deg, #ff6ec4, #7873f5, #42e695, #ff6ec4, #7873f5, #42e695);
+  background: linear-gradient(270deg, #018a18, #298a3e, #299e29, #023b0f, #28ac00, #086904);
   background-size: 1200% 1200%;
   animation: gradientMove 12s ease-in-out infinite;
 }
@@ -215,7 +215,7 @@
   animation: spin-slow 6s linear infinite;
 }
 .animated-gradient-blue-bg {
-  background: linear-gradient(90deg,rgba(0, 40, 99, 1) 0%, rgba(8, 61, 140, 1) 48%, rgba(7, 52, 120, 1) 57%, rgba(0, 54, 140, 1) 100%);
+  background: linear-gradient(90deg,rgb(3, 99, 0) 0%, rgb(8, 140, 52) 48%, rgb(7, 120, 22) 57%, rgb(0, 140, 42) 100%);
   background-size: 200% 200%;
   animation: gradientBlueMove 8s ease-in-out infinite;
 }
@@ -294,5 +294,94 @@
 .animate-subtle-gradient {
   animation: subtle-gradient 15s ease infinite;
 }
+@keyframes slideInFromLeft {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+.animate-fade-in-left {
+  animation: fade-in-left 0.6s ease-out forwards;
+}
+ 
+.text-gradient-green {
+  background-image: linear-gradient(to right, #6ee7b7, #34d399, #10b981);  
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.group-hover\:text-gradient-green-hover:hover {
+  background-image: linear-gradient(to right, #a7f3d0, #6ee7b7, #34d399);  
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.green-gradient-from-image {
+  width: 100%;
+  height: 20vh;
+  background-color: #0a2b08; 
+  background-image: radial-gradient(
+    ellipse at 50% 0%, 
+    #75bc20 0%,    
+    #4c9a2a 25%,  
+    #2a722c 50%,  
+    #114b1c 75%,   
+    #0a2b08 100%   
+  );
+}
+@property --angle-before { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@property --angle-after { syntax: '<angle>'; initial-value: 180deg; inherits: false; }
+
+.animated-green-border {
+  position: relative;
+  /* padding ถูกกำหนดใน className (p-0.5 sm:p-1) */
+  /* overflow: hidden ถูกกำหนดใน className */
+  /* rounded-2xl ถูกกำหนดใน className */
+}
+
+.animated-green-border::before,
+.animated-green-border::after {
+  content: '';
+  position: absolute;
+  top: 0; 
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0; 
+  border-radius: inherit; 
+}
+
+.animated-green-border::before {
+  background: conic-gradient(
+    from var(--angle-before),
+    transparent 0%, transparent 20%, #6ee7b7 23%, 
+    #34d399 25%, #10b981 27%, transparent 30%, transparent 100%
+  );
+  animation: rotateAngleBefore 4s linear infinite, pulseLightBefore 3s ease-in-out infinite alternate;
+}
 
  
+
+@keyframes rotateAngleBefore { to { --angle-before: 360deg; } }
+@keyframes rotateAngleAfter { to { --angle-after: -360deg; } }
+@keyframes pulseLightBefore { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@keyframes pulseLightAfter { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.9; } }

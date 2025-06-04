@@ -20,7 +20,6 @@ export default function UserHeader() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);
-        // ดึงเครดิตจาก profiles
         const { data: profile } = await supabase
           .from("profiles")
           .select("credit_balance")
@@ -32,7 +31,6 @@ export default function UserHeader() {
     };
     fetchUserAndCredit();
 
-    // ฟัง event
     const handleCreditUpdated = () => {
       fetchUserAndCredit();
     };
@@ -45,44 +43,49 @@ export default function UserHeader() {
 
   return (
     <motion.header
-      initial={{ opacity: 0, y: -30 }}
+      initial={{ opacity: 0, y: -25 }} // ลด y ลงเล็กน้อย
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="w-full bg-gradient-to-r from-blue-800 via-blue-900 to-blue-800 shadow-lg py-3 px-6 flex items-center justify-between rounded-b-xl z-50"
+      transition={{ duration: 0.5, ease: "easeOut" }} // ปรับ duration
+       
+      className="w-full animated-gradient-bg shadow-md py-2 px-4 sm:px-6 flex items-center justify-between   z-40" // ลด py, px, rounded, z-index
       style={{ position: "relative" }}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2"> {/* ลด gap */}
         <motion.div
-          initial={{ scale: 0.8 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          className="text-white text-lg font-medium"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 280, delay: 0.1 }} // ปรับ transition
+          className="text-white text-base font-medium" // ลด text size
           style={{ fontFamily: "Kanit, sans-serif" }}
         >
           🎟️ หวยเศรษฐี 789
         </motion.div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3"> {/* ลด gap */}
         {loading ? (
-          <Skeleton className="w-32 h-6 rounded" />
+          <>
+            <Skeleton className="w-24 h-5 rounded-md" /> {/* ปรับ Skeleton */}
+            <Skeleton className="w-28 h-5 rounded-full" /> {/* ปรับ Skeleton */}
+          </>
         ) : (
           <>
             <motion.div
-              initial={{ x: 20, opacity: 0 }}
+              initial={{ x: 15, opacity: 0 }} // ลด x
               animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="text-white   font-sm"
-              style={{ fontFamily: "Century Gothic, sans-serif" }}
+              transition={{ delay: 0.2, duration: 0.4 }} // ปรับ transition
+              className="text-white text-xs sm:text-sm" // ลด text size, เพิ่ม responsive
+              // style={{ fontFamily: "Century Gothic, sans-serif" }} // อาจจะเปลี่ยนเป็น Kanit หรือปล่อยให้ inherit
             >
-              👤 {user?.user_metadata?.name || user?.email}
+              👤 {user?.user_metadata?.name || user?.email?.split('@')[0]} {/* แสดงเฉพาะส่วนหน้า @ ของ email */}
             </motion.div>
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              className="bg-white/20 px-4 py-1 rounded-full text-white font-sm   shadow"
+              transition={{ delay: 0.3, duration: 0.4 }} // ปรับ transition
+              // ปรับ bg opacity, padding, text size, shadow และสีตัวเลขเครดิต
+              className="bg-white/15 px-3 py-0.5 rounded-full text-white text-xs sm:text-sm shadow-sm"
             >
-              💰 เครดิต: <span className="text-yellow-200">{credit?.toLocaleString() ?? 0}</span>
+              💰 เครดิต: <span className="font-semibold text-green-200">{credit?.toLocaleString() ?? "0"}</span>
             </motion.div>
           </>
         )}

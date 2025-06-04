@@ -103,7 +103,7 @@ export default async function Page() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
+  const imageUrl = 'https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//BG.png';
   const [{ data: typesData }, { data: subTypesData }, { data: schedulesData }] = await Promise.all([
     supabase.from("lottery_types").select(),
     supabase.from("lottery_sub_types").select(),
@@ -143,80 +143,42 @@ export default async function Page() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="w-full px-4 py-6 relative">
-          {/* ลูกบอล 7 */}
-          <svg
-            className="absolute left-8 top-4 w-14 h-14 drop-shadow-lg animate-bounce-slow"
-            viewBox="0 0 64 64"
-            fill="none"
-            style={{ zIndex: 2 }}
-          >
-            <circle cx="32" cy="32" r="28" fill="white" stroke="#e5e7eb" strokeWidth="4" />
-            <text x="32" y="40" textAnchor="middle" fontSize="1.8rem" fontWeight="bold" fill="#22223b" fontFamily="Kanit, sans-serif">7</text>
-          </svg>
-          {/* ลูกบอล 8 */}
-          <svg
-            className="absolute left-1/2 -top-8 w-20 h-20 drop-shadow-xl animate-bounce-slow"
-            viewBox="0 0 64 64"
-            fill="none"
-            style={{ zIndex: 2, transform: "translateX(-50%)", animationDelay: "0.5s" }}
-          >
-            <circle cx="32" cy="32" r="30" fill="white" stroke="#e5e7eb" strokeWidth="4" />
-            <text x="32" y="40" textAnchor="middle" fontSize="2rem" fontWeight="bold" fill="#22223b" fontFamily="Kanit, sans-serif">8</text>
-          </svg>
-          {/* ลูกบอล 9 */}
-          <svg
-            className="absolute right-10 top-8 w-12 h-12 drop-shadow-md animate-bounce-slow"
-            viewBox="0 0 64 64"
-            fill="none"
-            style={{ zIndex: 2, animationDelay: "1s" }}
-          >
-            <circle cx="32" cy="32" r="24" fill="white" stroke="#e5e7eb" strokeWidth="4" />
-            <text x="32" y="40" textAnchor="middle" fontSize="1.3rem" fontWeight="bold" fill="#22223b" fontFamily="Kanit, sans-serif">9</text>
-          </svg>
-          {/* ลูกบอล 7 (เล็ก) */}
-          <svg
-            className="absolute left-24 bottom-0 w-10 h-10 drop-shadow animate-bounce-slow"
-            viewBox="0 0 64 64"
-            fill="none"
-            style={{ zIndex: 2, animationDelay: "1.3s" }}
-          >
-            <circle cx="32" cy="32" r="18" fill="white" stroke="#e5e7eb" strokeWidth="3" />
-            <text x="32" y="40" textAnchor="middle" fontSize="1rem" fontWeight="bold" fill="#22223b" fontFamily="Kanit, sans-serif">7</text>
-          </svg>
-          {/* ลูกบอล 9 (เล็ก) */}
-          <svg
-            className="absolute right-32 bottom-2 w-8 h-8 drop-shadow animate-bounce-slow"
-            viewBox="0 0 64 64"
-            fill="none"
-            style={{ zIndex: 2, animationDelay: "1.7s" }}
-          >
-            <circle cx="32" cy="32" r="14" fill="white" stroke="#e5e7eb" strokeWidth="2" />
-            <text x="32" y="40" textAnchor="middle" fontSize="0.9rem" fontWeight="bold" fill="#22223b" fontFamily="Kanit, sans-serif">9</text>
-          </svg>
-
-          <div
-            className="
-              w-full mx-auto rounded-2xl shadow-2xl
-              bg-gradient-to-r from-blue-800 via-blue-900 to-blue-800
-              flex flex-col items-center justify-center
-              py-10
-              animate-fadein
-              relative
-            "
-            style={{ minHeight: 180, zIndex: 1 }}
-          >
-            <h1 className="text-2xl md:text-3xl font-bold text-white drop-shadow-lg modern-text-glow mb-2 tracking-wide">
+      
+        <div className="animated-green-border overflow-hidden rounded-2xl p-0.5 sm:p-1">  
+            
+            <div 
+              className="
+                w-full mx-auto rounded-xl shadow-2xl
+                flex flex-col items-end sm:items-center justify-center
+                py-6 sm:py-8 lg:py-10
+                min-h-[180px] sm:min-h-[200px] lg:min-h-[220px]
+                animate-fadein
+                relative 
+                bg-left sm:bg-center
+                pr-4 md:pr-0 
+              "
+              style={{
+                
+                backgroundImage: `url(${imageUrl})`,
+                backgroundSize: 'cover',
+                backgroundRepeat: 'no-repeat',
+              }}
+            >
+          
+            <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white drop-shadow-lg modern-text-glow mb-1 sm:mb-2 tracking-wide text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
               ยินดีต้อนรับสู่
             </h1>
-            <p className="mt-2 text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-pink-200 to-blue-200 modern-text-glow animate-pulse">
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-green-200 to-teal-300 modern-text-glow animate-pulse text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
               หวยเศรษฐี 789
             </p>
-            <p className="mt-4 text-base md:text-lg text-white/80">
+            <p className="mt-2 sm:mt-4 text-xs sm:text-sm md:text-base lg:text-lg text-white/80 text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
               เริ่มต้นการเดินทางสู่ความมั่งคั่งได้แล้ววันนี้!
             </p>
           </div>
-        </div>
+          </div>
+          
+        
+
         <LotteryTypeGrid
           grouped={grouped}
           schedules={schedules}

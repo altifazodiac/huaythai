@@ -734,6 +734,8 @@ export default function LotteryTicketPage() {
 
  // ... inside export default function LotteryTicketPage()
 
+// ... inside export default function LotteryTicketPage()
+
 const { allTypeLabels, groups } = useMemo(() => {
   const calculatedAllTypeLabels: Record<number, string[]> = {}; //
   payouts.forEach(p => { //
@@ -796,7 +798,7 @@ const { allTypeLabels, groups } = useMemo(() => {
   return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups }; //
 }, [ticketList, payouts]); //
 
-// ... rest of the component
+ 
 
 
   const ConfirmationDialog = () => (
