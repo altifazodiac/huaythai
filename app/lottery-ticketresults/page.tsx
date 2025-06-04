@@ -252,7 +252,7 @@ export default function LotteryTicketResultsPage() {
                     boxShadow: '0 4px 32px 0 rgba(30,60,114,0.15)',
                   }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/60 to-blue-400/40 animate-gradient-move z-0" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-green-900/60 to-green-400/40 animate-gradient-move z-0" />
                   <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <FaCrown className="text-yellow-300 text-2xl drop-shadow-glow" />
@@ -262,7 +262,7 @@ export default function LotteryTicketResultsPage() {
                       <Input placeholder="ค้นหาบิล..." value={filterBill} onChange={e => setFilterBill(e.target.value)} className="rounded-full bg-white/20 border-none text-white placeholder:text-white/70 shadow-inner focus:ring-2 focus:ring-yellow-300" />
                       <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className="rounded-full bg-white/20 border-none text-white placeholder:text-white/70 shadow-inner focus:ring-2 focus:ring-yellow-300" />
                     </div>
-                    <div className="flex items-center gap-2 bg-gradient-to-r from-green-400 to-green-600 rounded-full px-4 py-2 shadow-lg border-2 border-white/30">
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-green-800 rounded-full px-4 py-2 shadow-lg border-2 border-white/30">
                       <FaCoins className="text-yellow-200 text-xl animate-bounce" />
                       <div className="flex flex-col text-right">
                         <span className="text-xs text-white/80">ยอดรวมรางวัล</span>
@@ -288,7 +288,7 @@ export default function LotteryTicketResultsPage() {
                         // Responsive: use Collapsible for each bill
                         return (
                           <Collapsible key={win.bill_number} className="w-full">
-                            <div className="flex flex-col sm:flex-row items-center w-full bg-[#17469c]/90 rounded-lg px-2 py-1 gap-1 text-white text-xs cursor-pointer">
+                            <div className="flex flex-col sm:flex-row items-center w-full bg-green-600/90 rounded-lg px-2 py-1 gap-1 text-white text-xs cursor-pointer">
                               <CollapsibleTrigger asChild>
                                 <button className="flex flex-1 items-center gap-2 w-full text-left focus:outline-none">
                                   <FaCrown className="text-yellow-300 text-base" />
@@ -375,7 +375,7 @@ export default function LotteryTicketResultsPage() {
                                       const isWing = item.prize_code.includes('วิ่ง');
                                       const isStraight = !isTod && !isWing;
                                       const matchedNumbers = item.winning_number.split(',').map(s => s.trim()).filter(Boolean);
-                                      let icon = isStraight ? <FaMedal className="text-green-500 mr-1 inline" /> : isTod ? <FaRandom className="text-yellow-500 mr-1 inline" /> : <FaRunning className="text-blue-500 mr-1 inline" />;
+                                      let icon = isStraight ? <FaMedal className="text-green-500 mr-1 inline" /> : isTod ? <FaRandom className="text-yellow-500 mr-1 inline" /> : <FaRunning className="text-green-500 mr-1 inline" />;
                                       return (
                                         <motion.tr
                                           initial={{ opacity: 0, x: 20 }}
@@ -384,7 +384,7 @@ export default function LotteryTicketResultsPage() {
                                           key={item.id + '-' + idx2}
                                           className="bg-[#E3EAFD] hover:bg-[#D1DBF5] transition text-xs"
                                         >
-                                          <TableCell className="font-bold text-[#17469c] px-1 py-1">{icon}<Badge variant='outline' className="bg-blue-100 text-[#17469c] font-bold rounded-full px-2 py-0.5 shadow text-xs">{item.prize_code}</Badge></TableCell>
+                                          <TableCell className="font-bold text-[#17469c] px-1 py-1">{icon}<Badge variant='outline' className="bg-green-100 text-[#17469c] font-bold rounded-full px-2 py-0.5 shadow text-xs">{item.prize_code}</Badge></TableCell>
                                           <TableCell className="px-1 py-1">
                                             {isTod || isWing ? (
                                               <Badge className="bg-pink-500 text-white text-xs">{matchedNumbers.join(', ')}</Badge>

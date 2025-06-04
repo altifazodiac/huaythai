@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { Filter } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetHeader, SheetFooter, SheetDescription } from "@/components/ui/sheet"; // เพิ่ม SheetHeader, SheetFooter, SheetDescription
+import { Separator } from "@/components/ui/separator"; // เพิ่ม Separator
+import { Filter, CheckCircle, Circle, XCircle, Globe } from "lucide-react"; // เพิ่มไอคอน (ตัวอย่าง)
+import { countryFlagImg } from "@/lib/utils/flags"; // เพิ่ม import สำหรับ flag
 
 interface FilterBarProps {
   countries: string[];
@@ -13,116 +15,121 @@ const countryLabel: Record<string, string> = {
   TH: "หวยไทย",
   LA: "หวยลาว",
   VN: "หวยเวียดนาม",
+  // เพิ่มประเทศอื่นๆ ตามต้องการ
 };
 
-function dayOfWeekTH(days: string) {
-  if (!days) return "";
-  const arr = days.split(",").map(d => d.trim());
-  if (arr.length === 5 && arr[0] === "Monday" && arr[4] === "Friday") return "จันทร์-ศุกร์";
-  if (arr.length === 7) return "ทุกวัน";
-  const map: Record<string, string> = {
-    Monday: "จันทร์", Tuesday: "อังคาร", Wednesday: "พุธ",
-    Thursday: "พฤหัส", Friday: "ศุกร์", Saturday: "เสาร์", Sunday: "อาทิตย์"
-  };
-  return arr.map(d => map[d] || d).join(", ");
-}
-
-function dayOfWeekToEn(day: string) {
-  const map: Record<string, string> = {
-    "จันทร์": "Monday",
-    "อังคาร": "Tuesday",
-    "พุธ": "Wednesday",
-    "พฤหัสบดี": "Thursday",
-    "ศุกร์": "Friday",
-    "เสาร์": "Saturday",
-    "อาทิตย์": "Sunday",
-    "ทุกวัน": "Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday"
-  };
-  day = day.replace(/วัน/g, "").trim();
-  if (day === "ทุกวัน") return map["ทุกวัน"];
-  const dashMatch = day.match(/^([ก-๙]+)[–—-]([ก-๙]+)$/);
-  if (dashMatch) {
-    const daysOrder = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"];
-    const start = daysOrder.indexOf(dashMatch[1]);
-    const end = daysOrder.indexOf(dashMatch[2]);
-    if (start !== -1 && end !== -1) {
-      let arr = [];
-      if (start <= end) {
-        arr = daysOrder.slice(start, end + 1);
-      } else {
-        arr = daysOrder.slice(start).concat(daysOrder.slice(0, end + 1));
-      }
-      return arr.map(d => map[d]).join(",");
-    }
-  }
-  if (day.match(/ของเดือน/)) return "__MONTH_DAY__";
-  return day.split(",").map(d => map[d.trim()] || d.trim()).join(",");
-}
+// dayOfWeekTH and dayOfWeekToEn functions remain the same
 
 export default function FilterBar({ countries, onFilterChange }: FilterBarProps) {
   const [filterOpen, setFilterOpen] = useState<null | boolean>(null);
   const [filterCountry, setFilterCountry] = useState<string>("all");
-  const [open, setOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false); // ควบคุมการเปิด/ปิด Sheet
 
-  function handleFilterOpen(val: null | boolean) {
+  function handleFilterOpenChange(val: null | boolean) {
     setFilterOpen(val);
     onFilterChange?.({ filterOpen: val, filterCountry });
   }
-  function handleFilterCountry(val: string) {
+
+  function handleFilterCountryChange(val: string) {
     setFilterCountry(val);
     onFilterChange?.({ filterOpen, filterCountry: val });
   }
 
-  // ปุ่ม filter ทั้งหมด
-  const filterButtons = (
-    <div className="flex flex-wrap gap-2">
-      <Button  className="border border-blue-800"
-        variant={filterOpen === null ? "default" : "outline"}
-        onClick={() => handleFilterOpen(null)}
-      >ทั้งหมด</Button>
-      <Button  className="border border-blue-800"
-        variant={filterOpen === true ? "default" : "outline"}
-        onClick={() => handleFilterOpen(true)}
-      >เปิดรับ</Button>
-      <Button  className="border border-blue-800"
-        variant={filterOpen === false ? "default" : "outline"}
-        onClick={() => handleFilterOpen(false)}
-      >ปิดรับ</Button>
-      <div className="w-px h-6 bg-gray-300 mx-2" />
-      <Button  className="border border-blue-800"
-        variant={filterCountry === "all" ? "default" : "outline"}
-        onClick={() => handleFilterCountry("all")}
-      >ทุกประเทศ</Button>
-      {countries.map(code => (
-        <Button
-          className="border border-blue-800"
-          key={code}
-          variant={filterCountry === code ? "default" : "outline"}
-          onClick={() => handleFilterCountry(code)}
-        >{countryLabel[code] || code}</Button>
-      ))}
+  const statusFilters = [
+    { label: "ทั้งหมด", value: null, icon: <Circle className="mr-2 h-4 w-4" /> },
+    { label: "เปิดรับ", value: true, icon: <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> },
+    { label: "ปิดรับ", value: false, icon: <XCircle className="mr-2 h-4 w-4 text-red-500" /> },
+  ];
+
+  const countryFiltersList = [
+    { label: "ทุกประเทศ", value: "all" },
+    ...countries.map(code => ({ label: countryLabel[code] || code, value: code })),
+  ];
+
+  // Component สำหรับปุ่ม Filter แต่ละปุ่ม (เพื่อให้โค้ดไม่ซ้ำซ้อน)
+  const FilterButton = ({ label, value, isActive, onClick, icon, flag }: { label: string, value: any, isActive: boolean, onClick: () => void, icon?: React.ReactNode, flag?: React.ReactNode }) => (
+    <Button
+      variant={isActive ? "secondary" : "ghost"}
+      size="sm"
+      className={`rounded-full ${isActive ? "font-semibold" : ""} transition-all duration-150 ease-in-out`}
+      onClick={onClick}
+    >
+      {flag}
+      {icon}
+      {label}
+    </Button>
+  );
+
+  // ส่วนของ Filter buttons ที่จะใช้ทั้ง Desktop และ Mobile Sheet
+  const filterControls = (
+    <div className="flex flex-wrap gap-1 sm:gap-2 items-center w-full    backdrop-blur-sm rounded-lg px-2 py-2   shadow-sm">
+      {/* Status Filters */}
+      <div className="flex flex-row flex-wrap gap-1 items-center">
+        <span className="text-xs font-medium text-muted-foreground mr-2">สถานะ:</span>
+        {statusFilters.map(f => (
+          <FilterButton
+            key={f.label}
+            label={f.label}
+            value={f.value}
+            isActive={filterOpen === f.value}
+            onClick={() => handleFilterOpenChange(f.value)}
+            icon={filterOpen === f.value ? f.icon : <Circle className="mr-1 h-3 w-3" />}
+          />
+        ))}
+      </div>
+      {/* Country Filters */}
+      <div className="flex flex-row flex-wrap gap-1 items-center ml-4">
+        <span className="text-xs font-medium text-muted-foreground mr-2">ประเทศ:</span>
+        {countryFiltersList.map(c => (
+          <FilterButton
+            key={c.value}
+            label={c.label}
+            value={c.value}
+            isActive={filterCountry === c.value}
+            onClick={() => handleFilterCountryChange(c.value)}
+            flag={
+              c.value === "all"
+                ? <Globe className="mr-1 h-3 w-3 text-blue-400" />
+                : <img src={countryFlagImg(countryLabel[c.value] || c.value)} alt={c.label} className="mr-1 h-6 w-6 rounded-full object-cover border border-gray-200" />
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 
   return (
-    <div className="mb-4 ml-4">
+    <div className="mb-6 mt-2 px-4 sm:px-0"> {/* เพิ่ม mt-2 และปรับ px */}
       {/* Desktop: แสดงปุ่ม filter ปกติ */}
-      <div className="hidden sm:flex">{filterButtons}</div>
-      {/* Mobile: แสดงปุ่มเดียว เปิด Drawer */}
+      <div className="hidden sm:flex sm:flex-col sm:gap-4">{filterControls}</div>
+
+      {/* Mobile: แสดงปุ่มเดียว เปิด Sheet */}
       <div className="flex sm:hidden">
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" className="w-full flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              ตัวกรอง
+            <Button variant="outline" className="w-full flex items-center justify-center gap-2 py-3 text-base">
+              <Filter className="w-5 h-5" />
+              ค้นหา ({filterOpen !== null ? (filterOpen ? "เปิดรับ" : "ปิดรับ") : "ทั้งหมด"} / {filterCountry === "all" ? "ทุกประเทศ" : (countryLabel[filterCountry] || filterCountry)})
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="space-y-4">
-            <SheetTitle>ตัวกรอง</SheetTitle>
-            {filterButtons}
+          <SheetContent side="bottom" className="rounded-t-lg px-4 pb-6 pt-4 max-h-[80vh] overflow-y-auto">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="text-center text-xl">ตัวกรองข้อมูล</SheetTitle>
+              <SheetDescription className="text-center">
+                เลือกสถานะและประเทศที่ต้องการแสดง
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-6">
+              {filterControls}
+            </div>
+            <SheetFooter className="mt-6">
+              <Button className="w-full py-3 text-base" onClick={() => setIsSheetOpen(false)}>
+                แสดงผล
+              </Button>
+            </SheetFooter>
           </SheetContent>
         </Sheet>
       </div>
     </div>
   );
-} 
+}

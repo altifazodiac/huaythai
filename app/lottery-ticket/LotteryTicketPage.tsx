@@ -43,10 +43,12 @@ import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
 import SpectacularLoader from "@/components/ui/SpectacularLoader";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import debounce from "lodash.debounce";
+import { countryFlagImg } from "@/lib/utils/flags";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
   sub_type_name: string;
+  country_origin?: string;
 }
 interface LotterySubNumber {
   id: number;
@@ -190,7 +192,7 @@ export default function LotteryTicketPage() {
   const debouncedSetNumberInput = useRef(debounce((val: string) => setNumberInput(val), 200)).current;
 
   useEffect(() => {
-    supabase.from("lottery_sub_types").select("lottery_sub_type_id, sub_type_name").then(({ data }) => {
+    supabase.from("lottery_sub_types").select("lottery_sub_type_id, sub_type_name, country_origin").then(({ data }) => {
       if (data) setSubTypes(data);
     });
   }, [supabase]);
@@ -851,7 +853,7 @@ const { allTypeLabels, groups } = useMemo(() => {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">ยกเลิก</Button>
-          <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-green-600 hover:bg-green-700 text-white">
             {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
           </Button>
         </DialogFooter>
@@ -919,7 +921,7 @@ const { allTypeLabels, groups } = useMemo(() => {
               className="flex flex-row items-start bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 mb-2 gap-3 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
             >
               <div className="flex flex-col items-center justify-start min-w-[80px] max-w-[100px] text-center flex-shrink-0 pt-1">
-                <div className="text-sm font-bold text-blue-600 dark:text-blue-400 leading-tight">{group.digit_number} ตัว</div>
+                <div className="text-sm font-bold text-green-600 dark:text-green-400 leading-tight">{group.digit_number} ตัว</div>
                 <div className="text-xs text-slate-600 dark:text-slate-300 leading-tight break-words">
                   {group.typeLabels.join(' x ')}
                   {group._inferredPivotForSort ? ` (รูด19:${group._inferredPivotForSort})` : ''}
@@ -934,7 +936,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                   value={group.numbers.join('  ')}
                   readOnly
                   rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))}
-                  className="rounded-md p-1.5 w-full text-xs leading-snug resize-none bg-slate-50 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 focus-visible:ring-1 focus-visible:ring-blue-500 placeholder-slate-400 dark:placeholder-slate-500"
+                  className="rounded-md p-1.5 w-full text-xs leading-snug resize-none bg-slate-50 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 focus-visible:ring-1 focus-visible:ring-green-500 placeholder-slate-400 dark:placeholder-slate-500"
                   style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit', minHeight: '28px' }}
                 />
                 <button
@@ -983,28 +985,43 @@ const { allTypeLabels, groups } = useMemo(() => {
               className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-6 lg:px-8"
             >
               <Card className="mb-8 shadow-lg border-0 rounded-xl bg-white dark:bg-slate-800">
-                <CardHeader className="h-20 bg-blue-800 dark:bg-blue-700 rounded-t-xl shadow-lg flex flex-col items-start justify-center">
-                <div className="flex items-center space-x-3">
-                  <TicketIcon className="w-12 h-12 text-blue-100" /> 
-                  <span className="text-xl md:text-2xl font-bold text-white">สร้างรายการหวย</span></div>
-                  <span className="text-sm text-blue-100 dark:text-blue-200 font-medium">กรอกรายละเอียดเพื่อเพิ่มรายการซื้อหวยของคุณ</span>
+                <CardHeader className="h-20 bg-green-800 dark:bg-green-700 rounded-t-xl shadow-lg flex flex-col items-start justify-center">
+                  <div className="w-full">
+                    <div className="flex items-center space-x-3 w-full justify-between">
+                      <div className="flex items-center gap-3">
+                        <TicketIcon className="w-12 h-12 text-green-100" />
+                        <span className="text-lg md:text-xl font-bold text-white">สร้างรายการหวย</span>
+                      </div>
+                      {subTypeObj && (
+                        <div className="flex items-center gap-2 min-w-[120px] justify-end">
+                         
+                         <span className="font-semibold text-white dark:text-slate-200 text-sm md:text-md">{subTypeObj.sub_type_name}</span>
+                          {subTypeObj.country_origin && (
+                            <img src={countryFlagImg(subTypeObj.country_origin)} alt={subTypeObj.country_origin} className="h-10 w-10 rounded-full object-cover border border-gray-300" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-sm text-green-100 dark:text-green-200 font-medium block mt-1">กรอกรายละเอียดเพื่อเพิ่มรายการซื้อหวยของคุณ</span>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-4 md:p-6">  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"> 
+                <div className="flex gap-2 items-end mb-4">  
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                        <Hash className="w-4 h-4 text-blue-800" />
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1 text-gray-300">
+                        <Hash className="w-4 h-4 text-green-800" />
                         เลขบิล (Bill Number)
                       </label>
-                      <Input value={billNumber} readOnly className="bg-slate-100 dark:bg-slate-700 cursor-not-allowed border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500" />
+                      <Input value={billNumber} readOnly className="bg-white dark:bg-slate-900 text-sm cursor-not-allowed border-none focus:ring-green-500" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                        <Tag className="w-4 h-4 text-blue-800" />
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap- text-gray-300">
+                        <Tag className="w-4 h-4 text-green-800" />
                         ชื่อบิล (Bill Name)
                       </label>
-                      <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500" />
+                      <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" className="border-slate-300 dark:border-slate-600 rounded-lg focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500" />
                     </div>
+                   
                   </div>
                   <form className="space-y-6" onSubmit={(e) => e.preventDefault()}> 
                    <AnimatePresence mode="wait">
@@ -1016,7 +1033,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                       transition={{ duration: 0.35, ease: "easeOut" }}
                     >
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                        <FileText className="w-4 h-4 text-blue-800" />
+                        <FileText className="w-4 h-4 text-green-800" />
                         จำนวนหลัก
                       </label>
                         <div className="flex gap-2 mt-1 flex-wrap">
@@ -1033,8 +1050,8 @@ const { allTypeLabels, groups } = useMemo(() => {
                             }}
                               className={`rounded-full px-4 py-2 text-sm font-medium transition-colors
                                 ${selectedDigit === d 
-                                  ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600' 
-                                : 'bg-blue-50 border border-blue-100 text-blue-800 hover:bg-blue-250'
+                                  ? 'bg-green-600 text-white hover:bg-green-700 border-green-600' 
+                                : 'bg-green-50 border border-green-100 text-green-800 hover:bg-green-250'
                                 }`}
                             >
                               {d} ตัว
@@ -1054,7 +1071,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                          <ListChecks className="w-4 h-4 text-blue-800" />
+                          <ListChecks className="w-4 h-4 text-green-800" />
                           เลือกประเภท/รูปแบบ <span className="text-xs text-slate-500 dark:text-slate-400">(เลือกได้หลายแบบ)</span>
                         </label>
                         <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 && selectedDigit ? 'animate-shake border-2 border-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-md' : 'p-2'}`}>
@@ -1063,7 +1080,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                               key={type.id} 
                               className={`flex items-center gap-1.5 border rounded-md px-3 py-1.5 cursor-pointer shadow-sm transition-all
                                 ${selectedTypes.includes(type.id) 
-                                  ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 dark:border-blue-600 ring-1 ring-blue-500' 
+                                  ? 'bg-green-50 dark:bg-green-900/30 border-green-500 dark:border-green-600 ring-1 ring-green-500' 
                                   : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
                                 }`}
                             >
@@ -1072,7 +1089,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                                 checked={selectedTypes.includes(type.id)}
                                 onChange={() => handleTypeToggle(type.id)}
                                 disabled={(permuteThreeDigits && selectedDigit === 3 && (type.type_number === "เต็ง" || type.type_number === "โต๊ด"))}
-                                className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"
+                                className="h-4 w-4 text-green-600 border-slate-300 rounded focus:ring-green-500 dark:accent-green-500"
                               />
                               <span className="text-slate-800 dark:text-slate-200 text-sm">{type.type_number || "-"}</span>
                               <span className="text-xs text-slate-500 dark:text-slate-400">(จ่าย {type.price_paid})</span>
@@ -1095,11 +1112,11 @@ const { allTypeLabels, groups } = useMemo(() => {
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">รูปแบบเลข 2 ตัว</label>
                         <RadioGroup value={twoDigitOperation} onValueChange={(value) => setTwoDigitOperation(value as any)} className="flex flex-wrap gap-x-4 gap-y-2 mt-1 items-center">
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-none" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">ไม่มี</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-reverse" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-swipeFront" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหน้า</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-swipeBack" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหลัง</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" className="text-blue-600 border-slate-400 dark:border-slate-500 focus:ring-blue-500"/><label htmlFor="op-swipe19" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด19</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-none" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">ไม่มี</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-reverse" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-swipeFront" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหน้า</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-swipeBack" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหลัง</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-swipe19" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">19 ประตู</label></div>
                         </RadioGroup>
                       </motion.div>
                     )}
@@ -1115,7 +1132,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         className="flex items-center gap-2 mt-3"
                       >
-                        <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"/>
+                        <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="h-4 w-4 text-green-600 border-slate-300 rounded focus:ring-green-500 dark:accent-green-500"/>
                         <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข (รูด 6)</label>
                       </motion.div>
                     )}
@@ -1131,7 +1148,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         className="flex items-center gap-2 mt-3"
                       >
-                        <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="h-4 w-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 dark:accent-blue-500"/>
+                        <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="h-4 w-4 text-green-600 border-slate-300 rounded focus:ring-green-500 dark:accent-green-500"/>
                         <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด 9 (เพิ่ม 1-9 อัตโนมัติ)</label>
                       </motion.div>
                     )}
@@ -1148,13 +1165,13 @@ const { allTypeLabels, groups } = useMemo(() => {
                       >
                       <div className="flex justify-between items-center mb-1">
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                            <Hash className="w-4 h-4 text-blue-800" />
+                            <Hash className="w-4 h-4 text-green-800" />
                             หมายเลขหวย <span className="text-xs text-slate-500 dark:text-slate-400">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span>
                           </label>
                         {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
                          !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) && 
                          !swipeNineSingleDigit && (
-                              <Button type="button" size="sm" onClick={() => setIsNumberDrawerOpen(true)} className="rounded-full text-xs px-3 py-1 border-blue-500 bg-blue-50 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/30">เลือกจากชุดตัวเลข</Button>
+                              <Button type="button" size="sm" onClick={() => setIsNumberDrawerOpen(true)} className="rounded-full text-xs px-3 py-1 border-green-500 bg-green-50 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-900/30">เลือกจากชุดตัวเลข</Button>
                           )}
                       </div>
                       <Textarea
@@ -1168,7 +1185,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                         value={numberInput}
                         onChange={e => debouncedSetNumberInput(e.target.value)}
                         disabled={!selectedDigit || (swipeNineSingleDigit && selectedDigit === 1)}
-                        className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+                        className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
                       />
                       </motion.div>
                     )}
@@ -1184,7 +1201,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                          <DollarSign className="w-4 h-4 text-blue-800" />
+                          <DollarSign className="w-4 h-4 text-green-800" />
                           จำนวนเงิน (บาท)
                         </label>
                         {selectedTypes.length > 1 ? (
@@ -1195,57 +1212,52 @@ const { allTypeLabels, groups } = useMemo(() => {
         min={1}
         placeholder="ใส่ทั้งหมด"
         value={fillAllAmount}
-        onChange={e => setFillAllAmount(e.target.value)}
-        className="w-32 text-blue-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
-      />
-      <Button
-        type="button"
-        size="sm"
-        onClick={() => {
-          if (!fillAllAmount || isNaN(Number(fillAllAmount)) || Number(fillAllAmount) <= 0) {
-            toast.error("กรุณากรอกจำนวนเงินที่ถูกต้อง");
+        onChange={e => {
+          setFillAllAmount(e.target.value);
+          if (!e.target.value || isNaN(Number(e.target.value)) || Number(e.target.value) <= 0) {
+            // ไม่ setAmounts ถ้าค่าไม่ถูกต้อง
             return;
           }
           const newAmts: Record<number, string> = {};
           selectedTypes.forEach(typeId => {
-            newAmts[typeId] = fillAllAmount;
+            newAmts[typeId] = e.target.value;
           });
           setAmounts(newAmts);
         }}
-        className="px-4 py-1.5 text-sm rounded-md border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/30"
-      >
-        ใช้ยอดนี้
-      </Button>
+        className="w-32 text-green-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+      />
+      {/* ปุ่ม 'ใช้ยอดนี้' ถูกลบออก */}
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-2 gap-y-2">
       {selectedTypes.map(typeId => {
         const type = filteredTypes.find(t => t.id === typeId);
         return (
-          <div key={typeId}>
-            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
-              {type?.type_number || "-"}
-            </label>
-            <Input
-              type="number"
-              min={1}
-              value={amounts[typeId] || ""}
-              onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })}
-              placeholder="จำนวนเงิน"
-              disabled={!selectedDigit}
-              className="mt-0.5 border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
-            />
-            <div className="flex gap-1 mt-1.5 flex-wrap">
-              {[5, 10, 20, 50, 100].map(qAmt => (
-                <Button
-                  key={qAmt}
-                  type="button"
-                  size="sm"
-                  className="h-7 px-3 text-xs rounded-full bg-white border border-blue-800 text-blue-800 hover:bg-blue-50"
-                  onClick={() => setAmounts({ ...amounts, [typeId]: qAmt.toString() })} // Updated to setAmounts
-                >
-                  {qAmt}
-                </Button>
-              ))}
+          <div key={typeId} className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-slate-500 dark:text-slate-400 w-10 truncate">
+                {type?.type_number || "-"}
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={amounts[typeId] || ""}
+                onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })}
+                placeholder="฿"
+                className="h-8 w-20 px-2 text-xs border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500"
+              />
+              <div className="flex gap-1 ml-1">
+                {[5, 10, 20, 50, 100].map(qAmt => (
+                  <Button
+                    key={qAmt}
+                    type="button"
+                    size="sm"
+                    className="h-7 w-8 px-0 text-xs rounded bg-white border border-green-800 text-green-800 hover:bg-green-50"
+                    onClick={() => setAmounts({ ...amounts, [typeId]: qAmt.toString() })}
+                  >
+                    {qAmt}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         );
@@ -1262,7 +1274,7 @@ const { allTypeLabels, groups } = useMemo(() => {
       value={amount}
       onChange={e => setAmount(e.target.value)}
       disabled={!selectedDigit || selectedTypes.length === 0}
-      className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+      className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
     />
     <div className="flex gap-1 mt-1.5 flex-wrap">
       {[5, 10, 20, 50, 100].map(qAmt => (
@@ -1270,7 +1282,7 @@ const { allTypeLabels, groups } = useMemo(() => {
           key={qAmt}
           type="button"
           size="sm"
-          className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-blue-800 hover:bg-blue-50"
+          className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-green-800 hover:bg-green-50"
           onClick={() => setAmount(qAmt.toString())}
         >
           {qAmt}
@@ -1294,11 +1306,12 @@ const { allTypeLabels, groups } = useMemo(() => {
                         className="mb-4"
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                          <Calendar className="w-4 h-4 text-blue-800" />
+                          <Calendar className="w-4 h-4 text-green-800" />
                           วันที่ออกรางวัล
                         </label>
                         {selectedDraw ? (
                           <div className="py-2.5 px-3 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                           
                             {format(selectedDraw.date, 'd MMM yy', { locale: th })}
                             <span className="ml-2 text-xs">({selectedDraw.schedule.drawing_time})</span>
                             <span className="ml-2 text-xs text-red-600 dark:text-red-400">ปิดรับใน: {countdownText}</span>
@@ -1317,7 +1330,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                         type="button" 
                         onClick={handleAddTicket} 
                         disabled={!canAdd || loading} 
-                        className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
+                        className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                       >
                         เพิ่มรายการ
                       </Button>
@@ -1334,17 +1347,20 @@ const { allTypeLabels, groups } = useMemo(() => {
                   <CardContent className="p-4 md:p-6"> 
                     {ticketList.length === 0 ? (
                     <div className="text-center text-slate-500 dark:text-slate-400 py-8">
-                      <FileText className="inline w-6 h-6 mr-2 text-blue-400" />
+                      <FileText className="inline w-6 h-6 mr-2 text-green-400" />
                       ยังไม่มีรายการ
                     </div>  
                     ) : (
                       <>
                         <div className="mb-4 p-4 rounded-lg bg-slate-100/50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700">
                           <div className="flex flex-wrap justify-between items-center border-b border-dashed border-slate-300 dark:border-slate-600 pb-2 mb-2 gap-2">
-                            <span className="font-semibold text-md text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                            <span className="font-semibold text-md text-green-600 dark:text-green-400 flex items-center gap-1.5">
                             <TicketIcon className="w-5 h-5" />
                               หวย {subTypeObj?.sub_type_name || '-'}
                             </span>
+                            {subTypeObj?.country_origin && (
+                            <img src={countryFlagImg(subTypeObj.country_origin)} alt={subTypeObj.country_origin} className="h-10 w-10 rounded-full object-cover border border-gray-300" />
+                          )}
                           <span className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
                             <Hash className="w-4 h-4" />
                             บิล: {billNumber}
@@ -1374,7 +1390,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                       <div className="space-y-2.5">
                           <TicketListGroupComponent groupsMap={groups} handleRemoveGroupFn={handleRemoveGroup} />
                         </div>
-                      <div className="flex justify-end mt-6 text-xl font-bold text-blue-600 dark:text-blue-400 items-center gap-2">
+                      <div className="flex justify-end mt-6 text-xl font-bold text-green-600 dark:text-green-400 items-center gap-2">
                         <DollarSign className="w-6 h-6" />
                           ยอดรวมทั้งหมด: {(() => {
                             let total = 0;
@@ -1397,7 +1413,7 @@ const { allTypeLabels, groups } = useMemo(() => {
                   type="button" 
                   onClick={handleSubmit} 
                   disabled={loading || ticketList.length === 0 || isSubmitting} 
-                  className="px-10 py-3 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md min-w-[180px] flex items-center justify-center disabled:opacity-60"
+                  className="px-10 py-3 text-base font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-md min-w-[180px] flex items-center justify-center disabled:opacity-60"
                 >
                   {isSubmitting ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span>กำลังดำเนินการ...</span></>) : 
                    loading ? ("กำลังโหลด...") : ("ยืนยันการสั่งซื้อ")}
