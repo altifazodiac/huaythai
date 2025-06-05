@@ -739,66 +739,78 @@ export default function LotteryTicketPage() {
 // ... inside export default function LotteryTicketPage()
 
 const { allTypeLabels, groups } = useMemo(() => {
-  const calculatedAllTypeLabels: Record<number, string[]> = {}; //
-  payouts.forEach(p => { //
-    if (!p.type_number) return; //
-    if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = []; //
-    if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) { //
-      calculatedAllTypeLabels[p.digit_number].push(p.type_number); //
+  const calculatedAllTypeLabels: Record<number, string[]> = {};
+  payouts.forEach(p => {
+    if (!p.type_number) return;
+    if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
+    if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
+      calculatedAllTypeLabels[p.digit_number].push(p.type_number);
     }
   });
 
-  Object.keys(calculatedAllTypeLabels).forEach(digitStr => { //
-    const digit = Number(digitStr); //
-    const labels = calculatedAllTypeLabels[digit]; //
-    if (!labels) return; //
-    let ordered = [...labels]; //
-    if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) { //
-      ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")]; //
+  Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
+    const digit = Number(digitStr);
+    const labels = calculatedAllTypeLabels[digit];
+    if (!labels) return;
+    let ordered = [...labels];
+    if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) {
+      ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")];
     }
-    calculatedAllTypeLabels[digit] = Array.from(new Set(ordered)); //
+    calculatedAllTypeLabels[digit] = Array.from(new Set(ordered));
   });
 
-  const calculatedGroups: Map<string, Grouped> = new Map(); //
+  // --- ฟังก์ชัน serialize amounts ---
+  function serializeAmountsKey(typeLabels: string[], ticketList: TicketItem[], subTypeId: number, digit: number, numbers: string[]) {
+    // หา amounts ของแต่ละ typeLabel ที่ตรงกับเลขชุดนี้
+    return typeLabels
+      .map(label => {
+        // หา ticket ที่ตรงกับ subTypeId, digit, typeLabel, และเลขอย่างน้อย 1 ตัว
+        const found = ticketList.find(item =>
+          item.subType.lottery_sub_type_id === subTypeId &&
+          item.payout.digit_number === digit &&
+          (item.payout.type_number || "-") === label &&
+          item.numbers.some(n => numbers.includes(n))
+        );
+        return found ? found.amount : 0;
+      })
+      .join("x");
+  }
 
-  ticketList.forEach(item => { //
-    const digit = item.payout.digit_number; //
-    const subTypeId = item.subType.lottery_sub_type_id; //
-    const typeLabel = item.payout.type_number || "-"; //
-    const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [typeLabel]; //
-    const groupKey = `<span class="math-inline">\{subTypeId\}\|</span>{digit}|<span class="math-inline">\{canonicalTypeLabels\.sort\(\)\.join\(','\)\}\|</span>{item.amount}`; //
+  const calculatedGroups: Map<string, Grouped> = new Map();
 
-    if (!calculatedGroups.has(groupKey)) { //
-      const groupAmounts: Record<string, number> = {}; //
-      canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; }); //
-      calculatedGroups.set(groupKey, { //
-        digit_number: digit, //
-        numbers: [], // Initialized as empty //
-        typeLabels: canonicalTypeLabels, //
-        amounts: groupAmounts, //
-        typeOrder: canonicalTypeLabels, //
-        uniqueKey: item.uniqueKey, //
-        _inferredPivotForSort: inferSwipe19Pivot(item.numbers) || null, //
-        _processedItemUniqueKeysForNumbers: new Set<string>(), // ฮ New: Initialize the set
+  ticketList.forEach(item => {
+    const digit = item.payout.digit_number;
+    const subTypeId = item.subType.lottery_sub_type_id;
+    const typeLabel = item.payout.type_number || "-";
+    const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [typeLabel];
+    // --- ใช้ amountsKey จาก amounts ของแต่ละ type ---
+    const amountsKey = serializeAmountsKey(canonicalTypeLabels, ticketList, subTypeId, digit, item.numbers);
+    const groupKey = `${subTypeId}|${digit}|${canonicalTypeLabels.sort().join(',')}|${amountsKey}`;
+
+    if (!calculatedGroups.has(groupKey)) {
+      const groupAmounts: Record<string, number> = {};
+      canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; });
+      calculatedGroups.set(groupKey, {
+        digit_number: digit,
+        numbers: [],
+        typeLabels: canonicalTypeLabels,
+        amounts: groupAmounts,
+        typeOrder: canonicalTypeLabels,
+        uniqueKey: item.uniqueKey,
+        _inferredPivotForSort: inferSwipe19Pivot(item.numbers) || null,
+        _processedItemUniqueKeysForNumbers: new Set<string>(),
       });
     }
-    const group = calculatedGroups.get(groupKey)!; //
-    group.amounts[typeLabel] = item.amount;  //
-
-    // ฮ Changed logic for adding numbers to the group display:
-    // This ensures that for a given item.uniqueKey (representing one set of processed numbers from raw input),
-    // its numbers are added only once to this visual group.
-    // If another item with a *different* item.uniqueKey maps to the same visual group,
-    // its numbers will be added, preserving the behavior from the previous "remove all duplicates" request
-    // for distinct inputs.
+    const group = calculatedGroups.get(groupKey)!;
+    group.amounts[typeLabel] = item.amount;
     if (!group._processedItemUniqueKeysForNumbers.has(item.uniqueKey)) {
-      group.numbers.push(...item.numbers); // This was the "ฮ Changed" line from the previous request
+      group.numbers.push(...item.numbers);
       group._processedItemUniqueKeysForNumbers.add(item.uniqueKey);
     }
   });
 
-  return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups }; //
-}, [ticketList, payouts]); //
+  return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
+}, [ticketList, payouts]);
 
  
 
