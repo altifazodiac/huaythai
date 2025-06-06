@@ -92,6 +92,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       icon: ClipboardList,
     },
     {
+      title: "จัดการ API หวย",
+      href: "/admin/lottery-api-results",
+      icon: Ticket,
+    },
+    {
       title: "ฐานข้อมูล",
       href: "/admin/database",
       icon: Database,
