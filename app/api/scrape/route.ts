@@ -1,5 +1,6 @@
 // app/api/scrape/route.ts
 import { NextResponse } from 'next/server';
+// --- [แก้ไข] กลับมาใช้ playwright-core เหมือนเดิม ---
 import { chromium, BrowserContext } from 'playwright-core';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
@@ -135,6 +136,7 @@ export async function GET(request: Request) {
             headless: true,
         });
 
+        // --- [แก้ไข] เพิ่ม Manual Stealth Options ที่นี่ ---
         const context = await browser.newContext({
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
             viewport: { width: 1920, height: 1080 },
@@ -143,6 +145,7 @@ export async function GET(request: Request) {
                 'Accept-Language': 'en-US,en;q=0.9'
             }
         });
+        // ---------------------------------------------
 
         for (let i = 0; i < targetUrls.length; i += batchSize) {
             const batchUrls = targetUrls.slice(i, i + batchSize);

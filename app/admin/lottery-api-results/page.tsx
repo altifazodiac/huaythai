@@ -54,25 +54,28 @@ export default async function LotteryResultsPage() {
   const todayStr = now.toISOString().slice(0, 10); // yyyy-mm-dd
   const currentTime = now.toTimeString().slice(0, 5); // HH:mm
 
-  // สร้าง Map เฉพาะผลของวันนี้เท่านั้น (หรือ xxx, xx ถ้าไม่มีผลวันนี้)
+  // สร้าง Map เฉพาะผลของวันนี้เท่านั้น (ไม่แสดงผลวันก่อนหน้าในวันหยุด)
   const latestResultsMap = new Map<string, LotteryResult>();
   for (const result of recentResults || []) {
     if (!latestResultsMap.has(result.lottery_name)) {
       let displayResults: string[];
       if (result.draw_date !== todayStr) {
-        displayResults = ["3 ตัวบน", "2 ตัวบน", "2 ตัวล่าง"];
+        // ไม่ใช่ของวันนี้ (เช่น วันหยุด)
+        displayResults = ["xxx", "xx", "xx"];
       } else if (result.draw_time && result.draw_time > currentTime) {
-        displayResults = ["3 ตัวบน", "2 ตัวบน", "2 ตัวล่าง"];
+        // ยังไม่ถึงเวลาหวยออก
+        displayResults = ["xxx", "xx", "xx"];
       } else if (!result.results || result.results.length === 0) {
-        displayResults = ["3 ตัวบน", "2 ตัวบน", "2 ตัวล่าง"];
+        // ยังไม่มีผลหวย
+        displayResults = ["xxx", "xx", "xx"];
       } else {
+        // แสดงผลจริง
         displayResults = result.results;
       }
       latestResultsMap.set(result.lottery_name, { ...result, results: displayResults });
     }
   }
 
-  // ปรับการเรียงลำดับผลหวยในแต่ละหมวดหมู่ตาม draw_time จากน้อยไปมาก
   const groupedByCategory = Array.from(latestResultsMap.values()).reduce(
     (acc, result) => {
       const category = result.country;
@@ -80,12 +83,7 @@ export default async function LotteryResultsPage() {
         acc[category] = [];
       }
       acc[category].push(result);
-      // เรียงตาม draw_time จากน้อยไปมาก (เช่น 07:45, 11:15, ...)
-      acc[category].sort((a, b) => {
-        if (!a.draw_time) return 1;
-        if (!b.draw_time) return -1;
-        return a.draw_time.localeCompare(b.draw_time);
-      });
+      acc[category].sort((a, b) => a.lottery_name.localeCompare(b.lottery_name));
       return acc;
     },
     {} as Record<string, LotteryResult[]>
