@@ -1,127 +1,121 @@
 // app/admin/lottery-api-results/page.tsx
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr'; // <-- แก้ไข import เล็กน้อย
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { LotteryDisplay } from './lottery-display'; // <-- import Client Component ใหม่
 
-// กำหนด Type ของข้อมูลผลหวยให้ตรงกับตารางใน Supabase
-type LotteryResult = {
+export type LotteryResult = {
   id: number;
   created_at: string;
-  draw_date: string; // YYYY-MM-DD
+  draw_date: string;
+  draw_time?: string | null;
   country: string;
   lottery_name: string;
   results: string[];
   source_url: string | null;
 };
 
-// นี่คือ Server Component หลักของหน้าเพจ
-export default async function LotteryResultsPage() {
-  
-  const cookieStore = await cookies(); // <-- Add await here
+// ฟังก์ชันสำหรับจัดหมวดหมู่หวย
+const getCategoryName = (countryCode: string) => {
+  switch (countryCode) {
+    case 'TH': return 'หวยไทย';
+    case 'LA': return 'หวยลาว/แม่โขง';
+    case 'VN': return 'หวยเวียดนาม';
+    case 'STOCK': return 'หวยหุ้น';
+    case 'MY': return 'หวยมาเลย์';
+    default: return 'อื่นๆ';
+  }
+};
 
-  // สร้าง Supabase Client ตามรูปแบบที่ถูกต้อง 100%
+export const revalidate = 0;
+
+export default async function LotteryResultsPage() {
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        // TypeScript ต้องการให้เราส่งฟังก์ชันเข้าไป ไม่ใช่ object ตรงๆ
-        get(name: string) {
-          return cookieStore.get(name)?.value;
-        },
-      },
-    }
+    { cookies: { get: (name: string) => cookieStore.get(name)?.value } }
   );
 
-  const { data: results, error } = await supabase
+  const { data: recentResults, error } = await supabase
     .from('lottery_api_results')
-    .select('*')
+    .select<"*", LotteryResult>('*')
     .order('draw_date', { ascending: false })
-    .limit(100);
+    .order('draw_time', { ascending: false, nullsFirst: false })
+    .limit(300);
 
   if (error) {
-    console.error('Error fetching lottery results:', error);
+    console.error('Error fetching initial lottery results:', error);
+    return <p>เกิดข้อผิดพลาดในการดึงข้อมูล</p>;
   }
 
-  const groupedResults = (results || []).reduce((acc, result) => {
-    const date = result.draw_date;
-    if (!acc[date]) {
-      acc[date] = [];
+  // วันและเวลาปัจจุบัน (เวลาท้องถิ่นเซิร์ฟเวอร์)
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10); // yyyy-mm-dd
+  const currentTime = now.toTimeString().slice(0, 5); // HH:mm
+
+  // สร้าง Map เฉพาะผลของวันนี้เท่านั้น (หรือ xxx, xx ถ้าไม่มีผลวันนี้)
+  const latestResultsMap = new Map<string, LotteryResult>();
+  for (const result of recentResults || []) {
+    if (!latestResultsMap.has(result.lottery_name)) {
+      let displayResults: string[];
+      if (result.draw_date !== todayStr) {
+        displayResults = ["3 ตัวบน", "2 ตัวบน", "2 ตัวล่าง"];
+      } else if (result.draw_time && result.draw_time > currentTime) {
+        displayResults = ["3 ตัวบน", "2 ตัวบน", "2 ตัวล่าง"];
+      } else if (!result.results || result.results.length === 0) {
+        displayResults = ["3 ตัวบน", "2 ตัวบน", "2 ตัวล่าง"];
+      } else {
+        displayResults = result.results;
+      }
+      latestResultsMap.set(result.lottery_name, { ...result, results: displayResults });
     }
-    acc[date].push(result);
-    return acc;
-  }, {} as Record<string, LotteryResult[]>);
+  }
+
+  // ปรับการเรียงลำดับผลหวยในแต่ละหมวดหมู่ตาม draw_time จากน้อยไปมาก
+  const groupedByCategory = Array.from(latestResultsMap.values()).reduce(
+    (acc, result) => {
+      const category = result.country;
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(result);
+      // เรียงตาม draw_time จากน้อยไปมาก (เช่น 07:45, 11:15, ...)
+      acc[category].sort((a, b) => {
+        if (!a.draw_time) return 1;
+        if (!b.draw_time) return -1;
+        return a.draw_time.localeCompare(b.draw_time);
+      });
+      return acc;
+    },
+    {} as Record<string, LotteryResult[]>
+  );
   
+  const categoryOrder = ['TH', 'LA', 'VN', 'STOCK', 'MY', 'OTHER'];
+  const sortedCategories = Object.entries(groupedByCategory).sort(
+    ([a], [b]) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
+  );
+
+
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <main className="container mx-auto px-4 py-8">
+    <div className="bg-gray-100 dark:bg-gray-900 min-h-screen">
+      <main className="container mx-auto px-2 sm:px-4 py-8">
         <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-gray-800">ผลการออกรางวัล</h1>
-          <p className="text-lg text-gray-500 mt-2">
-            ข้อมูลล่าสุดจาก API
-          </p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">ผลการออกรางวัลล่าสุด</h1>
         </header>
 
-        {Object.keys(groupedResults).length === 0 ? (
-          <div className="text-center bg-white p-8 rounded-lg shadow-md">
-            <p className="text-xl text-gray-500">ยังไม่มีข้อมูลผลหวย</p>
+        {sortedCategories.length === 0 ? (
+          <div className="text-center bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+            <p className="text-xl text-gray-500 dark:text-gray-400">ยังไม่มีข้อมูลผลหวย</p>
           </div>
         ) : (
-          <div className="space-y-12">
-         
-            {(Object.entries(groupedResults) as [string, LotteryResult[]][]).map(([date, resultsForDate]) => (
-              <section key={date}>
-                <h2 className="text-2xl font-semibold text-gray-700 mb-4 pb-2 border-b-2 border-indigo-500">
-                  งวดวันที่{' '}
-                  {new Date(date).toLocaleDateString('th-TH', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    timeZone: 'UTC',
-                  })}
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {resultsForDate.map((result) => (
-                    <div
-                      key={result.id}
-                      className="bg-white rounded-lg shadow-lg overflow-hidden transition-transform transform hover:-translate-y-1"
-                    >
-                      <div className="p-5">
-                        <div className="flex justify-between items-start mb-3">
-                           <h3 className="text-xl font-bold text-indigo-700">
-                            {result.lottery_name}
-                          </h3>
-                           <span className="bg-indigo-100 text-indigo-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                             {result.country}
-                           </span>
-                        </div>
-                        
-                        <ul className="space-y-2 text-gray-600">
-                          {result.results.map((prize, index) => (
-                            <li key={index} className="flex items-center">
-                              <svg className="w-4 h-4 mr-2 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path></svg>
-                              <span>{prize}</span>
-                            </li>
-                          ))}
-                        </ul>
-
-                        {result.source_url && (
-                          <div className="mt-4 text-right">
-                             <a 
-                              href={result.source_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-sm text-gray-400 hover:text-indigo-500"
-                              >
-                               แหล่งที่มา
-                             </a>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
+          <div className="space-y-8">
+            {sortedCategories.map(([countryCode, results]) => (
+              <LotteryDisplay
+                key={countryCode}
+                categoryName={getCategoryName(countryCode)}
+                results={results}
+              />
             ))}
           </div>
         )}
