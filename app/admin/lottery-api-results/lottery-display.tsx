@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge"; // <-- [ใหม่] Import Badge
+import { Badge } from "@/components/ui/badge";
 import type { LotteryResult } from './page';
 import { Clock, CalendarDays, Loader2 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ function HistoryDrawer({ lottery }: { lottery: LotteryResult }) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchHistory = async () => {
-    if (isLoading || history.length > 0) return; // ไม่ต้อง fetch ซ้ำถ้ามีข้อมูลแล้ว
+    if (isLoading || history.length > 0) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -74,7 +74,6 @@ function HistoryDrawer({ lottery }: { lottery: LotteryResult }) {
                       {new Date(item.draw_date).toLocaleDateString('th-TH', { timeZone: 'UTC', day: '2-digit', month: 'short', year: 'numeric' })}
                       <div className="text-muted-foreground">{item.draw_time?.substring(0,5)}</div>
                     </TableCell>
-                    {/* --- [จุดที่แก้ไขหลัก] --- */}
                     <TableCell className="text-right">
                       <div className="flex flex-wrap gap-1 justify-end">
                         {item.results.map((prize, index) => (
@@ -84,7 +83,6 @@ function HistoryDrawer({ lottery }: { lottery: LotteryResult }) {
                         ))}
                       </div>
                     </TableCell>
-                    {/* ------------------------- */}
                   </TableRow>
                 ))}
               </TableBody>
@@ -108,6 +106,7 @@ export function LotteryDisplay({ categoryName, results }: LotteryDisplayProps) {
     return null;
   }
   
+  // Logic นี้จะทำงานถูกต้องเสมอ เพราะ `page.tsx` ได้จัดการวันที่ให้ตรงกันทั้งหมดแล้ว
   const latestDrawDate = new Date(results[0].draw_date);
 
   return (

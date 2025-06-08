@@ -2,7 +2,7 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { LotteryDisplay } from './lottery-display'; // <-- import Client Component ใหม่
+import { LotteryDisplay } from './lottery-display';
 
 export type LotteryResult = {
   id: number;
@@ -49,30 +49,48 @@ export default async function LotteryResultsPage() {
     return <p>เกิดข้อผิดพลาดในการดึงข้อมูล</p>;
   }
 
-  // วันและเวลาปัจจุบัน (เวลาท้องถิ่นเซิร์ฟเวอร์)
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10); // yyyy-mm-dd
-  const currentTime = now.toTimeString().slice(0, 5); // HH:mm
+  // --- [LOGIC ที่แก้ไขสมบูรณ์และยืดหยุ่นที่สุด] ---
 
-  // สร้าง Map เฉพาะผลของวันนี้เท่านั้น (ไม่แสดงผลวันก่อนหน้าในวันหยุด)
+  // จัดการกรณีไม่มีข้อมูลในฐานข้อมูลเลย
+  if (!recentResults || recentResults.length === 0) {
+    return (
+      <div className="bg-gray-100 dark:bg-gray-900 min-h-screen">
+        <main className="container mx-auto px-2 sm:px-4 py-8">
+            <header className="mb-8 text-center">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">ผลการออกรางวัลล่าสุด</h1>
+            </header>
+            <div className="text-center bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
+                <p className="text-xl text-gray-500 dark:text-gray-400">ยังไม่มีข้อมูลผลหวย</p>
+            </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 1. กำหนด "วันเป้าหมาย" จากผลหวยที่ใหม่ที่สุดในระบบ
+  const targetDateStr = recentResults[0].draw_date;
+
   const latestResultsMap = new Map<string, LotteryResult>();
-  for (const result of recentResults || []) {
+  const now = new Date();
+  const currentTime = now.toTimeString().slice(0, 5);
+
+  for (const result of recentResults) {
     if (!latestResultsMap.has(result.lottery_name)) {
-      let displayResults: string[];
-      if (result.draw_date !== todayStr) {
-        // ไม่ใช่ของวันนี้ (เช่น วันหยุด)
-        displayResults = ["xxx", "xx", "xx"];
-      } else if (result.draw_time && result.draw_time > currentTime) {
-        // ยังไม่ถึงเวลาหวยออก
-        displayResults = ["xxx", "xx", "xx"];
-      } else if (!result.results || result.results.length === 0) {
-        // ยังไม่มีผลหวย
-        displayResults = ["xxx", "xx", "xx"];
-      } else {
-        // แสดงผลจริง
-        displayResults = result.results;
+      let finalResult = { ...result };
+
+      // 2. เปรียบเทียบกับ "วันเป้าหมาย" (targetDateStr)
+      const needsPlaceholder =
+        result.draw_date !== targetDateStr ||
+        (result.draw_time && result.draw_time > currentTime) ||
+        !result.results || result.results.length === 0;
+
+      if (needsPlaceholder) {
+        finalResult.results = ["xxx", "xx", "xx"];
+        // 3. บังคับให้วันที่เป็น "วันเป้าหมาย" เพื่อความสม่ำเสมอ
+        finalResult.draw_date = targetDateStr;
       }
-      latestResultsMap.set(result.lottery_name, { ...result, results: displayResults });
+      
+      latestResultsMap.set(result.lottery_name, finalResult);
     }
   }
 
@@ -83,6 +101,7 @@ export default async function LotteryResultsPage() {
         acc[category] = [];
       }
       acc[category].push(result);
+      // เรียงตามชื่อหวยในแต่ละหมวดหมู่
       acc[category].sort((a, b) => a.lottery_name.localeCompare(b.lottery_name));
       return acc;
     },
@@ -102,21 +121,15 @@ export default async function LotteryResultsPage() {
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">ผลการออกรางวัลล่าสุด</h1>
         </header>
 
-        {sortedCategories.length === 0 ? (
-          <div className="text-center bg-white dark:bg-gray-800 p-8 rounded-lg shadow-md">
-            <p className="text-xl text-gray-500 dark:text-gray-400">ยังไม่มีข้อมูลผลหวย</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {sortedCategories.map(([countryCode, results]) => (
-              <LotteryDisplay
-                key={countryCode}
-                categoryName={getCategoryName(countryCode)}
-                results={results}
-              />
-            ))}
-          </div>
-        )}
+        <div className="space-y-8">
+          {sortedCategories.map(([countryCode, results]) => (
+            <LotteryDisplay
+              key={countryCode}
+              categoryName={getCategoryName(countryCode)}
+              results={results}
+            />
+          ))}
+        </div>
       </main>
     </div>
   );

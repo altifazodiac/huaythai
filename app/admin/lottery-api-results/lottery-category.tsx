@@ -15,7 +15,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Button } from '@/components/ui/button';
 import type { LotteryResult } from './page';
 import { Loader2 } from 'lucide-react';
 import {
@@ -64,7 +63,6 @@ export function LotteryCategory({ categoryName, countryCode, latestResults }: Lo
   const [error, setError] = useState<string | null>(null);
 
   const handleTriggerClick = () => {
-    // ดึงข้อมูลเฉพาะเมื่อยังไม่มีข้อมูลและไม่ได้กำลังโหลดอยู่
     if (!history && !isLoading) {
       fetchHistory();
     }
@@ -102,11 +100,6 @@ export function LotteryCategory({ categoryName, countryCode, latestResults }: Lo
       <CardFooter>
         <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="history">
-            {/* --- [จุดที่แก้ไข] --- */}
-            {/* 1. ลบ asChild และ <Button> ออก
-              2. ใส่ onClick และ style ที่ต้องการลงใน AccordionTrigger โดยตรง
-              3. ใช้ Fragment (<>) ครอบ Loader และ Text เพื่อให้เป็นลูกตัวเดียวในเงื่อนไข
-            */}
             <AccordionTrigger onClick={handleTriggerClick} className="w-full justify-center text-sm font-medium text-primary hover:no-underline hover:bg-accent rounded-md py-2">
               {isLoading ? (
                 <>
@@ -117,7 +110,6 @@ export function LotteryCategory({ categoryName, countryCode, latestResults }: Lo
                 'ดูผลย้อนหลัง'
               )}
             </AccordionTrigger>
-            {/* ------------------- */}
             <AccordionContent>
               {error && <p className="text-red-500 text-center">{error}</p>}
               {history && (
