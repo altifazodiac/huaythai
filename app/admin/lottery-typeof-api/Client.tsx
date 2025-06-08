@@ -1,9 +1,15 @@
 "use client";
 import { useState, useTransition } from "react";
-import { upsertAlias, deleteAlias } from "./actions";
+import { createClient } from '@supabase/supabase-js';
 import { Button } from "@/components/ui/button";
 import { Select, SelectItem, SelectTrigger, SelectContent } from "@/components/ui/select";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
+
+// สร้าง Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -38,40 +44,81 @@ export default function LotteryTypeofApiClient({ subTypes, apiNames, aliases: in
     setEditing(alias);
     setDrawerOpen(true);
   };
+
   const handleAdd = () => {
     setEditing({ lottery_sub_type_id: "", alias_name: "", id: undefined });
     setDrawerOpen(true);
   };
+
   const handleDrawerClose = () => {
     setDrawerOpen(false);
     setEditing(null);
   };
+
   const handleDelete = (id?: number) => {
     if (id === undefined) return;
     startTransition(async () => {
-      await deleteAlias(id);
+      const { error } = await supabase
+        .from('lottery_name_aliases')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("Supabase delete error:", error);
+        alert("เกิดข้อผิดพลาดในการลบรายการ: " + (error.message || "ไม่ทราบสาเหตุ"));
+        return;
+      }
       setAliases((prev: LotteryNameAlias[]) => prev.filter((a) => a.id !== id));
     });
   };
-  const handleSave = () => {
+
+  const handleSave = async () => {
     if (!editing) return;
-    const upsertPayload = {
-      id: editing.id,
-      sub_type_id: editing.lottery_sub_type_id,
-      api_name: editing.alias_name,
+
+    const payload = {
+      lottery_sub_type_id: Number(editing.lottery_sub_type_id),
+      alias_name: editing.alias_name,
     };
-    startTransition(async () => {
-      await upsertAlias(upsertPayload);
-      setEditing(null);
-      setDrawerOpen(false);
-      setAliases((prev: LotteryNameAlias[]) => {
-        if (editing.id) {
-          return prev.map((a) => (a.id === editing.id ? { ...a, ...editing } : a));
-        } else {
-          return [...prev, { ...editing, id: Math.random() } as LotteryNameAlias];
-        }
-      });
-    });
+
+    let saved: LotteryNameAlias | null = null;
+
+    if (editing.id) {
+      // UPDATE
+      const { data, error } = await supabase
+        .from('lottery_name_aliases')
+        .update(payload)
+        .eq('id', editing.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase update error:", error, "Payload:", payload);
+        alert("เกิดข้อผิดพลาดในการอัปเดตรายการ: " + (error.message || "ไม่ทราบสาเหตุ"));
+        return;
+      }
+      saved = data;
+      setAliases((prev) =>
+        prev.map((a) => (a.id === editing.id ? saved! : a))
+      );
+    } else {
+      // INSERT
+      const { data, error } = await supabase
+        .from('lottery_name_aliases')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase insert error:", error, "Payload:", payload);
+        alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + (error.message || "ไม่ทราบสาเหตุ"));
+        return;
+      }
+      saved = data;
+      setAliases((prev) => [...prev, saved!]);
+    }
+
+    setEditing(null);
+    setDrawerOpen(false);
   };
 
   return (
