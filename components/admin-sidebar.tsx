@@ -19,6 +19,7 @@ import {
   Sun,
   Moon,
   ChevronDown,
+  Globe,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -94,6 +95,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       title: "ประวัติการทำรายการ",
       href: "/admin/transactions",
       icon: ClipboardList,
+    },
+    {
+      title: "ประวัติการเข้าใช้งาน",
+      href: "/admin/login-history",
+      icon: Globe,
     },
     {
       title: "จัดการ API หวย",

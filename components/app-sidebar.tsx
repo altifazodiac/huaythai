@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import {
-  GalleryVerticalEnd, BookOpen, PieChart, Frame, Command, User2Icon, ShieldCheck, Sun, Moon
+  GalleryVerticalEnd, BookOpen, PieChart, Frame, Command, User2Icon, ShieldCheck, Sun, Moon, Calendar
 } from "lucide-react"
 import { LucideIcon } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
@@ -44,6 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     { title: "รายการหวยทั้งหมด", url: "/", icon: GalleryVerticalEnd },
     { title: "รายการซื้อ", url: "/ticketpurchases", icon: BookOpen },
     { title: "ตรวจผลหวย", url: "/lottery-ticketresults", icon: PieChart },
+    { title: "ผลหวยล่าสุด", url: "/lottery-results", icon: Calendar },
     { title: "สรุปรายการหวย", url: "/lottery-summary", icon: Frame },
     { title: "ธุรกรรมเครดิต", url: "/transactions", icon: Command },
   ]; //

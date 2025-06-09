@@ -1,13 +1,12 @@
 // app/login/page.tsx
 "use client";
 import { useState, useCallback, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/supabaseClient'; // ปรับ path ตามความเหมาะสม
+import { supabase } from '@/lib/supabase/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from "@/components/ui/button"; // ตรวจสอบว่า path ถูกต้อง
-import { Input } from '@/components/ui/input';  // ตรวจสอบว่า path ถูกต้อง
-import { Label } from '@/components/ui/label'; // ตรวจสอบว่า path ถูกต้อง
-import { User, Lock, Eye, EyeOff, Loader2, Droplet, Ticket } from 'lucide-react'; // ไอคอน User, Droplet สำหรับโลโก้ตัวอย่าง
+import { Button } from "@/components/ui/button";
+import { Input } from '@/components/ui/input';
+import { User, Lock, Eye, EyeOff, Loader2, Sparkles, Zap, Ticket } from 'lucide-react';
 import Particles from "react-tsparticles";
 import { loadFull } from "tsparticles";
 import type { Engine, ISourceOptions } from "tsparticles-engine";
@@ -21,261 +20,180 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  useEffect(() => { setIsMounted(true); }, []);
 
-  const particlesInit = useCallback(async (engine: Engine) => {
-    await loadFull(engine);
-  }, []);
+  const particlesInit = useCallback(async (engine: Engine) => { await loadFull(engine); }, []);
 
+  // Particle: เขียวเข้ม-เขียวอ่อน-เหลือง-ขาว
   const particlesOptions: ISourceOptions = {
-    fullScreen: { enable: true, zIndex: 0 },
-    background: {
-      // No background color here, using the main div's background
-    },
+    fullScreen: { enable: false },
+    background: { color: { value: "transparent" } },
     fpsLimit: 60,
-    interactivity: {
-      events: {
-        onHover: { enable: true, mode: "bubble" },
-        resize: true,
-      },
-      modes: {
-        bubble: { distance: 200, duration: 2, opacity: 0.1, size: 2 },
-      },
-    },
     particles: {
-      color: { value: "#a0aec0" },
-      links: { enable: false },
-      collisions: { enable: false },
-      move: {
-        direction: "none",
-        enable: true,
-        outModes: { default: "bounce" },
-        random: true,
-        speed: 0.5,
-        straight: false,
-      },
-      number: {
-        density: { enable: true, area: 1000 },
-        value: 30,
-      },
-      opacity: { value: 0.3 },
+      color: { value: ["#00ff99", "#00ffcc", "#39ff14", "#baffc9", "#fff", "#ffe066"] },
+      number: { value: 60, density: { enable: true, area: 800 } },
+      size: { value: { min: 2, max: 6 } },
+      move: { enable: true, speed: 1.2, direction: "none", outModes: { default: "bounce" } },
+      opacity: { value: 0.5, anim: { enable: true, speed: 1, opacity_min: 0.2, sync: false } },
       shape: { type: "circle" },
-      size: { value: { min: 1, max: 2 } },
+      links: { enable: true, color: "#39ff14", distance: 120, opacity: 0.2, width: 2 },
     },
     detectRetina: true,
   };
 
   const validateInputs = () => {
-    if (!email) {
-      setError('กรุณากรอกชื่อผู้ใช้หรืออีเมล');
-      return false;
-    }
-    if (password.length < 6) {
-      setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
-      return false;
-    }
-    setError(null);
-    return true;
+    if (!email) { setError('กรุณากรอกชื่อผู้ใช้หรืออีเมล'); return false; }
+    if (password.length < 6) { setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); return false; }
+    setError(null); return true;
   };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validateInputs()) return;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password,
-      });
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw signInError;
       if (data.user) {
+        // บันทึก login history
+        const ip = await fetch("https://api.ipify.org?format=json").then(res => res.json()).then(d => d.ip).catch(() => null);
+        await supabase.from("login_history").insert([{
+          user_id: data.user.id,
+          email: data.user.email,
+          ip_address: ip,
+          user_agent: typeof window !== "undefined" ? window.navigator.userAgent : null,
+        }]);
         await new Promise(resolve => setTimeout(resolve, 500));
-        router.push('/'); // Adjust path as needed
+        router.push('/');
       }
     } catch (err: any) {
-      if (err.message.includes('Invalid login credentials')) {
-        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      } else if (err.message.includes('Email not confirmed')) {
-        setError('กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ');
-      } else {
-        setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
-      }
-      console.error('Error:', err);
-    } finally {
-      setLoading(false);
-    }
+      if (err.message.includes('Invalid login credentials')) setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      else if (err.message.includes('Email not confirmed')) setError('กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ');
+      else setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+    } finally { setLoading(false); }
   };
 
+  // Animation variants
   const cardVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+    hidden: { opacity: 0, scale: 0.95, y: 40 },
+    visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.7, ease: "easeOut" } },
   };
-
   const itemVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 100 } },
-  };
-  const navItemVariants = {
-    hidden: { opacity: 0, y: -20 },
-    visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
+    hidden: { opacity: 0, x: -30 },
+    visible: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 120 } },
   };
 
-  if (!isMounted) {
-    return null; // Or a loading spinner
-  }
+  if (!isMounted) return null;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-sky-50 text-gray-800 p-4 relative overflow-hidden">
-      <Particles id="tsparticles" init={particlesInit} options={particlesOptions} />
-      {/* Top Navigation */}
-      <motion.nav
-        initial="hidden"
-        animate="visible"
-        variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
-        className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-6 md:px-12"
-      > {/* Added missing > here */}
-        <motion.div variants={navItemVariants} className="flex items-center space-x-2">
-          <Ticket className="h-8 w-8 text-blue-600" /> {/* โลโก้ตัวอย่าง */}
-          <span className="text-2xl font-bold text-gray-700">หวยเศรษฐี 789</span> {/* ชื่อเว็บ/แอป */}
-        </motion.div>
-        <motion.div variants={navItemVariants} className="flex items-center space-x-4 md:space-x-6">
-          <a href="#" className="text-sm text-gray-600 hover:text-blue-600">ติดต่อเรา</a>
-         
-          <Button variant="default" className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg">
-            สมัครสมาชิก
-          </Button>
-        </motion.div>
-      </motion.nav>
-      {/* Main Content Card */}
+    <div className="flex flex-col items-center justify-center min-h-screen w-full relative overflow-hidden">
+      {/* Animated neon gradient background */}
+      <div className="absolute inset-0 z-0 animate-gradient-move bg-gradient-to-br from-green-900 via-green-700 via-40% to-lime-400 opacity-95" />
+      {/* Animated glowing lines */}
+      <div className="absolute top-0 left-0 w-full h-2 z-10 bg-gradient-to-r from-lime-400 via-green-700 to-green-900 animate-glow-x" />
+      <div className="absolute bottom-0 right-0 w-full h-2 z-10 bg-gradient-to-l from-lime-400 via-green-700 to-green-900 animate-glow-x" />
+      {/* Particles */}
+      <Particles id="tsparticles" init={particlesInit} options={particlesOptions} className="absolute inset-0 w-full h-full z-0" />
+
+      {/* Main Card */}
       <motion.div
         variants={cardVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-10 mt-24 md:mt-32 w-full max-w-4xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[550px]"
-      > {/* Added missing > here */}
-        {/* Left Section - Wave */}
-        <div className="w-full md:w-1/2 p-2 md:p-0 relative overflow-hidden bg-gradient-to-br from-sky-100 via-indigo-100 to-purple-100 flex items-center justify-center">
-          <div className="absolute inset-0 opacity-50">
-            <div className="absolute -bottom-1/4 -left-1/4 w-full h-full bg-gradient-to-r from-blue-300 to-indigo-400 rounded-tr-[100%] opacity-70 transform rotate-[-15deg] scale-150"></div>
-            <div className="absolute -top-1/4 -right-1/4 w-full h-full bg-gradient-to-l from-purple-300 to-pink-300 rounded-bl-[100%] opacity-60 transform rotate-[-10deg] scale-150"></div>
-          </div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <motion.svg
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 1 }}
-              transition={{ duration: 2, ease: "easeInOut", delay: 0.5}}
-              viewBox="0 0 500 200"
-              className="w-full h-auto absolute opacity-30"
-              preserveAspectRatio="xMidYMid slice"
-              style={{ filter: "blur(1px)"}}
-            >
-                <path d="M0,100 C100,0 150,200 250,100 S400,0 500,100 L500,200 L0,200 Z" fill="url(#waveGradient1)"/>
-                <path d="M0,120 C80,50 180,180 250,120 S380,80 500,150 L500,200 L0,200 Z" fill="url(#waveGradient2)" style={{transform: "translateY(10px) translateX(20px)"}}/>
-                <defs>
-                    <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style={{stopColor: 'rgba(96, 165, 250, 0.4)', stopOpacity: 1}} />
-                    <stop offset="100%" style={{stopColor: 'rgba(167, 139, 250, 0.4)', stopOpacity: 1}} />
-                    </linearGradient>
-                    <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" style={{stopColor: 'rgba(125, 211, 252, 0.3)', stopOpacity: 1}} />
-                    <stop offset="100%" style={{stopColor: 'rgba(192, 132, 252, 0.3)', stopOpacity: 1}} />
-                    </linearGradient>
-                </defs>
-            </motion.svg>
-          </div>
-          <motion.div
-             initial={{ opacity: 0, scale: 0.5 }}
-             animate={{ opacity: 1, scale: 1 }}
-             transition={{ duration: 0.8, delay: 0.3, ease: [0, 0.71, 0.2, 1.01] }}
-             className="z-10 text-center p-8"
-           >
-             {/* สามารถใส่ content เพิ่มเติมฝั่งซ้ายได้ เช่น ข้อความต้อนรับ หรือ branding */}
-           </motion.div>
+        className="relative z-20 mt-20 md:mt-32 w-full max-w-4xl bg-white/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[540px] backdrop-blur-md border-4 border-lime-400/60"
+        style={{ boxShadow: "0 0 40px 10px #39ff14, 0 0 0 4px #166534" }}
+      >
+        {/* Image section */}
+        <div className="w-full md:w-1/2 h-48 md:h-auto relative flex items-center justify-center bg-gradient-to-br from-green-800 via-green-600 to-lime-300">
+          <img
+            src="https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//BgLogin.png"
+            alt="Login Background"
+            className="w-full h-full object-cover object-center opacity-80"
+            style={{ mixBlendMode: "screen", filter: "drop-shadow(0 0 40px #39ff14)" }}
+          />
+          {/* Overlay for better contrast */}
+          <div className="absolute inset-0 bg-gradient-to-t from-green-900/70 to-transparent" />
+          {/* Neon sparkles */}
+          <Sparkles className="absolute top-6 left-6 text-lime-300 animate-pulse" size={36} />
+          <Zap className="absolute bottom-6 right-6 text-lime-400 animate-blink" size={32} />
         </div>
-
-        {/* Right Section - Login Form */}
-        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white">
+        {/* Form section */}
+        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white/90">
           <motion.div
             initial="hidden"
             animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } } }}
             className="w-full"
           >
-            <motion.h1 variants={itemVariants} className="text-3xl font-bold text-gray-800">
-              เข้าสู่ระบบ
+            <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-green-900 drop-shadow-neon">
+              <span className="text-lime-400 animate-glow-text">เข้าสู่ระบบ</span>
             </motion.h1>
-            <motion.p variants={itemVariants} className="mt-1 text-sm text-gray-500 mb-8">
-              กรุณากรอกข้อมูลเพื่อเข้าสู่ระบบ
+            <motion.p variants={itemVariants} className="mt-2 text-lg text-green-700 mb-8 font-semibold animate-glow-text2">
+              ยินดีต้อนรับสู่ <span className="text-lime-400 font-bold">หวยเศรษฐี 789</span>
             </motion.p>
-
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-7">
               <motion.div variants={itemVariants}>
                 <div className="relative mt-1">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                    <User className="h-5 w-5 text-gray-400" />
+                    <User className="h-6 w-6 text-lime-400 animate-glow-text2" />
                   </span>
                   <Input
                     id="username"
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-3 pl-10 pr-3 border border-gray-300 placeholder-gray-400 text-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    placeholder="อีเมล" // ตามรูป
+                    className="w-full p-3 pl-12 pr-3 border-2 border-lime-400 placeholder-green-400 text-green-900 rounded-lg focus:ring-2 focus:ring-lime-400 focus:border-lime-500 transition-all bg-white/80 shadow-lg"
+                    placeholder="อีเมล"
                     required
                   />
                 </div>
               </motion.div>
-
               <motion.div variants={itemVariants}>
                 <div className="relative mt-1">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Lock className="h-5 w-5 text-gray-400" />
+                    <Lock className="h-6 w-6 text-lime-400 animate-glow-text2" />
                   </span>
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full p-3 pl-10 pr-10 border border-gray-300 placeholder-gray-400 text-gray-700 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                    placeholder="รหัสผ่าน" // ตามรูป, อาจหมายถึง Password
+                    className="w-full p-3 pl-12 pr-12 border-2 border-lime-400 placeholder-green-400 text-green-900 rounded-lg focus:ring-2 focus:ring-lime-400 focus:border-lime-500 transition-all bg-white/80 shadow-lg"
+                    placeholder="รหัสผ่าน"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-lime-400 hover:text-green-700 animate-blink"
                     aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                   >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    {showPassword ? <EyeOff className="h-6 w-6" /> : <Eye className="h-6 w-6" />}
                   </button>
                 </div>
               </motion.div>
-
               <AnimatePresence>
                 {error && (
                   <motion.p
                     initial={{ opacity: 0, y: -10, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto', marginTop: '0.5rem', marginBottom: '0.5rem' }}
                     exit={{ opacity: 0, y: -10, height: 0, marginTop: 0, marginBottom: 0 }}
-                    className="text-red-600 text-sm bg-red-100 p-3 rounded-md text-center border border-red-300"
+                    className="text-red-600 text-base bg-red-100 p-3 rounded-md text-center border-2 border-red-300 shadow-lg animate-pulse"
                   >
                     {error}
                   </motion.p>
                 )}
               </AnimatePresence>
-
               <motion.div variants={itemVariants}>
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-150 ease-in-out flex items-center justify-center"
+                  className="w-full py-3 font-bold text-white text-xl bg-gradient-to-r from-green-700 via-lime-400 to-green-900 hover:from-lime-400 hover:to-green-700 rounded-lg shadow-xl focus:outline-none focus:ring-4 focus:ring-lime-400 transition-all duration-150 ease-in-out flex items-center justify-center animate-glow-btn"
+                  style={{ boxShadow: "0 0 24px 6px #39ff14, 0 0 0 4px #166534" }}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                       กำลังดำเนินการ...
                     </>
                   ) : (
@@ -287,6 +205,54 @@ const LoginPage = () => {
           </motion.div>
         </div>
       </motion.div>
+      {/* Neon logo floating */}
+      <motion.div
+        initial={{ opacity: 0, y: -40, scale: 0.8 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ delay: 0.2, duration: 0.8, type: "spring" }}
+        className="fixed top-6 left-1/2 -translate-x-1/2 z-30 flex items-center space-x-3"
+      >
+        <Ticket className="h-12 w-12 text-lime-400 drop-shadow-neon animate-glow-text2" />
+        <span className="text-3xl font-extrabold text-white drop-shadow-neon animate-glow-text">หวยเศรษฐี 789</span>
+      </motion.div>
+      {/* Custom CSS for animation */}
+      <style>{`
+        @keyframes gradient-move {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .animate-gradient-move {
+          background-size: 200% 200%;
+          animation: gradient-move 7s ease-in-out infinite;
+        }
+        @keyframes glow-x {
+          0%, 100% { filter: drop-shadow(0 0 16px #39ff14); opacity: 0.7; }
+          50% { filter: drop-shadow(0 0 32px #fff700); opacity: 1; }
+        }
+        .animate-glow-x { animation: glow-x 2s infinite alternate; }
+        @keyframes glow-text {
+          0%, 100% { text-shadow: 0 0 16px #39ff14, 0 0 32px #fff700; }
+          50% { text-shadow: 0 0 32px #fff, 0 0 64px #39ff14; }
+        }
+        .animate-glow-text { animation: glow-text 2s infinite alternate; }
+        @keyframes glow-text2 {
+          0%, 100% { filter: drop-shadow(0 0 8px #39ff14); }
+          50% { filter: drop-shadow(0 0 24px #fff700); }
+        }
+        .animate-glow-text2 { animation: glow-text2 1.5s infinite alternate; }
+        .drop-shadow-neon { filter: drop-shadow(0 0 12px #39ff14) drop-shadow(0 0 24px #fff700); }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        .animate-blink { animation: blink 1.2s infinite; }
+        @keyframes glow-btn {
+          0%, 100% { box-shadow: 0 0 24px 6px #39ff14, 0 0 0 4px #166534; }
+          50% { box-shadow: 0 0 48px 12px #fff700, 0 0 0 8px #39ff14; }
+        }
+        .animate-glow-btn { animation: glow-btn 1.5s infinite alternate; }
+      `}</style>
     </div>
   );
 };
