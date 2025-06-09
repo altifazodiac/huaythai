@@ -1,0 +1,39 @@
+name: Scrape and Import Lottery Data
+
+on:
+  schedule:
+    - cron: '0 3,9,15 * * *' # ตัวอย่าง: รัน 3, 9, 15 UTC ทุกวัน
+  workflow_dispatch:
+
+jobs:
+  scrape-and-import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci && npm install ts-node
+
+      # (ถ้าใช้ Playwright ให้ติดตั้ง browser ด้วย)
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        continue-on-error: true
+
+      - name: Run Import Lottery Results Script
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          CHROME_EXECUTABLE_PATH: ${{ secrets.CHROME_EXECUTABLE_PATH }}
+        run: npx ts-node import-lottery-results.ts
+
+      # (ถ้าต้องการ trigger Vercel API หลัง scrape/import)
+      - name: Trigger Vercel Import Endpoint
+        run: |
+          curl -X POST https://www.xn--789-2llyfg0ajkp0jrf.com/api/import-lottery-results 

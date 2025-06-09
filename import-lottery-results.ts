@@ -99,36 +99,31 @@ async function automateBatchImportLotteryResults(drawDate: string) {
       
       if (!winningNumber) continue;
 
-      // ====================== ส่วนที่แก้ไข: การสร้างข้อมูล ======================
       if (result.startsWith('3 ตัวบน') && winningNumber.length === 3) {
-        // 1. "3 ตัวบน"
-        upsertRows.push(createRow('3 ตัวบน', winningNumber));
-        // 2. "2 ตัวบน"
-        upsertRows.push(createRow('2 ตัวบน', winningNumber.slice(-2)));
-        // 3. "3 ตัวโต๊ด" (รวมเป็นแถวเดียว)
-        const permutations = getPermutations(winningNumber);
-        upsertRows.push(createRow('3 ตัวโต๊ด', permutations.join(',')));
-        // 4. "วิ่งบน" (รวมเป็นแถวเดียว)
-        const uniqueTopDigits = getUniqueDigits(winningNumber);
-        upsertRows.push(createRow('วิ่งบน', uniqueTopDigits.join(',')));
+        upsertRows.push(
+          createRow('3 ตัวบน', winningNumber),
+          createRow('2 ตัวบน', winningNumber.slice(-2)),
+          createRow('3 ตัวโต๊ด', getPermutations(winningNumber).join(',')),
+          createRow('วิ่งบน', getUniqueDigits(winningNumber).join(','))
+        );
       }
       else if (result.startsWith('2 ตัวล่าง') && winningNumber.length === 2) {
-        // 1. "2 ตัวล่าง"
-        upsertRows.push(createRow('2 ตัวล่าง', winningNumber));
-        // 2. "วิ่งล่าง" (รวมเป็นแถวเดียว)
-        const uniqueBottomDigits = getUniqueDigits(winningNumber);
-        upsertRows.push(createRow('วิ่งล่าง', uniqueBottomDigits.join(',')));
+        upsertRows.push(
+          createRow('2 ตัวล่าง', winningNumber),
+          createRow('วิ่งล่าง', getUniqueDigits(winningNumber).join(','))
+        );
       }
-      // =======================================================================
     }
   }
+
+  // Log ภาพรวม
+  console.log(`[INFO] จำนวน rows ที่จะ upsert ทั้งหมด:`, upsertRows.length);
 
   if (upsertRows.length === 0) {
     console.log('No rows to upsert.');
     return;
   }
 
-  // Batch upsert
   const { error: upsertError } = await supabase
     .from('lottery_results')
     .upsert(upsertRows, { onConflict: 'schedule_id, draw_date, draw_time, prize_code' });

@@ -136,6 +136,11 @@ export async function GET(request: Request) {
         'Accept-Language': 'en-US,en;q=0.9'
       }
     });
+    // ลบข้อมูลทั้งหมดในตาราง lottery_api_results ก่อน insert ใหม่
+    const { error: deleteError } = await supabase.from('lottery_api_results').delete().neq('id', 0);
+    if (deleteError) {
+      throw new Error(`Supabase delete error: ${deleteError.message}`);
+    }
     for (let i = 0; i < targetUrls.length; i += batchSize) {
       const batchUrls = targetUrls.slice(i, i + batchSize);
       console.log(`--- Processing Batch ${Math.floor(i / batchSize) + 1} (${batchUrls.length} URLs) ---`);
