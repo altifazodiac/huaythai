@@ -324,20 +324,7 @@ export default function LotteryTicketPage() {
                 if (!part1.includes(num)) part2.push(num);
               }
   
-              const uniqueNums = Array.from(new Set([...part1, ...part2])); // This Set is for swipe19 definition.
-  
-              //ฮ Removed filtering logic based on globalUsedDoubles
-              // const filtered = uniqueNums.filter(num => {
-              //   const isDouble = num.length === 2 && num[0] === num[1];
-              //   return !isDouble || !globalUsedDoubles.has(num);
-              // });
-  
-              // filtered.forEach(num => {
-              //   if (num.length === 2 && num[0] === num[1]) {
-              //     globalUsedDoubles.add(num);
-              //   }
-              // });
-  
+              const uniqueNums = Array.from(new Set([...part1, ...part2]));  
               singleRawNumProcessedNumbers.push(...uniqueNums); //ฮ Changed from filtered to uniqueNums
             }
             break;
@@ -733,87 +720,92 @@ export default function LotteryTicketPage() {
   
     toast.success("ลบกลุ่มสำเร็จ!");
   }
-
- // ... inside export default function LotteryTicketPage()
-
-// ... inside export default function LotteryTicketPage()
-
-const { allTypeLabels, groups } = useMemo(() => {
-  const calculatedAllTypeLabels: Record<number, string[]> = {};
-  payouts.forEach(p => {
-    if (!p.type_number) return;
-    if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
-    if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
-      calculatedAllTypeLabels[p.digit_number].push(p.type_number);
-    }
-  });
-
-  Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
-    const digit = Number(digitStr);
-    const labels = calculatedAllTypeLabels[digit];
-    if (!labels) return;
-    let ordered = [...labels];
-    if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) {
-      ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")];
-    }
-    calculatedAllTypeLabels[digit] = Array.from(new Set(ordered));
-  });
-
-  // --- ฟังก์ชัน serialize amounts ---
-  function serializeAmountsKey(typeLabels: string[], ticketList: TicketItem[], subTypeId: number, digit: number, numbers: string[]) {
-    // หา amounts ของแต่ละ typeLabel ที่ตรงกับเลขชุดนี้
-    return typeLabels
-      .map(label => {
-        // หา ticket ที่ตรงกับ subTypeId, digit, typeLabel, และเลขอย่างน้อย 1 ตัว
-        const found = ticketList.find(item =>
-          item.subType.lottery_sub_type_id === subTypeId &&
-          item.payout.digit_number === digit &&
-          (item.payout.type_number || "-") === label &&
-          item.numbers.some(n => numbers.includes(n))
-        );
-        return found ? found.amount : 0;
-      })
-      .join("x");
-  }
-
-  const calculatedGroups: Map<string, Grouped> = new Map();
-
-  ticketList.forEach(item => {
-    const digit = item.payout.digit_number;
-    const subTypeId = item.subType.lottery_sub_type_id;
-    const typeLabel = item.payout.type_number || "-";
-    const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [typeLabel];
-    // --- ใช้ amountsKey จาก amounts ของแต่ละ type ---
-    const amountsKey = serializeAmountsKey(canonicalTypeLabels, ticketList, subTypeId, digit, item.numbers);
-    const groupKey = `${subTypeId}|${digit}|${canonicalTypeLabels.sort().join(',')}|${amountsKey}`;
-
-    if (!calculatedGroups.has(groupKey)) {
-      const groupAmounts: Record<string, number> = {};
-      canonicalTypeLabels.forEach(label => { groupAmounts[label] = 0; });
-      calculatedGroups.set(groupKey, {
-        digit_number: digit,
-        numbers: [],
-        typeLabels: canonicalTypeLabels,
-        amounts: groupAmounts,
-        typeOrder: canonicalTypeLabels,
-        uniqueKey: item.uniqueKey,
-        _inferredPivotForSort: inferSwipe19Pivot(item.numbers) || null,
-        _processedItemUniqueKeysForNumbers: new Set<string>(),
-      });
-    }
-    const group = calculatedGroups.get(groupKey)!;
-    group.amounts[typeLabel] = item.amount;
-    if (!group._processedItemUniqueKeysForNumbers.has(item.uniqueKey)) {
-      group.numbers.push(...item.numbers);
-      group._processedItemUniqueKeysForNumbers.add(item.uniqueKey);
-    }
-  });
-
-  return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
-}, [ticketList, payouts]);
-
- 
-
+  const { allTypeLabels, groups } = useMemo((): { allTypeLabels: Record<number, string[]>; groups: Map<string, Grouped> } => {
+    // ส่วนคำนวณ allTypeLabels คงไว้เหมือนเดิมทุกประการ
+    const calculatedAllTypeLabels: Record<number, string[]> = {};
+    payouts.forEach(p => {
+        if (!p.type_number) return;
+        if (!calculatedAllTypeLabels[p.digit_number]) calculatedAllTypeLabels[p.digit_number] = [];
+        if (!calculatedAllTypeLabels[p.digit_number].includes(p.type_number)) {
+            calculatedAllTypeLabels[p.digit_number].push(p.type_number);
+        }
+    });
+    Object.keys(calculatedAllTypeLabels).forEach(digitStr => {
+        const digit = Number(digitStr);
+        const labels = calculatedAllTypeLabels[digit];
+        if (!labels) return;
+        let ordered = [...labels];
+        if (digit === 2 && labels.includes("บน") && labels.includes("ล่าง")) {
+            ordered = ["บน", "ล่าง", ...labels.filter(l => l !== "บน" && l !== "ล่าง")];
+        }
+        calculatedAllTypeLabels[digit] = Array.from(new Set(ordered));
+    });
+  
+    const calculatedGroups: Map<string, Grouped> = new Map();
+  
+    // Step 1: จัดกลุ่ม ticket items ตามการกด "เพิ่มรายการ" แต่ละครั้ง (ด้วย uniqueKey)
+    const itemsByAddOperation = new Map<string, TicketItem[]>();
+    ticketList.forEach(item => {
+        if (!itemsByAddOperation.has(item.uniqueKey)) {
+            itemsByAddOperation.set(item.uniqueKey, []);
+        }
+        itemsByAddOperation.get(item.uniqueKey)!.push(item);
+    });
+  
+    // Step 2: วนลูปตามกลุ่มการเพิ่ม เพื่อสร้าง Visual Card ที่ถูกต้อง
+    itemsByAddOperation.forEach((itemsInOneGo, operationKey) => {
+        if (itemsInOneGo.length === 0) return;
+  
+        const representativeItem = itemsInOneGo[0];
+        const digit = representativeItem.payout.digit_number;
+        const subTypeId = representativeItem.subType.lottery_sub_type_id;
+        
+        // ✅ แก้ไขจุดนี้: ใช้ตัวแปร 'calculatedAllTypeLabels' ที่สร้างไว้แล้วใน scope นี้
+        const canonicalTypeLabels = calculatedAllTypeLabels[digit] || [];
+  
+        // Step 3: สร้าง Key จาก "ราคา" ของรายการที่เพิ่มเข้ามาในครั้งนั้นๆ
+        const amountsForThisGroup: Record<string, number> = {};
+        const typeLabelsForThisGroup: string[] = [];
+  
+        itemsInOneGo.forEach(item => {
+            if (item.payout.type_number) {
+                amountsForThisGroup[item.payout.type_number] = item.amount;
+                if (!typeLabelsForThisGroup.includes(item.payout.type_number)) {
+                    typeLabelsForThisGroup.push(item.payout.type_number);
+                }
+            }
+        });
+        
+        const amountsKey = canonicalTypeLabels.map(label => amountsForThisGroup[label] || 0).join("x");
+        
+        // **Group Key ที่ถูกต้องจะขึ้นอยู่กับราคาเท่านั้น**
+        const groupKey = `${subTypeId}|${digit}|${amountsKey}`;
+  
+        // Step 4: หา Card ที่มีอยู่แล้ว หรือสร้างใหม่ถ้าไม่มี
+        if (!calculatedGroups.has(groupKey)) {
+            calculatedGroups.set(groupKey, {
+                digit_number: digit,
+                numbers: [],
+                typeLabels: [],
+                amounts: amountsForThisGroup,
+                typeOrder: canonicalTypeLabels,
+                uniqueKey: groupKey, // ใช้ key ที่เสถียรเป็น key ของ group
+                _inferredPivotForSort: null,
+                _processedItemUniqueKeysForNumbers: new Set<string>(),
+            });
+        }
+  
+        // Step 5: เพิ่มตัวเลขและอัปเดตข้อมูลลงใน Card ที่ถูกต้อง
+        const group = calculatedGroups.get(groupKey)!;
+        
+        group.numbers.push(...representativeItem.numbers);
+        
+        const updatedTypeLabels = new Set([...group.typeLabels, ...typeLabelsForThisGroup]);
+        group.typeLabels = Array.from(updatedTypeLabels);
+    });
+  
+    return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
+  }, [ticketList, payouts]);
 
   const ConfirmationDialog = () => (
     <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
@@ -916,7 +908,7 @@ const { allTypeLabels, groups } = useMemo(() => {
   const TicketListGroupComponent = React.memo(({ groupsMap, handleRemoveGroupFn }: { groupsMap: Map<any, Grouped>, handleRemoveGroupFn: (group: Grouped) => void }) => {
     return (
       <AnimatePresence>
-        {Array.from(groupsMap.values()).map((group, idx) => {
+       {Array.from(groupsMap.values()).map((group: Grouped, idx: number) => {
           const allLabelsInGroup: string[] = group.typeLabels || [];
           const groupTotal = allLabelsInGroup.reduce((sum: number, label: string) => {
             const amountForLabel = group.amounts[label] ?? 0;
