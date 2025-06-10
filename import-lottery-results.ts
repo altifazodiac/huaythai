@@ -259,7 +259,7 @@ async function main() {
 
         const baseUrl = 'https://www.raakaadee.com/ตรวจหวย-หุ้น/';
         const lotteryNames = Object.keys(LOTTERY_METADATA);
-        const targetUrls = lotteryNames.map(name => `${baseUrl}${encodeURIComponent(name)}/`);
+        const targetUrls = lotteryNames.map(name => `${baseUrl}${(name)}/`);
         const batchSize = 10;
         const allDataToInsert: LotteryResult[] = [];
 
