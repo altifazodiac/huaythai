@@ -114,13 +114,15 @@ function parseTable(table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, url: str
     source_url: url,
   };
 }
+console.log('--- [SCRAPE] API route loaded ---');
+
 export async function GET(request: Request) {
+  console.log('--- [SCRAPE] Handler started ---');
   const baseUrl = 'https://www.raakaadee.com/ตรวจหวย-หุ้น/';
   const lotteryNames = Object.keys(LOTTERY_METADATA);
-  const targetUrls = lotteryNames.map(name => `${baseUrl}${encodeURIComponent(name)}/`);
+  const targetUrls = lotteryNames.map(name => `${baseUrl}${(name)}/`);
   const batchSize = 10;
   const allDataToInsert: LotteryResult[] = [];
-  console.log(`Starting to scrape ${targetUrls.length} pages in batches of ${batchSize}...`);
   let browser: any = null;
   try {
     browser = await chromium.launch({
@@ -137,13 +139,16 @@ export async function GET(request: Request) {
       }
     });
     // ลบข้อมูลทั้งหมดในตาราง lottery_api_results ก่อน insert ใหม่
+    console.log('[SCRAPE] Deleting all old data from lottery_api_results...');
     const { error: deleteError } = await supabase.from('lottery_api_results').delete().neq('id', 0);
     if (deleteError) {
-      throw new Error(`Supabase delete error: ${deleteError.message}`);
+      console.error('[SCRAPE] Supabase delete error:', deleteError);
+    } else {
+      console.log('[SCRAPE] All old data deleted from lottery_api_results');
     }
     for (let i = 0; i < targetUrls.length; i += batchSize) {
       const batchUrls = targetUrls.slice(i, i + batchSize);
-      console.log(`--- Processing Batch ${Math.floor(i / batchSize) + 1} (${batchUrls.length} URLs) ---`);
+      console.log(`[SCRAPE] --- Processing Batch ${Math.floor(i / batchSize) + 1} (${batchUrls.length} URLs) ---`);
       const scrapingPromises = batchUrls.map(url => scrapePage(url, context));
       const results = await Promise.allSettled(scrapingPromises);
       results.forEach((result) => {
@@ -152,38 +157,38 @@ export async function GET(request: Request) {
         }
       });
       const randomDelay = Math.floor(Math.random() * 3000) + 2000;
-      console.log(`--- Delaying for ${randomDelay / 1000} seconds before next batch... ---`);
+      console.log(`[SCRAPE] --- Delaying for ${randomDelay / 1000} seconds before next batch... ---`);
       await new Promise(resolve => setTimeout(resolve, randomDelay));
     }
-    console.log(`Discovered ${allDataToInsert.length} total valid results from all batches.`);
+    console.log('[SCRAPE] Scraping finished, found', allDataToInsert.length, 'items');
     if (allDataToInsert.length > 0) {
-      console.log(`Attempting to insert ${allDataToInsert.length} lottery results...`);
-     const chunkSize = 100;
+      console.log('[SCRAPE] Attempting to insert', allDataToInsert.length, 'items to lottery_api_results...');
+      const chunkSize = 100;
       for (let i = 0; i < allDataToInsert.length; i += chunkSize) {
         const chunk = allDataToInsert.slice(i, i + chunkSize);
         const { error } = await supabase.from('lottery_api_results').insert(chunk);
         if (error) {
           if (error.code === '23505') {
-            console.log(`Chunk ${i/chunkSize + 1}: Some results were duplicates and were skipped.`);
+            console.log(`[SCRAPE] Chunk ${i/chunkSize + 1}: Some results were duplicates and were skipped.`);
           } else {
-            throw new Error(`Supabase insert error in chunk ${i/chunkSize + 1}: ${error.message}`);
+            console.error(`[SCRAPE] Supabase insert error in chunk ${i/chunkSize + 1}:`, error);
           }
         } else {
-          console.log(`Chunk ${i/chunkSize + 1} with ${chunk.length} items inserted successfully.`);
+          console.log(`[SCRAPE] Chunk ${i/chunkSize + 1} with ${chunk.length} items inserted successfully.`);
         }
       }
     } else {
-      console.log('No new data to insert from any page.');
+      console.warn('[SCRAPE] No data to insert');
     }
     return NextResponse.json({
       message: `Scraping process completed for ${targetUrls.length} URLs.`,
       insertedCount: allDataToInsert.length
     });
   } catch (error) {
-    console.error('Critical error in main GET handler:', error);
+    console.error('[SCRAPE] Critical error in main GET handler:', error);
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   } finally {
     if (browser) await browser.close();
-    console.log('Browser closed. Process finished.');
+    console.log('[SCRAPE] Browser closed. Process finished.');
   }
 }
