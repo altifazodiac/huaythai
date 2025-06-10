@@ -1,3 +1,6 @@
+console.log('--- Script file loaded ---');
+console.log('ENV:', !!process.env.NEXT_PUBLIC_SUPABASE_URL, !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
 
@@ -7,6 +10,7 @@ const supabase = createClient(
 );
 
 async function main() {
+  console.log('--- Script started ---');
   // 1. ดึงเวลาปัจจุบัน (UTC)
   const now = new Date();
   const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
@@ -56,6 +60,6 @@ function isToday(date: Date) {
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error('Script error:', err);
   process.exit(1);
 }); 
