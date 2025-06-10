@@ -22,7 +22,7 @@ jobs:
 
       # (ถ้าใช้ Playwright ให้ติดตั้ง browser ด้วย)
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: bunx playwright install --with-deps
         continue-on-error: true
 
       - name: Run Auto Scrape by Schedule
