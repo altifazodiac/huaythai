@@ -77,13 +77,25 @@ export default async function LotteryResultsPage() {
   for (const result of recentResults) {
     if (!latestResultsMap.has(result.lottery_name)) {
       let finalResult = { ...result };
-
-      // 2. เปรียบเทียบกับ "วันเป้าหมาย" (targetDateStr)
-      const needsPlaceholder =
-        result.draw_date !== targetDateStr ||
-        (result.draw_time && result.draw_time > currentTime) ||
-        !result.results || result.results.length === 0;
-
+    
+      // --- [LOGIC ที่แก้ไขแล้ว] ---
+      let needsPlaceholder = false;
+    
+      // เงื่อนไข 1: วันที่ไม่ตรงกัน หรือ ไม่มีผลรางวัล
+      if (result.draw_date !== targetDateStr || !result.results || result.results.length === 0) {
+        needsPlaceholder = true;
+      } 
+      // เงื่อนไข 2: ถ้ามีเวลาออกรางวัล ให้เปรียบเทียบแบบวัน-เวลาที่ถูกต้อง
+      else if (result.draw_time) {
+        // สร้าง Date object ที่สมบูรณ์ของเวลาออกรางวัล
+        const drawDateTime = new Date(`${result.draw_date}T${result.draw_time}:00`);
+        // เปรียบเทียบกับเวลาปัจจุบันจริงๆ
+        if (now < drawDateTime) {
+          needsPlaceholder = true;
+        }
+      }
+      // --- [จบส่วนที่แก้ไข] ---
+    
       if (needsPlaceholder) {
         finalResult.results = ["xxx", "xx", "xx"];
         // 3. บังคับให้วันที่เป็น "วันเป้าหมาย" เพื่อความสม่ำเสมอ
