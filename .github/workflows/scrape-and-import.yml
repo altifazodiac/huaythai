@@ -12,26 +12,24 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
+      - name: Install Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
 
       - name: Install dependencies
-        run: npm ci && npm install ts-node
+        run: bun install
 
       # (ถ้าใช้ Playwright ให้ติดตั้ง browser ด้วย)
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
         continue-on-error: true
 
-      - name: Run Import Lottery Results Script
+      - name: Run Auto Scrape by Schedule
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          CHROME_EXECUTABLE_PATH: ${{ secrets.CHROME_EXECUTABLE_PATH }}
-        run: npx ts-node import-lottery-results.ts
+        run: bun run scripts/auto-scrape-by-schedule.ts
 
       # (ถ้าต้องการ trigger Vercel API หลัง scrape/import)
       - name: Trigger Vercel Import Endpoint
