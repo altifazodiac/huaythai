@@ -301,18 +301,37 @@ async function main() {
             });
         }
 
-        console.log(`\nDiscovered ${allDataToInsert.length} total valid results from scraping.`);
+        console.log(`\nDiscovered ${allDataToInsert.length} total raw results from scraping.`);
 
-        if (allDataToInsert.length > 0) {
-            console.log(`Attempting to insert ${allDataToInsert.length} lottery results into 'lottery_api_results'...`);
-            const { error } = await supabase.from('lottery_api_results').insert(allDataToInsert);
-            if (error) {
-                throw new Error(`Supabase insert error: ${error.message}`);
-            }
-            console.log('Data inserted into `lottery_api_results` successfully.');
-        } else {
-            console.log('No new data to insert from scraping.');
+if (allDataToInsert.length > 0) {
+    // --- ส่วนที่เพิ่มเข้ามาเพื่อกรองข้อมูลซ้ำซ้อน ---
+    const uniqueResultsMap = new Map<string, LotteryResult>();
+    for (const result of allDataToInsert) {
+        // สร้าง key ที่ไม่ซ้ำกันโดยอิงจาก ชื่อ, วันที่, และเวลา
+        const key = `<span class="math-inline">\{result\.lottery\_name\}\-</span>{result.draw_date}-${result.draw_time || ''}`;
+        if (!uniqueResultsMap.has(key)) {
+            uniqueResultsMap.set(key, result);
         }
+    }
+    const uniqueDataToInsert = Array.from(uniqueResultsMap.values());
+    console.log(`Filtered down to ${uniqueDataToInsert.length} unique results.`);
+    // --- จบส่วนที่เพิ่มเข้ามา ---
+
+    if (uniqueDataToInsert.length > 0) {
+        console.log(`Attempting to insert ${uniqueDataToInsert.length} unique lottery results into 'lottery_api_results'...`);
+        // ใช้ข้อมูลที่ไม่ซ้ำแล้วในการ insert
+        const { error } = await supabase.from('lottery_api_results').insert(uniqueDataToInsert);
+        if (error) {
+            throw new Error(`Supabase insert error: ${error.message}`);
+        }
+        console.log('Data inserted into `lottery_api_results` successfully.');
+    } else {
+        console.log('No new unique data to insert.');
+    }
+
+} else {
+    console.log('No new data to insert from scraping.');
+}
 
         await browser.close();
         browser = null; // ตั้งค่าเป็น null เพื่อป้องกันการ close ซ้ำ
