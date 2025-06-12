@@ -230,7 +230,7 @@ async function processAndImportResults(drawDate: string) {
 
 export async function scrapeAndStoreLottery(lotteryName: string): Promise<void> {
   const baseUrl = 'https://www.raakaadee.com/ตรวจหวย-หุ้น/';
-  const targetUrl = `${baseUrl}${encodeURIComponent(lotteryName)}/`;
+  const targetUrl = `${baseUrl}${(lotteryName)}/`;
 
   console.log(`\n🚀 [Task Start] Scraping for: ${lotteryName}`);
 
