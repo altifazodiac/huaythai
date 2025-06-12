@@ -1,14 +1,15 @@
-import { chromium, Browser, BrowserContext } from 'playwright';
+// file: scraper.ts
+
+import { chromium, Browser, BrowserContext } from 'playwright-core';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
-import { LOTTERY_METADATA } from '@/lib/utils/lotteryMetadata'; // !! ตรวจสอบว่า path นี้ถูกต้องในโปรเจกต์ของคุณ
+import { LOTTERY_METADATA } from '@/lib/utils/lotteryMetadata'; // ตรวจสอบว่า path นี้ถูกต้องในโปรเจกต์ของคุณ
 
 // =================================================================================
 // 1. CONFIGURATION & SETUP
 // =================================================================================
 
 // ใช้ Service Role Key เพราะสคริปต์นี้ทำงานในสภาพแวดล้อมที่ปลอดภัย (GitHub Actions)
-// และต้องการสิทธิ์ในการเขียน/ลบข้อมูลทั้งหมด
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -25,7 +26,7 @@ type LotteryResult = {
 
 
 // =================================================================================
-// 2. UTILITY & PARSING FUNCTIONS (จาก route.ts และ import-lottery-results.ts เดิม)
+// 2. UTILITY & PARSING FUNCTIONS (จาก import-lottery-results.ts)
 // =================================================================================
 
 /**
@@ -49,22 +50,13 @@ function convertDate(dateStr: string): string {
  * ดึงข้อมูลรางวัลจากตารางผลหวย
  */
 function parseTable(table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, url: string): LotteryResult | null {
-  const headerSelectors = ['h2 a', 'h2', 'h1 a', 'h1', 'h3 a', 'h3'];
-  let header: cheerio.Cheerio<any> | null = null;
-  for (const selector of headerSelectors) {
-    const foundHeader = table.find(selector);
-    if (foundHeader.length > 0) {
-      header = foundHeader;
-      break;
-    }
-  }
-  if (!header) { return null; }
-  const name = header.find('span[style*="color:blue"]').first().text().trim();
-  const dateText = header.find('span[style*="color:blue"]').eq(1).text().trim();
-  const timeText = header.find('span[style*="color:blue"]').eq(2).text().trim();
+  const name = table.find('span[style*="color:blue"]').first().text().trim();
+  const dateText = table.find('span[style*="color:blue"]').eq(1).text().trim();
+  const timeText = table.find('span[style*="color:blue"]').eq(2).text().trim();
   if (!name || !dateText) { return null; }
   const meta = LOTTERY_METADATA[name as keyof typeof LOTTERY_METADATA];
   if (!meta) { return null; }
+  
   const getPrize = (label: string): string => {
     const labelSpan = table.find('span').filter((_, el) => $(el).text().trim() === label);
     if (labelSpan.length > 0) {
@@ -72,14 +64,17 @@ function parseTable(table: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, url: str
     }
     return '';
   };
+  
   const availablePrizes: string[] = [];
   const prize3top = getPrize('3 ตัวบน');
   if (prize3top) availablePrizes.push(`3 ตัวบน: ${prize3top}`);
-  const prize2top = getPrize('2 ตัวบน');
-  if (prize2top) availablePrizes.push(`2 ตัวบน: ${prize2top}`);
   const prize2bottom = getPrize('2 ตัวล่าง');
   if (prize2bottom) availablePrizes.push(`2 ตัวล่าง: ${prize2bottom}`);
+  
+  // ในเวอร์ชั่นใหม่นี้ เราไม่จำเป็นต้องดึง '2 ตัวบน' จากหน้าเว็บ
+  // เพราะเราจะสร้างมันขึ้นมาเองจาก '3 ตัวบน' ในขั้นตอนการประมวลผล
   if (availablePrizes.length === 0) { return null; }
+  
   return {
     draw_date: convertDate(dateText),
     draw_time: timeText ? timeText.replace(/\s*น\./, '').trim() : undefined,
@@ -138,16 +133,9 @@ async function scrapePage(url: string, context: BrowserContext): Promise<Lottery
       const parsedData = parseTable($(tableEl), $, url);
       if (parsedData) { allPageData.push(parsedData); }
     }
-    if (allPageData.length > 0) {
-     console.log(`[Success] Scraped ${allPageData.length} result(s) from ${lotteryNameFromUrl}`);
-    }
     return allPageData;
   } catch (error) {
-    if (error instanceof Error && error.name === 'TimeoutError') {
-     console.warn(`[Timeout] Timed out processing page for ${lotteryNameFromUrl}. Skipping.`);
-    } else {
-     console.error(`[Error] Failed to process page for ${lotteryNameFromUrl}:`, error as Error);
-    }
+    console.error(`[Error] Failed to process page for ${lotteryNameFromUrl}:`, error as Error);
     return [];
   } finally {
     if (page) await page.close();
@@ -157,8 +145,8 @@ async function scrapePage(url: string, context: BrowserContext): Promise<Lottery
 /**
  * ประมวลผลและนำเข้าข้อมูลจากตาราง `lottery_api_results` ไปยัง `lottery_results`
  */
-async function automateBatchImportLotteryResults(drawDate: string) {
-    console.log(`\n--- Starting data import for date: ${drawDate} ---`);
+async function processAndImportResults(drawDate: string) {
+    console.log(`\n--- [Processor] Starting data import for date: ${drawDate} ---`);
 
     const { data: apiResults, error: apiError } = await supabase
         .from('lottery_api_results')
@@ -167,7 +155,7 @@ async function automateBatchImportLotteryResults(drawDate: string) {
 
     if (apiError) throw apiError;
     if (!apiResults || apiResults.length === 0) {
-        console.log(`No API results found to import for ${drawDate}.`);
+        console.log(`[Processor] No API results found to import for ${drawDate}.`);
         return;
     }
 
@@ -201,17 +189,14 @@ async function automateBatchImportLotteryResults(drawDate: string) {
         });
 
         for (const result of apiResult.results) {
-            if (typeof result !== 'string' || !result.includes(':')) continue;
-            
             const valuePart = result.split(':')[1];
-            const winningNumberMatch = valuePart.match(/\d+/);
-            const winningNumber = winningNumberMatch ? winningNumberMatch[0] : '';
+            const winningNumber = valuePart.match(/\d+/)?.[0] || '';
             if (!winningNumber) continue;
 
             if (result.startsWith('3 ตัวบน') && winningNumber.length === 3) {
                 upsertRows.push(
                     createRow('3 ตัวบน', winningNumber),
-                    createRow('2 ตัวบน', winningNumber.slice(-2)),
+                    createRow('2 ตัวบน', winningNumber.slice(-2)), // สร้าง 2 ตัวบนจาก 3 ตัวบน
                     createRow('3 ตัวโต๊ด', getPermutations(winningNumber).join(',')),
                     createRow('วิ่งบน', getUniqueDigits(winningNumber).join(','))
                 );
@@ -224,126 +209,68 @@ async function automateBatchImportLotteryResults(drawDate: string) {
         }
     }
 
-    console.log(`[Import] Found ${upsertRows.length} rows to upsert into lottery_results.`);
-
     if (upsertRows.length > 0) {
+        console.log(`[Processor] Found ${upsertRows.length} rows to upsert into 'lottery_results'.`);
         const { error: upsertError } = await supabase
             .from('lottery_results')
             .upsert(upsertRows, { onConflict: 'schedule_id, draw_date, draw_time, prize_code' });
 
         if (upsertError) {
-            console.error('Batch upsert error:', upsertError.message);
+            console.error('[Processor] Batch upsert error:', upsertError.message);
         } else {
-            console.log(`[Import] Batch upserted ${upsertRows.length} rows successfully.`);
+            console.log(`[Processor] Batch upserted ${upsertRows.length} rows successfully.`);
         }
     }
 }
 
 
 // =================================================================================
-// 4. MAIN ORCHESTRATOR
+// 4. MAIN ORCHESTRATOR FUNCTION (ที่จะถูกเรียกจาก Dispatcher)
 // =================================================================================
 
-async function main() {
-    let browser: Browser | null = null;
-    try {
-        console.log('🚀 Starting the scrape and import process...');
+export async function scrapeAndStoreLottery(lotteryName: string): Promise<void> {
+  const baseUrl = 'https://www.raakaadee.com/ตรวจหวย-หุ้น/';
+  const targetUrl = `${baseUrl}${encodeURIComponent(lotteryName)}/`;
 
-        // --- PART 1: SCRAPING (Logic from route.ts) ---
-        console.log('\n--- Launching Browser for Scraping ---');
-        // ใช้ chromium.launch() ปกติสำหรับ GitHub Actions
-        browser = await chromium.launch({ headless: true });
-        const context = await browser.newContext({
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-        });
+  console.log(`\n🚀 [Task Start] Scraping for: ${lotteryName}`);
 
-        const baseUrl = 'https://www.raakaadee.com/ตรวจหวย-หุ้น/';
-        const lotteryNames = Object.keys(LOTTERY_METADATA);
-        const targetUrls = lotteryNames.map(name => `${baseUrl}${(name)}/`);
-        const batchSize = 10;
-        const allDataToInsert: LotteryResult[] = [];
+  let browser: Browser | null = null;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+    });
 
-        console.log(`Starting to scrape ${targetUrls.length} pages in batches of ${batchSize}...`);
+    // --- PART 1: SCRAPING ---
+    const scrapedResults = await scrapePage(targetUrl, context);
+
+    if (scrapedResults && scrapedResults.length > 0) {
+      console.log(`[Scraper] Found ${scrapedResults.length} result(s). Upserting to 'lottery_api_results'...`);
+      
+      const { error: upsertApiError } = await supabase
+        .from('lottery_api_results')
+        .upsert(scrapedResults, { onConflict: 'draw_date,lottery_name,draw_time' }); // เพิ่ม draw_time เพื่อความแม่นยำ
+
+      if (upsertApiError) {
+        console.error(`[Scraper] DB Error on upserting raw data:`, upsertApiError.message);
+      } else {
+        console.log(`[Scraper] Successfully upserted raw data for ${lotteryName}.`);
         
-        // ล้างข้อมูลทั้งหมดในตาราง `lottery_api_results` ก่อน insert ใหม่
-        const { error: deleteError } = await supabase.from('lottery_api_results').delete().neq('id', 0);
-        if (deleteError) {
-            throw new Error(`Supabase delete error: ${deleteError.message}`);
-        }
-        console.log('Successfully cleared `lottery_api_results` table.');
+        // --- PART 2: PROCESSING ---
+        const drawDate = scrapedResults[0].draw_date;
+        await processAndImportResults(drawDate);
+      }
 
-        for (let i = 0; i < targetUrls.length; i += batchSize) {
-            const batchUrls = targetUrls.slice(i, i + batchSize);
-            console.log(`--- Processing Batch ${Math.floor(i / batchSize) + 1} (${batchUrls.length} URLs) ---`);
-            const scrapingPromises = batchUrls.map(url => scrapePage(url, context));
-            const results = await Promise.allSettled(scrapingPromises);
-            
-            results.forEach((result) => {
-                if (result.status === 'fulfilled' && result.value.length > 0) {
-                    allDataToInsert.push(...result.value);
-                }
-            });
-            const randomDelay = Math.floor(Math.random() * 3000) + 2000;
-            console.log(`--- Delaying for ${randomDelay / 1000} seconds before next batch... ---`);
-            await new Promise(resolve => setTimeout(resolve, randomDelay));
-        }
-
-        console.log(`\nDiscovered ${allDataToInsert.length} total valid results from all batches.`);
-
-        // --- Data Insertion (Logic from route.ts) ---
-        if (allDataToInsert.length > 0) {
-            // กรองข้อมูลซ้ำก่อน Insert
-            const uniqueResultsMap = new Map<string, LotteryResult>();
-            for (const result of allDataToInsert) {
-                const key = `${result.lottery_name}-${result.draw_date}-${result.draw_time || ''}`;
-                if (!uniqueResultsMap.has(key)) {
-                    uniqueResultsMap.set(key, result);
-                }
-            }
-            const uniqueDataToInsert = Array.from(uniqueResultsMap.values());
-            console.log(`Filtered down to ${uniqueDataToInsert.length} unique results.`);
-
-            console.log(`Attempting to insert ${uniqueDataToInsert.length} lottery results...`);
-            const chunkSize = 100; // แบ่งเป็นส่วนเล็กๆ เพื่อ Insert
-            for (let i = 0; i < uniqueDataToInsert.length; i += chunkSize) {
-                const chunk = uniqueDataToInsert.slice(i, i + chunkSize);
-                const { error } = await supabase.from('lottery_api_results').insert(chunk);
-                if (error) {
-                    // การจัดการ Error แบบใหม่: ถ้าซ้ำก็แค่ Log ไว้ ไม่ต้องหยุดทำงาน
-                    if (error.code === '23505') { 
-                        console.log(`Chunk ${Math.floor(i / chunkSize) + 1}: Some results were duplicates and were skipped by the database.`);
-                    } else {
-                        // ถ้าเป็น Error อื่นๆ ให้หยุดทำงาน
-                        throw new Error(`Supabase insert error in chunk ${Math.floor(i / chunkSize) + 1}: ${error.message}`);
-                    }
-                } else {
-                    console.log(`Chunk ${Math.floor(i / chunkSize) + 1} with ${chunk.length} items inserted successfully.`);
-                }
-            }
-        } else {
-            console.log('No new data to insert from any page.');
-        }
-
-        await browser.close();
-        browser = null; // ตั้งค่าเป็น null เพื่อป้องกันการ close ซ้ำ
-        console.log('--- Browser closed, scraping part finished. ---');
-
-        // --- PART 2: IMPORTING ---
-        const today = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
-        const drawDate = today.toISOString().slice(0, 10);
-        await automateBatchImportLotteryResults(drawDate);
-
-        console.log('\n✅ Process completed successfully!');
-
-    } catch (error) {
-        console.error('\n❌ A critical error occurred during the main process:', error);
-        process.exit(1); // ออกจาก process พร้อม error code เพื่อให้ GitHub Actions รู้ว่าล้มเหลว
-    } finally {
-        if (browser) {
-            await browser.close();
-        }
+    } else {
+      console.log(`[Scraper] No new results found on the page for ${lotteryName}.`);
     }
-}
 
-// --- RUN THE SCRIPT ---
-main();
+  } catch (error) {
+    console.error(`[Critical Error] A critical error occurred during task for ${lotteryName}:`, error);
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+    console.log(`✅ [Task End] Finished processing for: ${lotteryName}`);
+  }
+}

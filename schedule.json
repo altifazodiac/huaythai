@@ -1,0 +1,402 @@
+[
+    {
+      "lottery_name": "หวยฮานอยพิเศษ",
+      "draw_time": "17:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเยอรมัน",
+      "draw_time": "23:00:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยดึก",
+      "draw_time": "22:30:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขง HD",
+      "draw_time": "13:35:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีนบ่าย",
+      "draw_time": "14:00:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเกาหลี VIP",
+      "draw_time": "12:35:00"
+    },
+    {
+      "lottery_name": "หวยประชาชนลาว",
+      "draw_time": "07:45:00"
+    },
+    {
+      "lottery_name": "หวยฮานอย HD",
+      "draw_time": "11:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นไทยเย็น",
+      "draw_time": "16:40:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิเช้า VIP",
+      "draw_time": "09:05:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็งบ่าย VIP",
+      "draw_time": "15:25:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิพิเศษ บ่าย",
+      "draw_time": "13:25:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีน VISA บ่าย",
+      "draw_time": "14:15:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงสตาร์",
+      "draw_time": "15:35:00"
+    },
+    {
+      "lottery_name": "หวยลาวเช้า",
+      "draw_time": "08:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีนเช้า VIP",
+      "draw_time": "10:05:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีน VISA เช้า",
+      "draw_time": "10:15:00"
+    },
+    {
+      "lottery_name": "หวยลาวสบายดี",
+      "draw_time": "12:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิพิเศษ เช้า",
+      "draw_time": "09:05:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นไต้หวันพิเศษ",
+      "draw_time": "11:45:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิ VISA เช้า",
+      "draw_time": "09:15:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นอังกฤษ",
+      "draw_time": "23:00:00"
+    },
+    {
+      "lottery_name": "หวยลาวเจริญ",
+      "draw_time": "14:30:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยพัฒนา",
+      "draw_time": "19:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิบ่าย VIP",
+      "draw_time": "13:25:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นสิงคโปร์พิเศษ",
+      "draw_time": "15:55:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยทีวี",
+      "draw_time": "14:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีนเช้า",
+      "draw_time": "10:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นสิงคโปร์ VIP",
+      "draw_time": "17:05:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเยอรมัน VISA",
+      "draw_time": "22:15:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีนพิเศษ เช้า",
+      "draw_time": "10:05:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นดาวโจนส์",
+      "draw_time": "03:20:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็งบ่าย",
+      "draw_time": "15:00:00"
+    },
+    {
+      "lottery_name": "หวยมาเลย์",
+      "draw_time": "18:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเกาหลีพิเศษ",
+      "draw_time": "12:35:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นดาวโจนส์สตาร์",
+      "draw_time": "01:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวสันติภาพ",
+      "draw_time": "06:45:00"
+    },
+    {
+      "lottery_name": "หวยลาววิลล่า",
+      "draw_time": "20:10:00"
+    },
+    {
+      "lottery_name": "หวยลาวพลัส",
+      "draw_time": "12:05:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็ง VISA เช้า",
+      "draw_time": "11:15:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็งพิเศษ เช้า",
+      "draw_time": "10:35:00"
+    },
+    {
+      "lottery_name": "หวยลาวพัฒนา",
+      "draw_time": "20:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็งเช้า",
+      "draw_time": "11:00:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเวียดนามพิเศษ เช้า",
+      "draw_time": "11:30:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขง VIP",
+      "draw_time": "19:45:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็งเช้า VIP",
+      "draw_time": "10:35:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นรัสเซีย",
+      "draw_time": "23:00:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงพิเศษ",
+      "draw_time": "17:25:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นสิงคโปร์",
+      "draw_time": "16:30:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงโกลด์",
+      "draw_time": "22:45:00"
+    },
+    {
+      "lottery_name": "หวยลาวพรีเมี่ยม",
+      "draw_time": "23:00:00"
+    },
+    {
+      "lottery_name": "หวยลาวพัฒนาเที่ยง",
+      "draw_time": "12:30:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงพัฒนา",
+      "draw_time": "21:15:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็งพิเศษ บ่าย",
+      "draw_time": "15:25:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นอังกฤษ VIP",
+      "draw_time": "21:50:00"
+    },
+    {
+      "lottery_name": "หวยลาวไอยรา",
+      "draw_time": "23:30:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงไนท์",
+      "draw_time": "23:45:00"
+    },
+    {
+      "lottery_name": "หวยฮานอย Extra",
+      "draw_time": "22:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเวียดนามพิเศษ บ่าย",
+      "draw_time": "16:35:00"
+    },
+    {
+      "lottery_name": "หวยฮานอย VIP",
+      "draw_time": "19:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวร่ำรวย",
+      "draw_time": "16:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นรัสเซีย VIP",
+      "draw_time": "23:50:00"
+    },
+    {
+      "lottery_name": "หวยลาววังเวียง",
+      "draw_time": "22:00:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นอังกฤษพิเศษ",
+      "draw_time": "23:15:00"
+    },
+    {
+      "lottery_name": "หวยลาวก้าวหน้า",
+      "draw_time": "13:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวนครหลวง",
+      "draw_time": "15:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวสตาร์",
+      "draw_time": "15:45:00"
+    },
+    {
+      "lottery_name": "หวยลาวพัฒนาเช้า",
+      "draw_time": "09:00:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยปกติ",
+      "draw_time": "18:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิ VISA บ่าย",
+      "draw_time": "13:15:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงพลัส",
+      "draw_time": "16:40:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นรัสเซีย VISA",
+      "draw_time": "23:15:00"
+    },
+    {
+      "lottery_name": "หวยหลวงพระบาง VISA",
+      "draw_time": "06:15:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยกาชาด",
+      "draw_time": "16:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นอียิปต์",
+      "draw_time": "20:00:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยเฉพาะกิจ",
+      "draw_time": "16:30:00"
+    },
+    {
+      "lottery_name": "หวยฮานอย VISA",
+      "draw_time": "16:15:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิบ่าย",
+      "draw_time": "13:00:00"
+    },
+    {
+      "lottery_name": "หวยสาละวัน VISA",
+      "draw_time": "05:15:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นจีนบ่าย VIP",
+      "draw_time": "14:25:00"
+    },
+    {
+      "lottery_name": "หวยลาวพิเศษรอบเที่ยง",
+      "draw_time": "12:00:00"
+    },
+    {
+      "lottery_name": "หวยแม่โขงเมก้า",
+      "draw_time": "14:45:00"
+    },
+    {
+      "lottery_name": "หวยลาว VIP",
+      "draw_time": "21:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวมงคล",
+      "draw_time": "18:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นนิเคอิเช้า",
+      "draw_time": "09:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นไต้หวัน VIP",
+      "draw_time": "11:35:00"
+    },
+    {
+      "lottery_name": "หวยเวียดนาม VIP ออนไลน์",
+      "draw_time": "19:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นอังกฤษ VISA",
+      "draw_time": "21:15:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยอาเซียน",
+      "draw_time": "09:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวสตาร์ VIP",
+      "draw_time": "22:00:00"
+    },
+    {
+      "lottery_name": "หวยลาวรุ่งเรือง",
+      "draw_time": "21:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นไต้หวัน",
+      "draw_time": "12:35:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นดาวโจนส์ VIP พิเศษ",
+      "draw_time": "23:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นฮั่งเส็ง VISA บ่าย",
+      "draw_time": "15:15:00"
+    },
+    {
+      "lottery_name": "หวยลาวมั่นคง",
+      "draw_time": "15:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นเยอรมัน VIP",
+      "draw_time": "22:50:00"
+    },
+    {
+      "lottery_name": "หวยฮานอยดานัง",
+      "draw_time": "16:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นดาวโจนส์พิเศษ",
+      "draw_time": "23:30:00"
+    },
+    {
+      "lottery_name": "หวยหุ้นอินเดีย",
+      "draw_time": "17:30:00"
+    },
+    {
+      "lottery_name": "หวยลาวสามัคคี VIP",
+      "draw_time": "21:30:00"
+    }
+  ]
