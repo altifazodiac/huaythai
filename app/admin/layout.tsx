@@ -13,7 +13,8 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      console.log(user); // ดู user_metadata หรือ role
       if (!user) {
         router.replace("/login");
         return;
@@ -21,7 +22,7 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
       // สมมติ role อยู่ใน user.user_metadata.role
       const role = user.user_metadata?.role;
       if (role !== "admin") {
-        router.replace("/not-authorized"); // หรือ redirect ไปหน้าอื่น
+        router.replace("/"); // หรือ redirect ไปหน้าอื่น
         setIsAdmin(false);
       } else {
         setIsAdmin(true);
