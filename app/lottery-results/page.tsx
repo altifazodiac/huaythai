@@ -3,7 +3,6 @@ import { useEffect, useState, Fragment } from "react";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Search, ChevronRight, Loader2, BarChart3, History } from "lucide-react";
 import { countryFlagImg } from "@/lib/utils/flags";
@@ -24,83 +23,32 @@ import { DirectionProvider } from "@radix-ui/react-direction";
 
 // --- Unchanged Logic & Utility Functions ---
 
-// Placeholder for lottery type color mapping
 const LOTTERY_TYPE_COLORS: Record<string, string> = {
   "หวยลาว": "border-blue-500 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200",
   "หวยเวียดนาม": "border-red-500 bg-red-50 dark:bg-red-900/40 text-red-800 dark:text-red-200",
   "หวยหุ้น": "border-green-500 bg-green-50 dark:bg-green-900/40 text-green-800 dark:text-green-200",
-  // Add more as needed
+  "หวยไทย": "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200",
 };
 
 function getTypeColor(type: string) {
   return LOTTERY_TYPE_COLORS[type] || "border-gray-300 bg-gray-100 dark:border-gray-700 dark:bg-gray-800/40 text-gray-800 dark:text-gray-200";
 }
 
-function get2Top(num: string) {
-  // Return last 2 digits of 3-top
-  return num?.slice(-2) || "";
-}
-
 // ฟังก์ชันแปลง country code เป็นชื่อประเทศที่รองรับใน countryFlagImg
 function getCountryName(country: string, lotteryName: string) {
-  // ตัวอย่าง mapping เพิ่มเติม
-  if (country === 'RU' || /รัสเซีย/i.test(lotteryName)) return 'รัสเซีย';
-  if (country === 'VN' || /เวียดนาม/i.test(lotteryName)) return 'เวียดนาม';
+  if (country === 'VN' || /ฮานอย|เวียดนาม/i.test(lotteryName)) return 'เวียดนาม';
   if (country === 'LA' || /ลาว/i.test(lotteryName)) return 'ลาว';
-  if (country === 'TH' || /ไทย|สลากกินแบ่ง/i.test(lotteryName)) return 'ไทย';
-  if (country === 'MY' || /มาเลเซีย/i.test(lotteryName)) return 'มาเลเซีย';
-  if (country === 'SG' || /สิงคโปร์/i.test(lotteryName)) return 'สิงคโปร์';
-  if (country === 'HK' || /ฮ่องกง/i.test(lotteryName)) return 'ฮ่องกง';
-  if (country === 'TW' || /ตากปลายนาม/i.test(lotteryName)) return 'ไต้หวัน';
-  if (country === 'JP' || /ญี่ปุ่น/i.test(lotteryName)) return 'ญี่ปุ่น';
-  if (country === 'KR' || /เกาหลีใต้/i.test(lotteryName)) return 'เกาหลีใต้';
-  if (country === 'PH' || /ฟิลิปปินส์/i.test(lotteryName)) return 'ฟิลิปปินส์';
-  if (country === 'ID' || /อินโดนีเซีย/i.test(lotteryName)) return 'อินโดนีเซีย';
-  if (country === 'US' || /สหรัฐอเมริกา/i.test(lotteryName)) return 'สหรัฐอเมริกา';
-  if (country === 'AU' || /ออสเตรเลีย/i.test(lotteryName)) return 'ออสเตรเลีย';
-  if (country === 'CA' || /แคนาดา/i.test(lotteryName)) return 'แคนาดา';
-  if (country === 'NZ' || /นิวซีแลนด์/i.test(lotteryName)) return 'นิวซีแลนด์';
-  if (country === 'IE' || /ไอร์แลนด์/i.test(lotteryName)) return 'ไอร์แลนด์';
-  if (country === 'DE' || /เยอรมนี/i.test(lotteryName)) return 'เยอรมนี';
-  if (country === 'FR' || /ฝรั่งเศส/i.test(lotteryName)) return 'ฝรั่งเศส';
-  if (country === 'IT' || /อิตาลี/i.test(lotteryName)) return 'อิตาลี';
-  if (country === 'ES' || /สเปน/i.test(lotteryName)) return 'สเปน';
-  if (country === 'NL' || /สวิตเซอร์แลนด์/i.test(lotteryName)) return 'สวิตเซอร์แลนด์';
-  if (country === 'BE' || /เบลเยียม/i.test(lotteryName)) return 'เบลเยียม';
-  if (country === 'SE' || /สวีเดน/i.test(lotteryName)) return 'สวีเดน';
-  if (country === 'NO' || /นอร์เวย์/i.test(lotteryName)) return 'นอร์เวย์';
-  if (country === 'DK' || /เดนมาร์ก/i.test(lotteryName)) return 'เดนมาร์ก';
-  if (country ===  'STOCK' || /หวยหุ้น/i.test(lotteryName)) return 'หวยหุ้น';
-  if (country ===  'OTHER' || /อื่นๆ/i.test(lotteryName)) return 'อื่นๆ';
-  return country || lotteryName;
+  if (country === 'TH' || /ไทย|ธกส|ออมสิน/i.test(lotteryName)) return 'ไทย';
+  if (country === 'MY' || /มาเลย์/i.test(lotteryName)) return 'มาเลเซีย';
+  if (country === 'STOCK' || /หุ้น|ดาวโจนส์|นิเคอิ|จีน|ฮั่งเส็ง|ไต้หวัน|เกาหลี|สิงคโปร์/i.test(lotteryName)) return 'หวยหุ้น';
+  return 'อื่นๆ';
 }
 
 const COUNTRY_GROUPS: Record<string, string> = {
-  'TH': 'ไทย',
-  'LA': 'ลาว',
-  'VN': 'เวียดนาม',
-  'MY': 'มาเลเซีย',
-  'SG': 'สิงคโปร์',
-  'HK': 'ฮ่องกง',
-  'TW': 'ไต้หวัน',
-  'JP': 'ญี่ปุ่น',
-  'KR': 'เกาหลีใต้',
-  'PH': 'ฟิลิปปินส์',
-  'ID': 'อินโดนีเซีย',
-  'US': 'สหรัฐอเมริกา',
-  'AU': 'ออสเตรเลีย',
-  'CA': 'แคนาดา',
-  'NZ': 'นิวซีแลนด์',
-  'IE': 'ไอร์แลนด์',
-  'DE': 'เยอรมนี',
-  'FR': 'ฝรั่งเศส',
-  'IT': 'อิตาลี',
-  'ES': 'สเปน',
-  'NL': 'สวิตเซอร์แลนด์',
-  'BE': 'เบลเยียม',
-  'SE': 'สวีเดน',
-  'NO': 'นอร์เวย์',
-  'DK': 'เดนมาร์ก',
+  'TH': 'หวยไทย',
+  'LA': 'หวยลาว',
+  'VN': 'หวยเวียดนาม',
+  'MY': 'หวยมาเลเซีย',
   'STOCK': 'หวยหุ้น',
   'OTHER': 'อื่นๆ',
 };
@@ -145,6 +93,11 @@ export default function LotteryResultsPage() {
       .order('draw_date', { ascending: false })
       .order('draw_time', { ascending: false })
       .then(({ data, error }) => {
+        if (error) {
+          console.error("Error fetching lottery results:", error);
+          setLoading(false);
+          return;
+        }
         setResults(data || []);
         setLoading(false);
       });
@@ -178,7 +131,7 @@ export default function LotteryResultsPage() {
     return acc;
   }, {} as Record<string, any[]>);
 
-  const countryOrder = ['ไทย', 'ลาว', 'เวียดนาม', 'มาเลเซีย', 'หวยหุ้น'];
+  const countryOrder = ['หวยไทย', 'หวยลาว', 'หวยเวียดนาม', 'หวยมาเลเซีย', 'หวยหุ้น', 'อื่นๆ'];
   const sortedGroups = [
     ...countryOrder.filter(g => grouped[g]),
     ...Object.keys(grouped).filter(g => !countryOrder.includes(g)).sort(),
@@ -235,7 +188,7 @@ export default function LotteryResultsPage() {
                         {displayDateLabel && (
                             <div className="text-center text-sm font-light text-green-700 dark:text-green-300 mb-4 animate-fade-in">{displayDateLabel}</div>
                         )}
-                        {displayResults.length === 0 ? (
+                        {displayResults.length === 0 && !loading ? (
                             <div className="flex flex-col justify-center items-center h-64 text-center text-gray-500 dark:text-gray-400 animate-fade-in">
                                <Calendar className="w-12 h-12 mb-4"/>
                                <p className="font-light">ไม่พบข้อมูลผลหวย</p>
@@ -263,11 +216,19 @@ export default function LotteryResultsPage() {
                                                     </TableCell>
                                                 </TableRow>
                                                 {grouped[group].map((r: any) => {
-                                                    const time = r.draw_time || "-";
-                                                    const top3 = (r.results?.[0] || "xxx,xx").replace(/^3 ตัวบน ?: ?/, '');
-                                                    const top2 = (r.results?.[1] || "xx").replace(/^2 ตัวบน ?: ?/, '');
-                                                    const bottom2 = (r.results?.[2] || "xx").replace(/^2 ตัวล่าง ?: ?/, '');
-                                                    const isPending = top3.includes('x') || top2.includes('x') || bottom2.includes('x');
+                                                    // --- START: CORRECTED LOGIC ---
+                                                    const time = r.draw_time ? r.draw_time.substring(0, 5) : "-";
+                                                    
+                                                    const top3Result = r.results?.find((res: string) => res.startsWith('3 ตัวบน')) || 'xxx';
+                                                    const top3 = top3Result.replace(/^3 ตัวบน ?: ?/, '');
+
+                                                    const bottom2Result = r.results?.find((res: string) => res.startsWith('2 ตัวล่าง')) || 'xx';
+                                                    const bottom2 = bottom2Result.replace(/^2 ตัวล่าง ?: ?/, '');
+
+                                                    const top2 = top3.slice(-2);
+                                                    
+                                                    const isPending = top3.includes('x') || bottom2.includes('x');
+                                                    // --- END: CORRECTED LOGIC ---
 
                                                     return (
                                                         <TableRow
@@ -281,7 +242,7 @@ export default function LotteryResultsPage() {
                                                                 <span className="text-xs sm:text-sm font-light text-green-900 dark:text-green-200 truncate">{r.lottery_name || group}</span>
                                                             </TableCell>
                                                             <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{top3}</TableCell>
-                                                            <TableCell className={`p-2 text-center text-sm font-mono transition-colors hidden sm:table-cell ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{top2}</TableCell>
+                                                            <TableCell className={`p-2 text-center text-sm font-mono transition-colors hidden sm:table-cell ${isPending || top2.length < 2 ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{isPending ? 'xx' : top2}</TableCell>
                                                             <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{bottom2}</TableCell>
                                                             <TableCell className="p-2">
                                                                 <ChevronRight className="w-4 h-4 text-green-400 dark:text-green-600" />
@@ -312,65 +273,76 @@ export default function LotteryResultsPage() {
                 {selected ? selected.lottery_name : 'ไม่พบข้อมูล'}
             </DrawerDescription>
           </DrawerHeader>
-          {selected ? (
-            <div className="p-4 flex flex-col gap-4 text-sm font-light">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                {renderFlag(selected.country, selected.lottery_name)}
-                <div className="flex flex-col">
-                    <span className="font-semibold">{selected.lottery_name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {selected.draw_date ? format(new Date(selected.draw_date), "dd MMMM yyyy") : "-"}
-                        {' @ '}{selected.draw_time || "-"}
-                    </span>
+          {selected ? (() => {
+            // --- Re-calculate values inside the drawer for consistency ---
+            const top3Result = selected.results?.find((res: string) => res.startsWith('3 ตัวบน')) || '';
+            const top3 = top3Result.replace(/^3 ตัวบน ?: ?/, '');
+            const top2 = top3.slice(-2);
+            
+            const bottom2Result = selected.results?.find((res: string) => res.startsWith('2 ตัวล่าง')) || '';
+            const bottom2 = bottom2Result.replace(/^2 ตัวล่าง ?: ?/, '');
+
+            return (
+              <div className="p-4 flex flex-col gap-4 text-sm font-light">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                  {renderFlag(selected.country, selected.lottery_name)}
+                  <div className="flex flex-col">
+                      <span className="font-semibold">{selected.lottery_name}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {selected.draw_date ? format(new Date(selected.draw_date), "dd MMMM yyyy") : "-"}
+                          {' @ '}{selected.draw_time ? selected.draw_time.substring(0,5) : "-"}
+                      </span>
+                  </div>
+                </div>
+  
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">3 ตัวบน</div>
+                      <div className="text-lg font-mono font-semibold text-gray-800 dark:text-gray-200">{top3 || '...'}</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">2 ตัวบน</div>
+                      <div className="text-lg font-mono font-semibold text-gray-800 dark:text-gray-200">{top2 || '..'}</div>
+                  </div>
+                  <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">2 ตัวล่าง</div>
+                      <div className="text-lg font-mono font-semibold text-gray-800 dark:text-gray-200">{bottom2 || '..'}</div>
+                  </div>
+                </div>
+                
+                <Separator className="my-2 bg-gray-200 dark:bg-gray-800"/>
+  
+                <div className="space-y-3 flex-1 overflow-y-auto" style={{maxHeight: 'calc(100vh - 300px)'}}>
+                  {filteredResults.filter(r => r.lottery_name === selected.lottery_name)
+                      .sort((a, b) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime())
+                      .slice(0, 30)
+                      .map((r:any) => {
+                          const histTop3 = (r.results?.find((res: string) => res.startsWith('3 ตัวบน')) || '').replace(/^3 ตัวบน ?: ?/, '');
+                          const histBottom2 = (r.results?.find((res: string) => res.startsWith('2 ตัวล่าง')) || '').replace(/^2 ตัวล่าง ?: ?/, '');
+                          const histTop2 = histTop3.slice(-2);
+
+                          return (
+                            <div key={r.id} className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-xs">
+                              <div className="text-gray-500 dark:text-gray-400 row-span-3">{r.draw_date ? format(new Date(r.draw_date), "dd/MM") : "-"}</div>
+                              <div className="col-start-2 flex items-center gap-2 text-mono">
+                                 <span className="w-12 text-gray-500 dark:text-gray-400 font-light">3 บน:</span>
+                                 <span className="font-semibold text-gray-700 dark:text-gray-300">{histTop3}</span>
+                              </div>
+                              <div className="col-start-2 flex items-center gap-2 text-mono">
+                                 <span className="w-12 text-gray-500 dark:text-gray-400 font-light">2 บน:</span>
+                                 <span className="font-semibold text-gray-700 dark:text-gray-300">{histTop2}</span>
+                              </div>
+                               <div className="col-start-2 flex items-center gap-2 text-mono">
+                                 <span className="w-12 text-gray-500 dark:text-gray-400 font-light">2 ล่าง:</span>
+                                 <span className="font-semibold text-gray-700 dark:text-gray-300">{histBottom2}</span>
+                              </div>
+                            </div>
+                          )
+                      })}
                 </div>
               </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">3 ตัวบน</div>
-                    <div className={`text-lg font-mono font-semibold ${getTypeColor(selected.lottery_name)}`}>{(selected.results?.[0] || "xxx,xx").replace(/^3 ตัวบน ?: ?/, '')}</div>
-                </div>
-                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">2 ตัวบน</div>
-                    <div className={`text-lg font-mono font-semibold ${getTypeColor(selected.lottery_name)}`}>{(selected.results?.[1] || "xx").replace(/^2 ตัวบน ?: ?/, '')}</div>
-                </div>
-                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">2 ตัวบน</div>
-                    <div className={`text-lg font-mono font-semibold ${getTypeColor(selected.lottery_name)}`}>{(selected.results?.[1] || "xx").replace(/^2 ตัวบน ?: ?/, '')}</div>
-                </div>
-                <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                    <div className="text-xs text-gray-500 dark:text-gray-400">2 ตัวล่าง</div>
-                    <div className={`text-lg font-mono font-semibold ${getTypeColor(selected.lottery_name)}`}>{(selected.results?.[2] || "xx")}</div>
-                </div>
-              </div>
-              
-              <Separator className="my-2 bg-gray-200 dark:bg-gray-800"/>
-
-              <div className="space-y-3 flex-1 overflow-y-auto" style={{maxHeight: 'calc(100vh - 300px)'}}>
-                {filteredResults.filter(r => r.lottery_name === selected.lottery_name)
-                    .sort((a, b) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime())
-                    .slice(0, 30) // Limit to last 30 results for performance
-                    .map((r:any) => (
-                      <div key={r.id} className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 text-xs">
-                        <div className="text-gray-500 dark:text-gray-400 row-span-2">{r.draw_date ? format(new Date(r.draw_date), "dd/MM") : "-"}</div>
-                        <div className="col-start-2 flex items-center gap-2 text-mono">
-                           <span className="w-12 text-gray-500 dark:text-gray-400 font-light">3 บน:</span>
-                           <span className="font-semibold text-gray-700 dark:text-gray-300">{(r.results?.[0] || "xxx,xx").replace(/^3 ตัวบน ?: ?/, '')}</span>
-                        </div>
-                        <div className="col-start-2 flex items-center gap-2 text-mono">
-                           <span className="w-12 text-gray-500 dark:text-gray-400 font-light">2 บน:</span>
-                           <span className="font-semibold text-gray-700 dark:text-gray-300">{(r.results?.[1] || "xx")}</span>
-                        </div>
-                         <div className="col-start-2 flex items-center gap-2 text-mono">
-                           <span className="w-12 text-gray-500 dark:text-gray-400 font-light">2 ล่าง:</span>
-                           <span className="font-semibold text-gray-700 dark:text-gray-300">{(r.results?.[2] || "xx")}</span>
-                        </div>
-                      </div>
-                    ))}
-              </div>
-
-            </div>
-          ) : (
+            )
+          })() : (
             <div className="p-4 text-center text-gray-500 dark:text-gray-400 font-light">ไม่พบข้อมูล</div>
           )}
         </DrawerContent>

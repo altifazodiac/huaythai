@@ -1,0 +1,234 @@
+[
+  {
+    "sub_type_name": "ลาว EXTRA",
+    "lottery_sub_type_id": 13
+  },
+  {
+    "sub_type_name": "ลาว TV",
+    "lottery_sub_type_id": 15
+  },
+  {
+    "sub_type_name": "ลาว HD",
+    "lottery_sub_type_id": 16
+  },
+  {
+    "sub_type_name": "ลาวสามัคคี",
+    "lottery_sub_type_id": 17
+  },
+  {
+    "sub_type_name": "ลาวสามัคคี VIP",
+    "lottery_sub_type_id": 18
+  },
+  {
+    "sub_type_name": "ลาว VIP",
+    "lottery_sub_type_id": 19
+  },
+  {
+    "sub_type_name": "ลาวสตาร์",
+    "lottery_sub_type_id": 20
+  },
+  {
+    "sub_type_name": "ฮานอยพิเศษ",
+    "lottery_sub_type_id": 32
+  },
+  {
+    "sub_type_name": "นิเคอิเช้า VIP",
+    "lottery_sub_type_id": 34
+  },
+  {
+    "sub_type_name": "นิเคอิเช้า",
+    "lottery_sub_type_id": 35
+  },
+  {
+    "sub_type_name": "ลาวสตาร์ VIP",
+    "lottery_sub_type_id": 21
+  },
+  {
+    "sub_type_name": "ลาวดิจิตอล",
+    "lottery_sub_type_id": 22
+  },
+  {
+    "sub_type_name": "ลาวกาชาด",
+    "lottery_sub_type_id": 23
+  },
+  {
+    "sub_type_name": "ลาวโจนส์",
+    "lottery_sub_type_id": 25
+  },
+  {
+    "sub_type_name": "ฮานอย HD",
+    "lottery_sub_type_id": 27
+  },
+  {
+    "sub_type_name": "ฮานอย TV",
+    "lottery_sub_type_id": 28
+  },
+  {
+    "sub_type_name": "ฮานอย EXTRA",
+    "lottery_sub_type_id": 29
+  },
+  {
+    "sub_type_name": "ฮานอยปกติ",
+    "lottery_sub_type_id": 30
+  },
+  {
+    "sub_type_name": "ฮานอย VIP",
+    "lottery_sub_type_id": 31
+  },
+  {
+    "sub_type_name": "ฮานอยกาชาด",
+    "lottery_sub_type_id": 26
+  },
+  {
+    "sub_type_name": "ฮานอยสามัคคี",
+    "lottery_sub_type_id": 7
+  },
+  {
+    "sub_type_name": "ลาวพัฒนา",
+    "lottery_sub_type_id": 3
+  },
+  {
+    "sub_type_name": "สิงคโปร์ VIP",
+    "lottery_sub_type_id": 12
+  },
+  {
+    "sub_type_name": "ดาวโจนส์",
+    "lottery_sub_type_id": 11
+  },
+  {
+    "sub_type_name": "สลากกินแบ่งรัฐบาล",
+    "lottery_sub_type_id": 1
+  },
+  {
+    "sub_type_name": "หุ้นอียิปต์",
+    "lottery_sub_type_id": 63
+  },
+  {
+    "sub_type_name": "เกาหลี VIP",
+    "lottery_sub_type_id": 64
+  },
+  {
+    "sub_type_name": "ฮานอยอาเซียน",
+    "lottery_sub_type_id": 69
+  },
+  {
+    "sub_type_name": "ลาว STAR",
+    "lottery_sub_type_id": 72
+  },
+  {
+    "sub_type_name": "ลาวอาเซียน",
+    "lottery_sub_type_id": 73
+  },
+  {
+    "sub_type_name": "สลากธ.ก.ส.",
+    "lottery_sub_type_id": 76
+  },
+  {
+    "sub_type_name": "ไทยเช้า",
+    "lottery_sub_type_id": 77
+  },
+  {
+    "sub_type_name": "ไทยบ่าย",
+    "lottery_sub_type_id": 78
+  },
+  {
+    "sub_type_name": "นิเคอิบ่าย",
+    "lottery_sub_type_id": 36
+  },
+  {
+    "sub_type_name": "นิเคอิบ่าย VIP",
+    "lottery_sub_type_id": 37
+  },
+  {
+    "sub_type_name": "ฮั่งเส็งเช้า VIP",
+    "lottery_sub_type_id": 38
+  },
+  {
+    "sub_type_name": "ฮั่งเส็งเช้า",
+    "lottery_sub_type_id": 39
+  },
+  {
+    "sub_type_name": "ฮั่งเส็งบ่าย",
+    "lottery_sub_type_id": 40
+  },
+  {
+    "sub_type_name": "ฮั่งเส็งบ่าย VIP",
+    "lottery_sub_type_id": 41
+  },
+  {
+    "sub_type_name": "เกาหลี",
+    "lottery_sub_type_id": 42
+  },
+  {
+    "sub_type_name": "สิงคโปร์",
+    "lottery_sub_type_id": 45
+  },
+  {
+    "sub_type_name": "หุ้นอินเดีย",
+    "lottery_sub_type_id": 46
+  },
+  {
+    "sub_type_name": "รัสเซีย",
+    "lottery_sub_type_id": 47
+  },
+  {
+    "sub_type_name": "รัสเซีย VIP",
+    "lottery_sub_type_id": 48
+  },
+  {
+    "sub_type_name": "เยอรมัน",
+    "lottery_sub_type_id": 49
+  },
+  {
+    "sub_type_name": "เยอรมัน VIP",
+    "lottery_sub_type_id": 50
+  },
+  {
+    "sub_type_name": "อังกฤษ",
+    "lottery_sub_type_id": 51
+  },
+  {
+    "sub_type_name": "อังกฤษ VIP",
+    "lottery_sub_type_id": 52
+  },
+  {
+    "sub_type_name": "ดาวโจนส์ STAR",
+    "lottery_sub_type_id": 53
+  },
+  {
+    "sub_type_name": "ไต้หวัน VIP",
+    "lottery_sub_type_id": 43
+  },
+  {
+    "sub_type_name": "ไต้หวัน",
+    "lottery_sub_type_id": 44
+  },
+  {
+    "sub_type_name": "จีนเช้า",
+    "lottery_sub_type_id": 56
+  },
+  {
+    "sub_type_name": "จีนเช้า VIP",
+    "lottery_sub_type_id": 57
+  },
+  {
+    "sub_type_name": "จีนบ่าย",
+    "lottery_sub_type_id": 58
+  },
+  {
+    "sub_type_name": "จีนบ่าย VIP",
+    "lottery_sub_type_id": 59
+  },
+  {
+    "sub_type_name": "ฮานอย STAR",
+    "lottery_sub_type_id": 33
+  },
+  {
+    "sub_type_name": "ดาวโจนส์ VIP",
+    "lottery_sub_type_id": 54
+  },
+  {
+    "sub_type_name": "ไทยเย็น",
+    "lottery_sub_type_id": 55
+  }
+]

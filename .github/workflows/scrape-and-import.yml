@@ -1,0 +1,38 @@
+name: Scrape and Import Lottery Data
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape-and-import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.bun/bin:$PATH"
+
+      - name: Install dependencies
+        run: bun install
+
+      # (ถ้าใช้ Playwright ให้ติดตั้ง browser ด้วย)
+      - name: Install Playwright Browsers
+        run: bunx playwright install --with-deps
+        continue-on-error: true
+
+      - name: Run Auto Scrape by Schedule
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: bun run scripts/auto-scrape-by-schedule.ts
+
+      # (ถ้าต้องการ trigger Vercel API หลัง scrape/import)
+      - name: Trigger Vercel Import Endpoint
+        run: |
+          curl -X POST https://www.xn--789-2llyfg0ajkp0jrf.com/api/import-lottery-results 
