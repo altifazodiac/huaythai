@@ -13,16 +13,27 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      console.log(user); // ดู user_metadata หรือ role
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) {
         router.replace("/login");
         return;
       }
-      // สมมติ role อยู่ใน user.user_metadata.role
-      const role = user.user_metadata?.role;
+
+      // 1. ลองดึง role จากตาราง users ก่อน
+      const { data: userRow, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      let role = userRow?.role;
+      // 2. ถ้าไม่มี role ในตาราง users ให้ fallback ไป user_metadata
+      if (!role) {
+        role = user.user_metadata?.role;
+      }
+
       if (role !== "admin") {
-        router.replace("/"); // หรือ redirect ไปหน้าอื่น
+        router.replace("/");
         setIsAdmin(false);
       } else {
         setIsAdmin(true);
