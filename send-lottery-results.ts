@@ -99,7 +99,7 @@ async function main() {
         }, {});
         
         // สร้างข้อความที่จะส่งจากข้อมูลที่จัดกลุ่มแล้ว
-    let messageText =  `╔════════════════════════╗\n`;
+    let messageText =  `╔══════ หวยเศรษฐี789 ═════╗\n`;
         messageText += `📅 ผลหวยรอบ ${endTime} 📅\n`;
         messageText += `   ประจำวันที่ ${drawDate}\n`;
         messageText += `╚════════════════════════╝\n\n`;
