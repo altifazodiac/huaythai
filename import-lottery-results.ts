@@ -212,6 +212,13 @@ async function automateBatchImportLotteryResults(drawDate: string) {
         }
     }
     if (upsertRows.length > 0) {
+        console.log('[Import][Debug] ตัวอย่างข้อมูลที่จะ upsert ลง lottery_results:');
+        upsertRows.slice(0, 3).forEach((row, idx) => {
+            console.log(`[Sample ${idx + 1}]`, JSON.stringify(row));
+        });
+        if (upsertRows.length > 3) {
+            console.log(`[Import][Debug] ...ทั้งหมด ${upsertRows.length} rows`);
+        }
         console.log(`[Import] Found ${upsertRows.length} rows to upsert into lottery_results.`);
         const { error: upsertError } = await supabase.from('lottery_results').upsert(upsertRows, { onConflict: 'schedule_id, draw_date, prize_code' });
         if (upsertError) console.error('Batch upsert error:', upsertError.message);

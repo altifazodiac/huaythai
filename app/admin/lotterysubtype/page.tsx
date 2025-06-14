@@ -837,6 +837,7 @@ export default function LotterySubTypePage() {
                     required
                   >
                     <option value="">เลือกจำนวนหลัก</option>
+                    <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
                     {payoutSubTypeId && [3,13,15,16,17,18,19,20,21,22,23,25].includes(payoutSubTypeId) && (
@@ -848,7 +849,7 @@ export default function LotterySubTypePage() {
                   <label className="text-sm font-medium">ประเภท</label>
                   <Input
                     name="type_number"
-                    placeholder="เช่น บน, ล่าง, โต๊ด"
+                    placeholder="เช่น บน, ล่าง, โต๊ด,วิ่งบน,วิ่งล่าง"
                     value={payoutForm.type_number || ""}
                     onChange={handlePayoutChange}
                     required

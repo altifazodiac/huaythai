@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DirectionProvider } from "@radix-ui/react-direction";
+import { supabase } from "@/lib/supabase/supabaseClient";
 
 // --- Unchanged Logic & Utility Functions ---
 
@@ -77,6 +78,7 @@ function renderFlag(country: string, lotteryName: string) {
 // --- Main Page Component ---
 export default function LotteryResultsPage() {
   const [results, setResults] = useState<any[]>([]);
+  const [allAliases, setAllAliases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<any | null>(null);
@@ -84,47 +86,66 @@ export default function LotteryResultsPage() {
 
   useEffect(() => {
     setLoading(true);
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-    supabase
-      .from('lottery_api_results')
-      .select('id, created_at, draw_date, country, lottery_name, results, source_url, draw_time')
-      .order('draw_date', { ascending: false })
-      .order('draw_time', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("Error fetching lottery results:", error);
-          setLoading(false);
-          return;
-        }
-        setResults(data || []);
+    const fetchData = async () => {
+      // 1. ดึง alias + sub_type
+      const { data: aliases, error: aliasError } = await supabase
+        .from("lottery_name_aliases")
+        .select("alias_name, lottery_sub_type_id, lottery_sub_types(country, country_origin)");
+      // 2. ดึง schedule
+      const { data: schedules, error: scheduleError } = await supabase
+        .from("drawing_schedules")
+        .select("lottery_sub_type_id, drawing_time");
+      // 3. ดึงผลรางวัลวันนี้
+      const todayStr = format(new Date(), "yyyy-MM-dd");
+      const { data: apiResults, error: apiError } = await supabase
+        .from("lottery_api_results")
+        .select("id, created_at, draw_date, country, lottery_name, results, source_url, draw_time")
+        .eq("draw_date", todayStr);
+
+      if (aliasError || apiError || scheduleError) {
         setLoading(false);
+        return;
+      }
+      // 4. รวมข้อมูล schedule เข้า alias
+      const aliasesWithTime = (aliases || []).map(alias => {
+        const schedule = (schedules || []).find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
+        return { ...alias, drawing_time: schedule?.drawing_time || null };
       });
+      setAllAliases(aliasesWithTime);
+      setResults(apiResults || []);
+      setLoading(false);
+    };
+    fetchData();
   }, []);
 
-  const filteredResults = results.filter((r) => {
-    if (!filter) return true;
-    return (r.lottery_name || '').toLowerCase().includes(filter.toLowerCase());
+  // รวมข้อมูล alias + ผลจริง (ถ้าไม่มีผลจริงให้ placeholder)
+  const today = format(new Date(), "yyyy-MM-dd");
+  const mergedResults = allAliases.map((alias: any) => {
+    const found = results.find(
+      (r) => r.lottery_name === alias.alias_name && r.draw_date === today
+    );
+    if (found) return found;
+    return {
+      id: `placeholder-${alias.alias_name}`,
+      draw_date: today,
+      country: alias.lottery_sub_types?.country || "OTHER",
+      lottery_name: alias.alias_name,
+      results: ["3 ตัวบน: xxx", "2 ตัวล่าง: xx"],
+      draw_time: alias.drawing_time || null,
+      source_url: null,
+      created_at: null,
+      isPlaceholder: true,
+    };
   });
 
-  const today = new Date();
-  const todayResults = filteredResults.filter(r => r.draw_date && isSameDay(new Date(r.draw_date), today));
+  // filter/search
+  const filteredResults = mergedResults.filter((r) => {
+    if (!filter) return true;
+    return (r.lottery_name || "").toLowerCase().includes(filter.toLowerCase());
+  });
 
-  let displayResults = todayResults;
-  let displayDateLabel = '';
-  if (todayResults.length === 0 && filteredResults.length > 0) {
-    const sorted = [...filteredResults].sort((a, b) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime());
-    const latestDate = sorted[0].draw_date;
-    displayResults = filteredResults.filter(r => r.draw_date === latestDate);
-    displayDateLabel = `* แสดงผลล่าสุดของวันที่ ${format(new Date(latestDate), 'dd/MM/yyyy')}`;
-  } else if (todayResults.length > 0) {
-    displayDateLabel = `ผลหวยวันนี้ (${format(today, 'dd/MM/yyyy')})`;
-  } else {
-    displayDateLabel = '* ไม่มีข้อมูลสำหรับวันนี้';
-  }
-  
-  const grouped = displayResults.reduce((acc, r) => {
+  // group by country
+  const grouped = filteredResults.reduce((acc, r) => {
     const group = getCountryGroup(r.country);
     if (!acc[group]) acc[group] = [];
     acc[group].push(r);
@@ -179,16 +200,19 @@ export default function LotteryResultsPage() {
             
             {/* --- Main Content --- */}
             <main className="flex-1 w-full p-2 sm:p-4 transition-all duration-300">
+                {/* วันที่แสดงบนสุด */}
+                <div className="w-full flex justify-center mb-4">
+                  <div className="bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100 rounded-lg px-6 py-2 text-lg font-bold shadow animate-fade-in">
+                    {`ผลหวยประจำวันที่ ${format(new Date(today), 'dd MMMM yyyy', { locale: undefined })}`}
+                  </div>
+                </div>
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
                         <Loader2 className="animate-spin w-10 h-10 text-green-600 dark:text-green-400" />
                     </div>
                 ) : (
                     <>
-                        {displayDateLabel && (
-                            <div className="text-center text-sm font-light text-green-700 dark:text-green-300 mb-4 animate-fade-in">{displayDateLabel}</div>
-                        )}
-                        {displayResults.length === 0 && !loading ? (
+                        {filteredResults.length === 0 && !loading ? (
                             <div className="flex flex-col justify-center items-center h-64 text-center text-gray-500 dark:text-gray-400 animate-fade-in">
                                <Calendar className="w-12 h-12 mb-4"/>
                                <p className="font-light">ไม่พบข้อมูลผลหวย</p>
@@ -208,50 +232,59 @@ export default function LotteryResultsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {sortedGroups.map(group => (
-                                            <Fragment key={group}>
-                                                <TableRow key={group} className="border-b-2 border-green-200 dark:border-green-800/60 bg-green-100/80 dark:bg-green-950/50 sticky top-[48px] z-10">
-                                                    <TableCell colSpan={6} className="p-2 text-sm font-semibold text-green-900 dark:text-green-200">
-                                                        {group}
-                                                    </TableCell>
-                                                </TableRow>
-                                                {grouped[group].map((r: any) => {
-                                                    // --- START: CORRECTED LOGIC ---
-                                                    const time = r.draw_time ? r.draw_time.substring(0, 5) : "-";
-                                                    
-                                                    const top3Result = r.results?.find((res: string) => res.startsWith('3 ตัวบน')) || 'xxx';
-                                                    const top3 = top3Result.replace(/^3 ตัวบน ?: ?/, '');
+                                        {sortedGroups.map(group => {
+                                            // Sort by draw_time ascending (null/undefined last)
+                                            const sortedByTime = [...grouped[group]].sort((a, b) => {
+                                                if (!a.draw_time && !b.draw_time) return 0;
+                                                if (!a.draw_time) return 1;
+                                                if (!b.draw_time) return -1;
+                                                return a.draw_time.localeCompare(b.draw_time);
+                                            });
+                                            return (
+                                                <Fragment key={group}>
+                                                    <TableRow key={group} className="border-b-2 border-green-200 dark:border-green-800/60 bg-green-100/80 dark:bg-green-950/50 sticky top-[48px] z-10">
+                                                        <TableCell colSpan={6} className="p-2 text-sm font-semibold text-green-900 dark:text-green-200">
+                                                            {group}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    {sortedByTime.map((r: any) => {
+                                                        // --- START: CORRECTED LOGIC ---
+                                                        const time = r.draw_time ? r.draw_time.substring(0, 5) : "-";
+                                                        
+                                                        const top3Result = r.results?.find((res: string) => res.startsWith('3 ตัวบน')) || 'xxx';
+                                                        const top3 = top3Result.replace(/^3 ตัวบน ?: ?/, '');
 
-                                                    const bottom2Result = r.results?.find((res: string) => res.startsWith('2 ตัวล่าง')) || 'xx';
-                                                    const bottom2 = bottom2Result.replace(/^2 ตัวล่าง ?: ?/, '');
+                                                        const bottom2Result = r.results?.find((res: string) => res.startsWith('2 ตัวล่าง')) || 'xx';
+                                                        const bottom2 = bottom2Result.replace(/^2 ตัวล่าง ?: ?/, '');
 
-                                                    const top2 = top3.slice(-2);
-                                                    
-                                                    const isPending = top3.includes('x') || bottom2.includes('x');
-                                                    // --- END: CORRECTED LOGIC ---
+                                                        const top2 = top3.slice(-2);
+                                                        
+                                                        const isPending = top3.includes('x') || bottom2.includes('x');
+                                                        // --- END: CORRECTED LOGIC ---
 
-                                                    return (
-                                                        <TableRow
-                                                            key={r.id}
-                                                            className="border-b border-green-100/80 dark:border-green-900/50 hover:bg-green-200/50 dark:hover:bg-green-800/40 transition-colors duration-200 cursor-pointer"
-                                                            onClick={() => { setSelected(r); setDrawerOpen(true); }}
-                                                        >
-                                                            <TableCell className="p-2 text-xs font-mono text-green-800 dark:text-green-300">{time}</TableCell>
-                                                            <TableCell className="p-2 flex items-center gap-3">
-                                                                {renderFlag(r.country, r.lottery_name)}
-                                                                <span className="text-xs sm:text-sm font-light text-green-900 dark:text-green-200 truncate">{r.lottery_name || group}</span>
-                                                            </TableCell>
-                                                            <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{top3}</TableCell>
-                                                            <TableCell className={`p-2 text-center text-sm font-mono transition-colors hidden sm:table-cell ${isPending || top2.length < 2 ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{isPending ? 'xx' : top2}</TableCell>
-                                                            <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{bottom2}</TableCell>
-                                                            <TableCell className="p-2">
-                                                                <ChevronRight className="w-4 h-4 text-green-400 dark:text-green-600" />
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    );
-                                                })}
-                                            </Fragment>
-                                        ))}
+                                                        return (
+                                                            <TableRow
+                                                                key={r.id}
+                                                                className="border-b border-green-100/80 dark:border-green-900/50 hover:bg-green-200/50 dark:hover:bg-green-800/40 transition-colors duration-200 cursor-pointer"
+                                                                onClick={() => { setSelected(r); setDrawerOpen(true); }}
+                                                            >
+                                                                <TableCell className="p-2 text-xs font-mono text-green-800 dark:text-green-300">{time}</TableCell>
+                                                                <TableCell className="p-2 flex items-center gap-3">
+                                                                    {renderFlag(r.country, r.lottery_name)}
+                                                                    <span className="text-xs sm:text-sm font-light text-green-900 dark:text-green-200 truncate">{r.lottery_name || group}</span>
+                                                                </TableCell>
+                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{top3}</TableCell>
+                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors hidden sm:table-cell ${isPending || top2.length < 2 ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{isPending ? 'xx' : top2}</TableCell>
+                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{bottom2}</TableCell>
+                                                                <TableCell className="p-2">
+                                                                    <ChevronRight className="w-4 h-4 text-green-400 dark:text-green-600" />
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </Fragment>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </div>

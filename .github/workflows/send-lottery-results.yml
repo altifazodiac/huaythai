@@ -1,0 +1,35 @@
+name: Send Lottery Results
+
+on:
+  schedule:
+    # รันทุก 30 นาทีเหมือนเดิม
+    - cron: '0,30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  send-results:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout โค้ดใน Repository ของเรา
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. ตั้งค่าสภาพแวดล้อม Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # หรือเวอร์ชัน LTS ที่คุณใช้
+          cache: 'npm' # สั่งให้ cache node_modules เพื่อให้รันครั้งถัดไปเร็วขึ้น
+
+      # 3. ติดตั้ง Dependencies ทั้งหมด
+      - name: Install dependencies
+        run: npm install
+
+      # 4. รัน Script ของเราโดยตรง
+      - name: Run send results script
+        run: npx ts-node send-lottery-results.ts
+        # 5. ส่งค่า Environment Variables/Secrets เข้าไปใน Script
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

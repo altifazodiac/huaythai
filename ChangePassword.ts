@@ -1,3 +1,5 @@
+import { supabase } from "./lib/supabaseClient";
+
 const bcrypt = require('bcrypt');
 
 async function hashPassword(password: string) {
@@ -7,6 +9,19 @@ async function hashPassword(password: string) {
 }
 
 // ใช้งาน
-hashPassword('74108520').then(hashed => {
-    console.log(hashed); // แสดงรหัสผ่านที่เข้ารหัสแล้ว
+hashPassword('987654321').then(hashed => {
+    const { data, error } = await supabase.auth.update({
+        password: '987654321' // Replace with the new password
+      });
+      console.log(data, error);
 });
+
+
+
+
+
+
+
+
+
+

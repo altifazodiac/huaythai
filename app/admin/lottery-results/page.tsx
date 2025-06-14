@@ -77,6 +77,25 @@ interface LotteryScheduleCardProps {
   onPasteResultForThisCard?: (values: { top3: string, bottom2: string }) => void;
 }
 
+// ฟังก์ชันแปลงชื่อวันอังกฤษเป็นไทย (ใช้ร่วมกับ LotteryScheduleCard)
+const dayOfWeekTH: Record<string, string> = {
+  'Monday': 'จันทร์',
+  'Tuesday': 'อังคาร',
+  'Wednesday': 'พุธ',
+  'Thursday': 'พฤหัสบดี',
+  'Friday': 'ศุกร์',
+  'Saturday': 'เสาร์',
+  'Sunday': 'อาทิตย์',
+};
+
+function getDayOfWeekTH(days: string[] | string | undefined): string {
+  if (!days) return '';
+  if (Array.isArray(days)) {
+    return days.map(d => dayOfWeekTH[d] || d).join(', ');
+  }
+  return dayOfWeekTH[days] || days;
+}
+
 const LotteryScheduleCard: React.FC<LotteryScheduleCardProps> = ({
   sch,
   subNumbers,
@@ -153,6 +172,9 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
               รอบ: {sch.drawing_time}
+              {sch.day_of_week && getDayOfWeekTH(sch.day_of_week) && (
+                <span> วัน{getDayOfWeekTH(sch.day_of_week)}</span>
+              )}
             </CardDescription>
           </div>
           {(!isSuccessfullySaved || isSaving) && !isSaving && (
@@ -522,7 +544,10 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
             <h2 className="text-xl font-semibold text-slate-700 mb-1.5">{group.details.type_name}</h2>
               {group.details.description && <p className="text-sm text-slate-500 mb-5">{group.details.description}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {group.schedules.map(sch => {
+              {group.schedules
+                .slice() // copy to avoid mutating state
+                .sort((a, b) => a.drawing_time.localeCompare(b.drawing_time))
+                .map(sch => {
                   const subTypeId = sch.lottery_sub_types[0]?.lottery_sub_type_id;
                 return (
                   <LotteryScheduleCard
