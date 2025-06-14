@@ -99,10 +99,10 @@ async function main() {
         }, {});
         
         // สร้างข้อความที่จะส่งจากข้อมูลที่จัดกลุ่มแล้ว
-        let messageText = `╔═══════════════════════════════╗\n`;
-        messageText += `      📅 ผลหวยรอบ ${endTime} 📅\n`;
-        messageText += `      ประจำวันที่ ${drawDate}\n`;
-        messageText += `╚═══════════════════════════════╝\n\n`;
+    let messageText =  `╔════════════════════════╗\n`;
+        messageText += `📅 ผลหวยรอบ ${endTime} 📅\n`;
+        messageText += `   ประจำวันที่ ${drawDate}\n`;
+        messageText += `╚════════════════════════╝\n\n`;
 
         Object.values(groupedResults).forEach(lotto => {
             messageText += `${lotto.flag} ${lotto.name} (${lotto.time})\n`;
