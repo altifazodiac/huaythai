@@ -23,7 +23,7 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
       const { data: userRow, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       let role = userRow?.role;
