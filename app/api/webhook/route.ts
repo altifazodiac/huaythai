@@ -21,6 +21,36 @@ const config = {
 };
 const client = new Client(config);
 
+// --- Utility Functions ---
+function getCountryCode(countryOrigin: string): string {
+    const map: Record<string, string> = {
+        'ไทย': 'TH',
+        'ลาว': 'LA',
+        'เวียดนาม': 'VN',
+        'มาเลเซีย': 'MY',
+        'สหรัฐอเมริกา': 'US',
+        'อังกฤษ': 'GB',
+        'รัสเซีย': 'RU',
+        'จีน': 'CN',
+        'ญี่ปุ่น': 'JP',
+        'เยอรมัน': 'DE',
+        'อินเดีย': 'IN',
+        'สิงคโปร์': 'SG',
+        'อิตาลี': 'IT',
+        'สเปน': 'ES',
+        'ฟิลิปปินส์': 'PH',
+        'ออสเตรีย': 'AT',
+        // เพิ่มประเทศอื่นๆ ตามต้องการ
+    };
+    return map[countryOrigin] || countryOrigin;
+}
+
+function countryCodeToFlagEmoji(code: string): string {
+    return code
+        .toUpperCase()
+        .replace(/./g, char => String.fromCodePoint(127397 + char.charCodeAt(0)));
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: WebhookRequestBody = await req.json();
@@ -87,24 +117,25 @@ export async function POST(req: NextRequest) {
                   acc[key] = {
                       name: result.lottery_sub_types.sub_type_name,
                       time: result.draw_time,
-                      flag: result.lottery_sub_types.country_origin,
-                      top3: 'ไม่มี',
-                      top2: 'ไม่มี',
-                      bottom2: 'ไม่มี',
+                      flag: getCountryCode(result.lottery_sub_types.country_origin),
+                      top3: 'รอผล',
+                      top2: 'รอผล',
+                      bottom2: 'รอผล',
                   };
               }
-              if (result.prize_code === '3top') acc[key].top3 = result.winning_number;
-              if (result.prize_code === '2top') acc[key].top2 = result.winning_number;
-              if (result.prize_code === '2bottom') acc[key].bottom2 = result.winning_number;
+              if (['3 ตัวบน', '3top'].includes(result.prize_code)) acc[key].top3 = result.winning_number;
+              if (['2 ตัวบน', '2top'].includes(result.prize_code)) acc[key].top2 = result.winning_number;
+              if (['2 ตัวล่าง', '2bottom'].includes(result.prize_code)) acc[key].bottom2 = result.winning_number;
               return acc;
           }, {});
 
-          let messageText =  `╔═ ผลหวยล่าสุด ═╗\n`;
+          let messageText =  `╔══ ผลหวยล่าสุด หวยเศรษฐี789 ══╗\n`;
           messageText += `   ประจำวันที่ ${drawDate}\n`;
-          messageText += `╚══════════════╝\n\n`;
+          messageText += `╚════════════╝\n\n`;
 
           Object.values(groupedResults).forEach(lotto => {
-              messageText += `${lotto.flag} ${lotto.name} (${lotto.time})\n`;
+              const flagEmoji = countryCodeToFlagEmoji(lotto.flag);
+              messageText += `${flagEmoji} ${lotto.name} (${lotto.time})\n`;
               messageText += `  ✨ 3 ตัวบน: ${lotto.top3}\n`;
               messageText += `  💫 2 ตัวบน: ${lotto.top2}\n`;
               messageText += `  ⬇️ 2 ตัวล่าง: ${lotto.bottom2}\n\n`;

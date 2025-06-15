@@ -177,20 +177,35 @@ async function automateBatchImportLotteryResults(drawDate: string) {
         console.log(`No API results found to import for date: ${drawDate}.`);
         return;
     }
+    console.log(`[Import][Debug] lottery_api_results for ${drawDate}:`, apiResults);
+
     const { data: aliases, error: aliasError } = await supabase.from('lottery_name_aliases').select('alias_name, lottery_sub_type_id');
     if (aliasError) throw aliasError;
+    console.log(`[Import][Debug] lottery_name_aliases:`, aliases);
+
     const { data: schedules, error: scheduleError } = await supabase.from('drawing_schedules').select('schedule_id, lottery_sub_type_id, drawing_time');
     if (scheduleError) throw scheduleError;
     const { data: subTypes, error: subTypeError } = await supabase.from('lottery_sub_types').select('lottery_sub_type_id, lottery_type_id');
     if (subTypeError) throw subTypeError;
+
     const upsertRows: any[] = [];
     for (const apiResult of apiResults) {
+        console.log(`[Import][Debug] Processing apiResult.lottery_name: "${apiResult.lottery_name}"`);
         const alias = aliases.find(a => a.alias_name === apiResult.lottery_name);
-        if (!alias) { console.warn(`[Import] No alias found for: ${apiResult.lottery_name}`); continue; };
+        if (!alias) { 
+            console.warn(`[Import][Warning] No alias found for: "${apiResult.lottery_name}"`);
+            continue; 
+        }
         const schedule = schedules.find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
-        if (!schedule) { console.warn(`[Import] No schedule found for: ${apiResult.lottery_name}`); continue; };
+        if (!schedule) { 
+            console.warn(`[Import][Warning] No schedule found for: "${apiResult.lottery_name}" (sub_type_id: ${alias.lottery_sub_type_id})`);
+            continue; 
+        }
         const subType = subTypes.find(st => st.lottery_sub_type_id === alias.lottery_sub_type_id);
-        if (!subType) continue;
+        if (!subType) {
+            console.warn(`[Import][Warning] No subType found for: "${apiResult.lottery_name}" (sub_type_id: ${alias.lottery_sub_type_id})`);
+            continue;
+        }
         const createRow = (prizeCode: string, number: string) => ({ lottery_type_id: subType.lottery_type_id, lottery_sub_type_id: alias.lottery_sub_type_id, schedule_id: schedule.schedule_id, draw_date: apiResult.draw_date, draw_time: apiResult.draw_time, prize_code: prizeCode, winning_number: number });
         for (const result of apiResult.results) {
             if (typeof result !== 'string' || !result.includes(':')) continue;

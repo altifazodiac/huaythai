@@ -15,6 +15,37 @@ interface FormattedResult {
     bottom2: string;
 }
 
+// --- Utility Functions ---
+function getCountryCode(countryOrigin: string): string {
+    const map: Record<string, string> = {
+        'ไทย': 'TH',
+        'ลาว': 'LA',
+        'เวียดนาม': 'VN',
+        'มาเลเซีย': 'MY',
+        'สหรัฐอเมริกา': 'US',
+        'อังกฤษ': 'GB',
+        'รัสเซีย': 'RU',
+        'จีน': 'CN',
+        'ญี่ปุ่น': 'JP',
+        'เยอรมัน': 'DE',
+        'อินเดีย': 'IN',
+        'สิงคโปร์': 'SG',
+        'อิตาลี': 'IT',
+        'สเปน': 'ES',
+        'ฟิลิปปินส์': 'PH',
+        'ออสเตรีย': 'AT',
+        
+        
+    };
+    return map[countryOrigin] || countryOrigin;
+}
+
+function countryCodeToFlagEmoji(code: string): string {
+    return code
+        .toUpperCase()
+        .replace(/./g, char => String.fromCodePoint(127397 + char.charCodeAt(0)));
+}
+
 // --- Main Logic Function ---
 async function main() {
     console.log('Starting stateful lottery result script...');
@@ -40,11 +71,8 @@ async function main() {
         const drawDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
         const currentTime = formatInTimeZone(now, timeZone, 'HH:mm:ss');
 
-        // 1. ดึงผลหวยที่ "ยังไม่ได้ส่ง" และ "ผลออกแล้ว" ทั้งหมดของวันนี้
-        console.log(`Fetching unsent results for date: ${drawDate}`);
-        
-        // ✅ แก้ไขตรงนี้: ย้าย Comment ออกมาไว้นอก backtick ``
-        // สำคัญมาก: ต้องดึง ID มาด้วยเพื่อใช้ในการอัปเดต
+        // 1. ดึงผลหวยของวันนี้เท่านั้น (และยังไม่เคยส่ง LINE)
+        console.log(`Fetching results for today only (not sent to LINE): ${drawDate}`);
         const { data: results, error: dbError } = await supabaseClient
             .from('lottery_results')
             .select(`
@@ -53,22 +81,23 @@ async function main() {
                 draw_time,
                 winning_number,
                 prize_code,
+                is_sent_to_line,
                 lottery_sub_types (
                     sub_type_name,
-                    country_origin
+                    country_origin,
+                    country
                 )
             `)
-            .eq('is_sent_to_line', false)
             .eq('draw_date', drawDate)
-            .not('winning_number', 'is', null)
-            .order('draw_time', { ascending: true });
+            .eq('is_sent_to_line', false)
+            .order('draw_time', { ascending: false });
 
         if (dbError) {
             throw new Error(`Supabase select error: ${dbError.message}`);
         }
 
         if (!results || results.length === 0) {
-            console.log('No new lottery results to send. Exiting gracefully.');
+            console.log('No lottery results for today. Exiting gracefully.');
             return;
         }
         
@@ -81,27 +110,28 @@ async function main() {
                 acc[key] = {
                     name: result.lottery_sub_types.sub_type_name,
                     time: result.draw_time,
-                    flag: result.lottery_sub_types.country_origin,
-                    top3: 'ไม่มี',
-                    top2: 'ไม่มี',
-                    bottom2: 'ไม่มี',
+                    flag: getCountryCode(result.lottery_sub_types.country_origin),
+                    top3: 'รอผล',
+                    top2: 'รอผล',
+                    bottom2: 'รอผล',
                 };
             }
-            if (result.prize_code === '3top') acc[key].top3 = result.winning_number;
-            if (result.prize_code === '2top') acc[key].top2 = result.winning_number;
-            if (result.prize_code === '2bottom') acc[key].bottom2 = result.winning_number;
+            if (result.prize_code === '3 ตัวบน') acc[key].top3 = result.winning_number;
+            if (result.prize_code === '2 ตัวบน') acc[key].top2 = result.winning_number;
+            if (result.prize_code === '2 ตัวล่าง') acc[key].bottom2 = result.winning_number;
 
             return acc;
         }, {});
         
         // 3. สร้างและส่งข้อความ (Logic เดิม)
-        let messageText =  `╔═ หวยเศรษฐี789═╗\n`;
+    let messageText =  `╔════ หวยเศรษฐี789 ════╗\n`;
         messageText += `📅 ผลหวยรอบล่าสุด (${currentTime}) 📅\n`;
         messageText += `   ประจำวันที่ ${drawDate}\n`;
         messageText += `╚══════════════╝\n\n`;
 
         Object.values(groupedResults).forEach(lotto => {
-            messageText += `${lotto.flag} ${lotto.name} (${lotto.time})\n`;
+            const flagEmoji = countryCodeToFlagEmoji(lotto.flag);
+            messageText += `${flagEmoji} ${lotto.name} (${lotto.time})\n`;
             messageText += `  ✨ 3 ตัวบน: ${lotto.top3}\n`;
             messageText += `  💫 2 ตัวบน: ${lotto.top2}\n`;
             messageText += `  ⬇️ 2 ตัวล่าง: ${lotto.bottom2}\n\n`;
