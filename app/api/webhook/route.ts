@@ -40,6 +40,9 @@ function getCountryCode(countryOrigin: string): string {
         'สเปน': 'ES',
         'ฟิลิปปินส์': 'PH',
         'ออสเตรีย': 'AT',
+        "เกาหลี": "KR",
+        "ฮั่งเส็ง": "HK",
+        "ไต้หวัน": "TW",
         // เพิ่มประเทศอื่นๆ ตามต้องการ
     };
     return map[countryOrigin] || countryOrigin;
@@ -80,7 +83,7 @@ export async function POST(req: NextRequest) {
 
           console.log(`User ${event.source?.userId} requested latest results for date: ${drawDate}`);
 
-          // ค้นหาผลหวยทั้งหมดของวันนี้ที่ออกรางวัลแล้ว โดยเรียงจากเวลาล่าสุดไปเก่าสุด
+          // ดึงผลหวยของวันนี้ทั้งหมด (ไม่จำกัดเฉพาะรอบล่าสุด)
           const { data: allTodayResults, error: dbError } = await supabase
             .from('lottery_results')
             .select(`
@@ -106,13 +109,9 @@ export async function POST(req: NextRequest) {
             return client.replyMessage(event.replyToken, replyMessage);
           }
 
-          // กรองเอาเฉพาะผลหวยของ "รอบล่าสุด" ที่เจอ
-          const latestTime = allTodayResults[0].draw_time;
-          const latestDrawResults = allTodayResults.filter(r => r.draw_time === latestTime);
-
           // --- 3. นำ Logic การจัดกลุ่มและสร้างข้อความมาใช้ ---
-          const groupedResults = latestDrawResults.reduce<Record<string, FormattedResult>>((acc, result: any) => {
-              const key = result.lottery_sub_types.sub_type_name;
+          const groupedResults = allTodayResults.reduce<Record<string, FormattedResult>>((acc, result: any) => {
+              const key = result.lottery_sub_types.sub_type_name + '|' + result.draw_time;
               if (!acc[key]) {
                   acc[key] = {
                       name: result.lottery_sub_types.sub_type_name,
@@ -129,7 +128,7 @@ export async function POST(req: NextRequest) {
               return acc;
           }, {});
 
-          let messageText =  `╔══ ผลหวยล่าสุด หวยเศรษฐี789 ══╗\n`;
+          let messageText =  `╔═ ผลหวยวันนี้หวยเศรษฐี789 ═╗\n`;
           messageText += `   ประจำวันที่ ${drawDate}\n`;
           messageText += `╚════════════╝\n\n`;
 

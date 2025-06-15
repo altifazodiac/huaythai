@@ -34,6 +34,9 @@ function getCountryCode(countryOrigin: string): string {
         'สเปน': 'ES',
         'ฟิลิปปินส์': 'PH',
         'ออสเตรีย': 'AT',
+        "เกาหลี": "KR",
+        "ฮั่งเส็ง": "HK",
+        "ไต้หวัน": "TW",
         
         
     };
@@ -124,7 +127,7 @@ async function main() {
         }, {});
         
         // 3. สร้างและส่งข้อความ (Logic เดิม)
-    let messageText =  `╔════ หวยเศรษฐี789 ════╗\n`;
+    let messageText =  `╔══ หวยเศรษฐี789 ══╗\n`;
         messageText += `📅 ผลหวยรอบล่าสุด (${currentTime}) 📅\n`;
         messageText += `   ประจำวันที่ ${drawDate}\n`;
         messageText += `╚══════════════╝\n\n`;
