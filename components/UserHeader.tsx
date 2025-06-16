@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
 import { Skeleton } from "@/components/ui/skeleton"; // ใช้ Skeleton loading
+import Link from "next/link";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,7 +51,7 @@ export default function UserHeader() {
       className="w-full animated-gradient-bg shadow-md py-2 px-4 sm:px-6 flex items-center justify-between   z-40" // ลด py, px, rounded, z-index
       style={{ position: "relative" }}
     >
-      <div className="flex items-center gap-2"> {/* ลด gap */}
+      <Link href="/" className="flex items-center gap-2"> {/* ลด gap */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -60,7 +61,7 @@ export default function UserHeader() {
         >
           🎟️ หวยเศรษฐี 789
         </motion.div>
-      </div>
+      </Link>
       <div className="flex items-center gap-3"> {/* ลด gap */}
         {loading ? (
           <>

@@ -519,12 +519,13 @@ export default function LotteryTicketPage() {
   }
 
   async function handleConfirmSubmit() {
+    if (isSubmitting) return; // ป้องกัน double click
+    setIsSubmitting(true);
     if (!selectedDraw || !user) {
       toast.error(!user ? "กรุณาเข้าสู่ระบบก่อนทำรายการ" : "ไม่พบข้อมูลรอบรางวัล");
       return;
     }
     try {
-      setIsSubmitting(true);
       const drawDateForCheck = new Date(selectedDraw.date); drawDateForCheck.setHours(0, 0, 0, 0);
       const todayForCheck = new Date(); todayForCheck.setHours(0, 0, 0, 0);
 
@@ -807,63 +808,88 @@ export default function LotteryTicketPage() {
     return { allTypeLabels: calculatedAllTypeLabels, groups: calculatedGroups };
   }, [ticketList, payouts]);
 
-  const ConfirmationDialog = () => (
-    <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
-      <DialogContent className="bg-white dark:bg-slate-800">
-        <DialogHeader>
-          <DialogTitle className="text-slate-800 dark:text-slate-100">ยืนยันการซื้อหวย</DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400">
-            {selectedDraw ? (
-              <>
-                <span>วันที่: {format(selectedDraw.date, 'PPP', { locale: th })}</span><br />
-                <span>เวลาออก: {selectedDraw.schedule.drawing_time}</span>
-              </>
-            ) : (
-              <span className="text-red-500">ไม่พบข้อมูลรอบออกรางวัล</span>
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="text-sm">
-            <p className="font-medium mb-2 text-slate-700 dark:text-slate-300">รายการที่เลือก:</p>
-            <div className="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-md">
-              <table className="min-w-full text-xs">
-                <thead >
-                  <tr className="bg-slate-50 dark:bg-slate-700">
-                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-left text-slate-600 dark:text-slate-300">ประเภท</th>
-                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-left text-slate-600 dark:text-slate-300">หมายเลข</th>
-                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-right text-slate-600 dark:text-slate-300">จำนวนเงิน/เลข</th>
-                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-right text-slate-600 dark:text-slate-300">จำนวนเลข</th>
-                    <th className="px-2 py-1.5 border-b border-slate-200 dark:border-slate-600 text-right text-slate-600 dark:text-slate-300">รวม</th>
-                  </tr>
-                </thead>
-                <tbody className="text-slate-700 dark:text-slate-300">
-                  {ticketList.map((item, index) => (
-                    <tr key={item.uniqueKey + "_" + index} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
-                      <td className="px-2 py-1.5">{item.subType.sub_type_name} - {item.payout.type_number}</td>
-                      <td className="px-2 py-1.5">{item.numbers.join(', ')}</td>
-                      <td className="px-2 py-1.5 text-right">{item.amount.toLocaleString()}</td>
-                      <td className="px-2 py-1.5 text-right">{item.numbers.length}</td>
-                      <td className="px-2 py-1.5 text-right">{(item.amount * item.numbers.length).toLocaleString()}</td>
+  const ConfirmationDialog = () => {
+    // --- Group tickets by subType, type, amount ---
+    const grouped = useMemo(() => {
+      const groups: Record<string, { label: string; numbers: string[]; amount: number; total: number }> = {};
+      ticketList.forEach(item => {
+        const key = `${item.subType.sub_type_name}|${item.payout.type_number}|${item.amount}`;
+        if (!groups[key]) {
+          groups[key] = {
+            label: `${item.subType.sub_type_name} - ${item.payout.type_number}`,
+            numbers: [],
+            amount: item.amount,
+            total: 0,
+          };
+        }
+        groups[key].numbers.push(...item.numbers);
+        groups[key].total += item.amount * item.numbers.length;
+      });
+      return Object.values(groups);
+    }, [ticketList]);
+
+    return (
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent className="bg-white dark:bg-slate-800 max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-slate-800 dark:text-slate-100">ยืนยันการซื้อหวย</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
+              {selectedDraw ? (
+                <>
+                  <span>วันที่: {format(selectedDraw.date, 'PPP', { locale: th })}</span><br />
+                  <span>เวลาออก: {selectedDraw.schedule.drawing_time}</span>
+                </>
+              ) : (
+                <span className="text-red-500">ไม่พบข้อมูลรอบออกรางวัล</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto my-2">
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-700">
+                  <th className="px-2 py-1.5 border-b text-left">ประเภท</th>
+                  <th className="px-2 py-1.5 border-b text-left">หมายเลข</th>
+                  <th className="px-2 py-1.5 border-b text-right">จำนวนเงิน/เลข</th>
+                  <th className="px-2 py-1.5 border-b text-right">จำนวนเลข</th>
+                  <th className="px-2 py-1.5 border-b text-right">รวม</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-4 text-slate-400">ไม่มีรายการ</td></tr>
+                ) : (
+                  grouped.map((group, idx) => (
+                    <tr key={group.label + idx} className="border-b last:border-b-0">
+                      <td className="px-2 py-1.5">{group.label}</td>
+                      <td className="px-2 py-1.5">
+                        {group.numbers.slice(0, 5).join(", ")}
+                        {group.numbers.length > 5 && (
+                          <> ... (รวม {group.numbers.length} เลข)</>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-right">{group.amount.toLocaleString()}</td>
+                      <td className="px-2 py-1.5 text-right">{group.numbers.length}</td>
+                      <td className="px-2 py-1.5 text-right">{group.total.toLocaleString()}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
           <div className="text-right font-medium mt-2 text-slate-800 dark:text-slate-200">
-            ยอดรวม: {ticketList.reduce((sum, item) => sum + item.amount * item.numbers.length, 0).toLocaleString()} บาท
+            ยอดรวม: {grouped.reduce((sum, g) => sum + g.total, 0).toLocaleString()} บาท
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">ยกเลิก</Button>
-          <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-green-600 hover:bg-green-700 text-white">
-            {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+          <DialogFooter className="sticky bottom-0 bg-white dark:bg-slate-800 pt-4 z-10">
+            <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">ยกเลิก</Button>
+            <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-green-600 hover:bg-green-700 text-white">
+              {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   const fetchUserData = useCallback(async () => {
     const { data: { user: supabaseUser } } = await supabase.auth.getUser(); 

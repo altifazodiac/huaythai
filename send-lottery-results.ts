@@ -1,8 +1,9 @@
-// send-lottery-results.ts (ฉบับแก้ไข)
+// send-lottery-results.ts (ฉบับแก้ไข Error)
 
 import { Client } from '@line/bot-sdk';
 import { createClient } from '@supabase/supabase-js';
 import { formatInTimeZone } from 'date-fns-tz';
+import { subMinutes } from 'date-fns';
 import 'dotenv/config';
 
 // --- Type Definitions ---
@@ -37,8 +38,7 @@ function getCountryCode(countryOrigin: string): string {
         "เกาหลี": "KR",
         "ฮั่งเส็ง": "HK",
         "ไต้หวัน": "TW",
-        
-        
+        "สลากกินแบ่งรัฐบาล": "TH",
     };
     return map[countryOrigin] || countryOrigin;
 }
@@ -71,12 +71,20 @@ async function main() {
     try {
         const timeZone = 'Asia/Bangkok';
         const now = new Date();
+        
         const drawDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
         const currentTime = formatInTimeZone(now, timeZone, 'HH:mm:ss');
+        
+        const threeMinutesAgo = subMinutes(now, 3);
+        const triggerTime = formatInTimeZone(threeMinutesAgo, timeZone, 'HH:mm:ss');
 
-        // 1. ดึงผลหวยของวันนี้เท่านั้น (และยังไม่เคยส่ง LINE)
-        console.log(`Fetching results for today only (not sent to LINE): ${drawDate}`);
-        const { data: results, error: dbError } = await supabaseClient
+        const dayOfMonth = parseInt(formatInTimeZone(now, timeZone, 'd'), 10);
+        const hourOfDay = parseInt(formatInTimeZone(now, timeZone, 'H'), 10);
+        const minuteOfDay = parseInt(formatInTimeZone(now, timeZone, 'm'), 10);
+
+        // 1. ดึงผลหวย *ทั้งหมด* ของวันนี้ที่ยังไม่เคยส่ง
+        console.log(`Fetching all unsent results for today: ${drawDate}`);
+        const { data: allUnsentResults, error: dbError } = await supabaseClient
             .from('lottery_results')
             .select(`
                 id,
@@ -85,35 +93,92 @@ async function main() {
                 winning_number,
                 prize_code,
                 is_sent_to_line,
-                lottery_sub_types (
-                    sub_type_name,
-                    country_origin,
-                    country
-                )
+                lottery_sub_types ( sub_type_name, country_origin, country )
             `)
             .eq('draw_date', drawDate)
-            .eq('is_sent_to_line', false)
-            .order('draw_time', { ascending: false });
+            .eq('is_sent_to_line', false);
 
         if (dbError) {
             throw new Error(`Supabase select error: ${dbError.message}`);
         }
 
-        if (!results || results.length === 0) {
-            console.log('No lottery results for today. Exiting gracefully.');
+        if (!allUnsentResults || allUnsentResults.length === 0) {
+            console.log('No unsent lottery results for today. Exiting gracefully.');
+            return;
+        }
+
+        console.log(`Current time: ${currentTime}, Trigger time (3 mins ago): ${triggerTime}`);
+        
+        // 2. กรองเฉพาะหวยที่ "ถึงเวลา" ที่จะส่ง (Time-Eligible)
+        const eligibleResults = allUnsentResults.filter(result => {
+            // --- FIX START ---
+            // เพิ่มการตรวจสอบว่า lottery_sub_types มีข้อมูลและเป็น array ที่ไม่ว่าง
+            if (!result.lottery_sub_types || result.lottery_sub_types.length === 0) {
+                return false;
+            }
+            const subTypeName = result.lottery_sub_types[0].sub_type_name;
+            // --- FIX END ---
+            
+            if (subTypeName === 'สลากกินแบ่งรัฐบาล') {
+                const isAllowedDay = dayOfMonth === 1 || dayOfMonth === 16;
+                const isAllowedTime = (hourOfDay > 15) || (hourOfDay === 15 && minuteOfDay >= 43);
+                if (isAllowedDay && isAllowedTime) {
+                    console.log(`Gov lottery is eligible by date/time.`);
+                    return true;
+                }
+                return false;
+            }
+            
+            if (result.draw_time <= triggerTime) {
+                console.log(`'${subTypeName}' with draw time ${result.draw_time} is eligible.`);
+                return true;
+            }
+
+            return false;
+        });
+
+        if (eligibleResults.length === 0) {
+            console.log("No results are eligible for sending at this time. Exiting.");
+            return;
+        }
+
+        // 3. กรองอีกชั้น เฉพาะหวยที่มี "เลขรางวัล" แล้วเท่านั้น
+        const finalResultsToSend = eligibleResults.filter(result => {
+            const hasWinningNumber = result.winning_number && result.winning_number.trim() !== '' && result.winning_number !== 'รอผล';
+            if (!hasWinningNumber) {
+                // --- FIX START ---
+                // ตรวจสอบก่อนเรียกใช้ เพื่อป้องกัน error และแสดง log ได้อย่างถูกต้อง
+                const subTypeName = (result.lottery_sub_types && result.lottery_sub_types.length > 0)
+                    ? result.lottery_sub_types[0].sub_type_name
+                    : 'Unknown';
+                console.log(`Skipping '${subTypeName}' (ID: ${result.id}) because winning_number is missing.`);
+                // --- FIX END ---
+            }
+            return hasWinningNumber;
+        });
+
+        if (finalResultsToSend.length === 0) {
+            console.log("Eligible results found, but none have winning numbers yet. Exiting.");
             return;
         }
         
-        console.log(`Found ${results.length} new results to process.`);
+        // 4. จัดกลุ่มผลลัพธ์
+        const groupedResults = finalResultsToSend.reduce<Record<string, FormattedResult>>((acc, result: any) => {
+            // --- FIX START ---
+            if (!result.lottery_sub_types || result.lottery_sub_types.length === 0) {
+                return acc; // ข้ามรายการนี้ถ้าไม่มีข้อมูล sub_type
+            }
+            const subType = result.lottery_sub_types[0];
+            const key = subType.sub_type_name;
+            // --- FIX END ---
 
-        // 2. จัดกลุ่มผลลัพธ์ (Logic เดิม)
-        const groupedResults = results.reduce<Record<string, FormattedResult>>((acc, result: any) => {
-            const key = result.lottery_sub_types.sub_type_name;
             if (!acc[key]) {
                 acc[key] = {
-                    name: result.lottery_sub_types.sub_type_name,
+                    // --- FIX START ---
+                    name: subType.sub_type_name,
                     time: result.draw_time,
-                    flag: getCountryCode(result.lottery_sub_types.country_origin),
+                    flag: getCountryCode(subType.country_origin),
+                    // --- FIX END ---
                     top3: 'รอผล',
                     top2: 'รอผล',
                     bottom2: 'รอผล',
@@ -126,11 +191,11 @@ async function main() {
             return acc;
         }, {});
         
-        // 3. สร้างและส่งข้อความ (Logic เดิม)
-    let messageText =  `╔══ หวยเศรษฐี789 ══╗\n`;
+        // 5. สร้างและส่งข้อความ
+        let messageText =  `╔══ หวยเศรษฐี789 ══╗\n`;
         messageText += `📅 ผลหวยรอบล่าสุด (${currentTime}) 📅\n`;
-        messageText += `   ประจำวันที่ ${drawDate}\n`;
-        messageText += `╚══════════════╝\n\n`;
+        messageText += `    ประจำวันที่ ${drawDate}\n`;
+        messageText += `╚════════════╝\n\n`;
 
         Object.values(groupedResults).forEach(lotto => {
             const flagEmoji = countryCodeToFlagEmoji(lotto.flag);
@@ -145,8 +210,8 @@ async function main() {
         await lineClient.broadcast([{ type: 'text', text: messageText }]);
         console.log('Message has been sent successfully!');
 
-        // 4. อัปเดตสถานะในฐานข้อมูล (ส่วนนี้จะทำงานถูกต้องแล้ว)
-        const resultIds = results.map(r => r.id);
+        // 6. อัปเดตสถานะในฐานข้อมูล (เฉพาะรายการที่ส่งสำเร็จ)
+        const resultIds = finalResultsToSend.map(r => r.id);
         console.log(`Updating ${resultIds.length} rows in database to is_sent_to_line = true`);
         
         const { error: updateError } = await supabaseClient

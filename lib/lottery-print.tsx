@@ -3,6 +3,7 @@ import { th } from "date-fns/locale";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { getThailandTime, getNextDrawDate } from "@/lib/utils/date-utils";
+import { toZonedTime } from "date-fns-tz";
 
 // --- START: Types adapted from page.tsx ---
 interface LotterySubType {
@@ -219,7 +220,10 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
     const formattedActualDrawDate = purchase.draw_date 
       ? format(parseISO(purchase.draw_date), "d MMMM yyyy", { locale: th })
       : "ไม่ระบุ";
-    const formattedPurchaseDateTime = format(parseISO(purchase.purchase_date), "d MMM yy HH:mm น.", { locale: th });
+    const THAILAND_TZ = "Asia/Bangkok";
+    const purchaseDateObj = parseISO(purchase.purchase_date);
+    const purchaseDateInThai = toZonedTime(purchaseDateObj, THAILAND_TZ);
+    const formattedPurchaseDateTime = format(purchaseDateInThai, "d MMM yy HH:mm น.", { locale: th });
     const lotteryTypeName = purchase.items.length > 0 ? purchase.items[0].lottery_sub_types.sub_type_name : "ไม่ระบุประเภท";
 
     // Transform PrintLotteryTicketItem[] to TicketDisplayItem[] for createGroups
@@ -244,15 +248,15 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
       }, 0);
 
       return `
-        <div class="ticket-group-item" style="display: flex; border-bottom: 1px solid #eee; padding: 4px 2px; font-size: 11px;">
-          <div class="group-info" style="width: 90px; text-align: center; padding-right: 5px; border-right: 1px dashed #ccc; flex-shrink: 0;">
-            <div style="font-weight: bold;">${group.digit_number} ตัว</div>
-            <div style="color: #d32f2f; font-size: 10px;">${group.typeOrder.join(" x ")}</div>
-            <div style="font-size: 10px;">${group.typeOrder.map(label => (group.amounts[label] !== undefined ? group.amounts[label] : 0).toFixed(0)).join(" x ")}</div>
-            <div style="font-size: 10px; color: #555;">รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] !== undefined ? group.amounts[label] : 0), 0) * group.numbers.length).toFixed(0)}฿</div>
+        <div class="ticket-group-item" style="display: flex; border-bottom: 1px solid #e5e7eb; padding: 8px 4px; font-size: 12px; background:rgba(20,83,45,0.04); border-radius: 8px; margin-bottom: 4px; box-shadow:0 1px 2px rgba(20,83,45,0.04);">
+          <div class="group-info" style="width: 90px; text-align: center; padding-right: 8px; border-right: 2px dashed #22c55e; flex-shrink: 0;">
+            <div style="font-weight: bold; color: #14532d; font-size: 15px;"><i class='fa fa-th-large' style='color:#22c55e; margin-right:2px;'></i>${group.digit_number} ตัว</div>
+            <div style="color: #166534; font-size: 11px; font-weight:500;">${group.typeOrder.map(label => `<i class='fa fa-certificate' style='color:#facc15;'></i> ${label}`).join(" ")}</div>
+            <div style="font-size: 11px; color:#14532d;">${group.typeOrder.map(label => (group.amounts[label] !== undefined ? group.amounts[label] : 0).toFixed(0)).join(" x ")}</div>
+            <div style="font-size: 11px; color: #22c55e; font-weight:600;"><i class='fa fa-coins' style='color:#facc15;'></i> รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] !== undefined ? group.amounts[label] : 0), 0) * group.numbers.length).toFixed(0)}฿</div>
           </div>
-          <div class="group-numbers" style="flex-grow: 1; padding-left: 8px; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
-            ${group.numbers.map(num => `<span style="background-color: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-size:12px;">${num}</span>`).join("")}
+          <div class="group-numbers" style="flex-grow: 1; padding-left: 12px; line-height: 1.7; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+            ${group.numbers.map(num => `<span style="background: linear-gradient(90deg,#22c55e 0%,#14532d 100%); color: #fff; padding: 2px 8px; border-radius: 6px; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(20,83,45,0.10); display:inline-flex; align-items:center;"><i class='fa fa-ticket' style='margin-right:3px;'></i>${num}</span>`).join("")}
           </div>
         </div>
       `;
@@ -270,173 +274,145 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               font-family: 'Kanit', sans-serif;
               margin: 0;
               padding: 0;
-              background: rgb(223, 223, 223);
-              color: #333;
-              line-height: 1.4;
-              font-size: 12px;
+              background: #f6fef8;
+              color: #14532d;
+              line-height: 1.5;
+              font-size: 13px;
+              transition: background 0.3s, color 0.3s;
             }
             .container {
               width: 150mm;
               margin: 10mm auto;
-              border: 1px solid #ddd;
+              border: 1px solid #22c55e;
               position: relative;
-              background: rgb(223, 223, 223);
-              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+              background: #fff;
+              box-shadow: 0 4px 16px rgba(20,83,45,0.10);
+              border-radius: 16px;
+              overflow: hidden;
             }
             .watermark {
               position: absolute;
               top: 50%;
               left: 50%;
-              transform: translate(-50%, -50%) rotate(-45deg);
-              font-size: 32px;
-              color: rgba(0, 0, 0, 0.1);
-              font-weight: 700;
+              transform: translate(-50%, -50%) rotate(-30deg);
+              font-size:42px;
+              color: rgba(34,197,94,0.10);
+              font-weight: 900;
               z-index: 0;
               pointer-events: none;
+              letter-spacing: 2px;
+              user-select: none;
             }
             .header {
               width: 100%;
-              height: 18px;
+              min-height: 32px;
               text-align: center;
-              background: rgb(203, 236, 255);
+              background: linear-gradient(90deg,#14532d 0%,#22c55e 100%);
               border-bottom: 4px solid #fff;
-              padding-top: 3mm;
-              padding-bottom: 3mm;
-              margin-bottom: 3mm;
+              padding-top: 8px;
+              padding-bottom: 8px;
+              margin-bottom: 8px;
               position: relative;
               z-index: 1;
+              color: #fff;
+              box-shadow: 0 2px 8px rgba(20,83,45,0.08);
             }
             .header h1 {
-              font-size: 14px;
+              font-size: 18px;
               font-weight: 700;
               margin: 0;
-              color: #d32f2f;
+              color: #fff;
+              letter-spacing: 1px;
+              display: inline-block;
+              vertical-align: middle;
             }
             .header .draw-date {
-              font-size: 12px;
-              color: #555;
+              font-size: 13px;
+              color: #e5e7eb;
               margin-top: 2px;
             }
             .ticket-info {
               display: flex;
-              justify-content: space-between;
-              font-size: 11px;
-              color: #555;
-              margin-bottom: 3mm;
+              flex-direction: column;
+              gap: 6px;
+              margin-bottom: 8px;
+              padding: 0 16px;
               position: relative;
               z-index: 1;
+              font-size: 13px;
+            }
+            .ticket-info-row {
+              display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #22c55e; padding-bottom: 4px;
+            }
+            .ticket-info .icon {
+              color: #22c55e; margin-right: 4px;
             }
             .ticket-number-barcode {
-              height: 18px;
-              width: 450px;
+              height: 22px;
+              width: 100%;
               text-align: center;
               font-family: 'Kanit', sans-serif;
-              font-size: 12px;
-              font-weight:semibold;
+              font-size: 14px;
+              font-weight:600;
               letter-spacing: 2px;
-              background:rgb(79, 210, 243);
-              margin-left: 55px;
-              color: rgb(240, 40, 40);
-              border-radius: 3px;
-              margin-bottom: -5mm;
+              background: linear-gradient(90deg,#22c55e 0%,#14532d 100%);
+              color: #fff;
+              border-radius: 6px;
+              margin-bottom: 8px;
+              margin-top: 2px;
               position: relative;
               z-index: 1;
-            }
-            .items-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 3mm;
-              position: relative;
-              z-index: 1;
-            }
-            .items-table th,
-            .items-table td {
-              padding: 1mm 2mm;
-              text-align: left;
-              font-size: 11px;
-            }
-            .items-table tr {
-              border-bottom: 1px solid #ddd;
-            }
-            .items-table th {
-              background: #f5f5f5;
-              font-weight: 600;
-              color: #333;
-            }
-            .ticket-numbers {
-              display: flex;
-              flex-wrap: wrap;
-              gap: 5px;
-            }
-            .ticket-numbers .number-group {
-              display: inline-flex;
-              gap: 2px;
-            }
-            .ticket-numbers .number-group span {
-              display: inline-block;
-              width: 14px;
-              height: 14px;
-              line-height: 14px;
-              text-align: center;
-              background: #e0f2fe;
-              color: #1976d2;
-              border-radius: 2px;
-              font-weight: 500;
-              font-size: 10px;
-            }
-            .matching-tickets {
-              margin-top: 3mm;
-              padding: 2mm;
-              background: rgb(223, 223, 223);
-              border-radius: 3px;
-              font-size: 11px;
-            }
-            .matching-tickets h3 {
-              margin: 0 0 2mm 0;
-              color: #e65100;
-              font-size: 12px;
-            }
-            .matching-tickets table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .matching-tickets td {
-              padding: 1mm;
-              border-bottom: 1px solid rgb(223, 223, 223);
+              box-shadow: 0 1px 4px rgba(20,83,45,0.10);
+              display: flex; align-items: center; justify-content: center;
             }
             .total {
               text-align: center;
-              font-size: 20px;
+              font-size: 22px;
               font-weight: 700;
-              margin-top: 3mm;
-              padding-top: 2mm;
-              width: 400px;
-              height: 40px;
-              border-radius: 0px;
+              margin-top: 8px;
+              padding-top: 8px;
+              width: 420px;
+              height: 48px;
+              border-radius: 12px;
               margin: 0 auto;
               position: relative;
               z-index: 1;
+              background: linear-gradient(90deg,#14532d 0%,#22c55e 100%);
+              color: #fff;
+              box-shadow: 0 2px 8px rgba(20,83,45,0.10);
+              display: flex; align-items: center; justify-content: center; gap: 8px;
             }
+            .total .fa-coins { color: #facc15; margin-right: 4px; }
             .footer {
               text-align: center;
-              margin-top: 5mm;
-              font-size: 10px;
-              color: #777;
-              padding-top: 3mm;
+              margin-top: 12px;
+              font-size: 11px;
+              color: #166534;
+              padding-top: 8px;
               position: relative;
               z-index: 1;
+              background: linear-gradient(90deg,#f6fef8 0%,#d1fae5 100%);
+              border-top: 1px solid #22c55e;
             }
             .footer p {
-              margin: 1mm 0;
+              margin: 2px 0;
             }
             @media print {
               body {
                 margin: 0;
+                background: #fff !important;
+                color: #14532d !important;
               }
               .container {
                 box-shadow: none;
                 border: none;
                 margin: 0 auto;
+                background: #fff !important;
+              }
+              .header, .footer, .ticket-number-barcode, .ticket-group-item, .total {
+                background: #fff !important;
+                color: #14532d !important;
+                box-shadow: none !important;
               }
               @page {
                 size: 80mm auto;
@@ -447,42 +423,40 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
         </head>
         <body>
           <div class="container">
-            <div class="watermark">หวยไทย ออนไลน์</div>
+            <div class="watermark"><i class='fa fa-leaf'></i> หวยเศรษฐี 789 ออนไลน์</div>
             <div class="header">
               <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <h1 style="font-size: 16px; margin: 0;font-weight: 300;color: #000;">บันทึกช่วยจำ</h1>
-                <div style="border: 1px solid rgb(81, 198, 245); width: 100px; height: 20px; background-color: #fff;"><h1 style="font-size: 14px; margin: 0;font-weight: 200;color: #bbbbbb;">${user?.user_metadata?.name || "Guest"}</h1></div>
+                <h1 style="font-size: 20px; margin: 0;font-weight: 700;color: #fff; letter-spacing:1px;"><i class='fa fa-receipt' style='margin-right:6px;'></i>บันทึกช่วยจำ</h1>
+                <div style="border: 1px solid #fff; width: 120px; height: 28px; background-color: #22c55e; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-left:10px;"><h1 style="font-size: 15px; margin: 0;font-weight: 500;color: #fff; display:flex; align-items:center;"><i class='fa fa-user-circle' style='margin-right:4px;'></i>${user?.user_metadata?.name || "Guest"}</h1></div>
               </div>
             </div>
-            <div class="ticket-info" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 3mm; padding: 0 10px; position: relative; z-index: 1; font-size: 11px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
-                <span style="font-weight: bold; font-size: 14px; color: #d32f2f;">${lotteryTypeName}</span>
-                <span style="font-size: 12px; color: #333;">บิล: ${purchase.ticket_set_number}</span>
+            <div class="ticket-info">
+              <div class="ticket-info-row">
+                <span style="font-weight: bold; font-size: 15px; color: #14532d;"><i class='fa fa-star icon'></i>${lotteryTypeName}</span>
+                <span style="font-size: 13px; color: #166534;"><i class='fa fa-barcode icon'></i>บิล: ${purchase.ticket_set_number}</span>
               </div>
-              <div style="display: flex; justify-content: space-between;">
-                <span style="color: #555;">งวด: ${formattedActualDrawDate} (เวลา ${purchase.draw_time || 'N/A'})</span>
-                <span style="color: #555;">ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
+              <div class="ticket-info-row" style="border-bottom:none;">
+                <span style="color: #166534;"><i class='fa fa-calendar icon'></i>งวด: ${formattedActualDrawDate} (เวลา ${purchase.draw_time || 'N/A'})</span>
+                <span style="color: #166534;"><i class='fa fa-user icon'></i>ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 2px; padding-bottom: 2px; border-bottom: 1px dashed #ccc;">
-                <span style="color: #c0392b; font-weight: bold; font-size: 11px;">
-                  <i class="fa fa-clock-o" aria-hidden="true" style="margin-right: 3px;"></i>ปิดรับใน:
-                </span>
-                <span style="color: #c0392b; font-weight: bold; font-size: 11px;">${countdownText}</span>
+              <div class="ticket-info-row">
+                <span style="color: #22c55e; font-weight: bold; font-size: 13px;"><i class="fa fa-clock-o icon" aria-hidden="true"></i>ปิดรับใน:</span>
+                <span style="color: #22c55e; font-weight: bold; font-size: 13px;">${countdownText}</span>
               </div>
-              <div style="font-size: 11px; text-align: right; background-color: #fff8e1; padding: 4px 6px; border-radius: 3px; color: #5d4037; margin-top: 2px;">
-                วันที่ซื้อ: ${formattedPurchaseDateTime}
+              <div style="font-size: 12px; text-align: right; background-color: #e7fbe9; padding: 4px 8px; border-radius: 6px; color: #14532d; margin-top: 2px;">
+                <i class='fa fa-calendar-check-o icon'></i>วันที่ซื้อ: ${formattedPurchaseDateTime}
               </div>
             </div>
-            
-            <div class="ticket-number-barcode">****ขอบคุณที่อุดหนุน เฮงๆ รวยๆ ค่ะ****</div>
-            <div class="items-display" style="margin-top: 3mm; margin-bottom: 3mm;">${newGroupedHtml}</div>
-            <div class="total" style="display: flex; align-items: center; justify-content: center; gap: 5px;">
-              <div style="font-size: 16px; font-weight: 400; background-color:rgb(236, 236, 236);color: rgb(131, 131, 131); border-radius: 0px;height: 30px;width: 80px;padding-top: 10px;">ยอดรวม</div>
-              <div style="font-size: 18px; font-weight: 800; background-color:rgb(209, 208, 208);color: rgb(56, 148, 201); border-radius: 0px;height: 30px;width: 200px;padding-top: 10px;">${billTotal.toFixed(0)} ฿</div>
-              <div style="font-size: 16px; font-weight: 400; background-color:rgb(236, 236, 236); color: rgb(133, 133, 133);border-radius: 0px;height: 30px;width: 80px;padding-top: 10px;">บาท</div>
+            <div class="ticket-number-barcode"><i class='fa fa-smile-o' style='margin-right:6px;'></i>ขอบคุณที่อุดหนุน เฮงๆ รวยๆ ค่ะ</div>
+            <div class="items-display" style="margin-top: 8px; margin-bottom: 8px;">${newGroupedHtml}</div>
+            <div class="total">
+              <i class='fa fa-money'></i>
+               <span style="font-size: 16px; font-weight: 400; margin-left: 6px;">ยอดรวม:</span>
+              <span style="font-size: 24px; font-weight: 800; font-family: 'Arial', sans-serif;">${billTotal.toFixed(0)}</span>
+              <span style="font-size: 16px; font-weight: 400; margin-left: 6px;">บาท</span>
             </div>
             <div class="footer">
-             
+              <p><i class='fa fa-leaf'></i> หวยเศรษฐี 789 ออนไลน์ &copy; ${new Date().getFullYear()} | <i class='fa fa-phone'></i> ติดต่อแอดมิน</p>
             </div>
           </div>
         </body>
@@ -605,3 +579,4 @@ export async function getPreferredOrderMapFromDB(): Promise<Record<number, strin
   });
   return map;
 }
+
