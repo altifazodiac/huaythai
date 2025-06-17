@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose } from "@/components/ui/drawer";
+import BillDetailDrawer from "@/components/lottery/BillDetailDrawer";
 
 interface RemoveLog {
   id: number;
@@ -46,6 +47,8 @@ export default function RemoveLogsPage() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<RemoveLog | null>(null);
+  const [billDrawerOpen, setBillDrawerOpen] = useState(false);
+  const [selectedBillNumber, setSelectedBillNumber] = useState<string | null>(null);
 
   async function fetchLogs() {
     setLoading(true);
@@ -229,31 +232,23 @@ export default function RemoveLogsPage() {
               <tbody>
                 {softDeletedTickets.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-4 text-gray-400">ไม่พบข้อมูล</td>
+                    <td colSpan={8} className="text-center py-4 text-gray-400">ไม่พบข้อมูล</td>
                   </tr>
                 ) : (
                   softDeletedTickets.map((ticket, idx) => {
                     const daysPassed = differenceInDays(new Date(), new Date(ticket.deleted_at));
                     const daysLeft = Math.max(0, 30 - daysPassed);
                     return (
-                      <tr key={ticket.id} className="border-b hover:bg-gray-50">
+                      <tr key={ticket.id} className="border-b hover:bg-green-50 cursor-pointer" onClick={() => { setSelectedBillNumber(ticket.bill_number); setBillDrawerOpen(true); }}>
                         <td className="px-2 py-1 text-center">{idx + 1}</td>
-                        <td className="px-2 py-1">{format(new Date(ticket.deleted_at), 'd MMM yyyy HH:mm', { locale: th })}</td>
+                        <td className="px-2 py-1">{ticket.deleted_at ? format(new Date(ticket.deleted_at), 'd MMM yyyy HH:mm', { locale: th }) : '-'}</td>
                         <td className="px-2 py-1">{ticket.user_id}</td>
-                        <td className="px-2 py-1">{ticket.bill_number}</td>
-                        <td className="px-2 py-1">{ticket.bill_name || '-'}</td>
+                        <td className="px-2 py-1 font-bold text-green-700">{ticket.bill_number}</td>
                         <td className="px-2 py-1">{ticket.draw_date ? format(new Date(ticket.draw_date), 'd MMM yyyy', { locale: th }) : '-'}</td>
                         <td className="px-2 py-1">{ticket.close_time || '-'}</td>
-                        <td className="px-2 py-1 text-red-600 font-bold">{daysLeft} วัน</td>
-                        <td className="px-2 py-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRestore(ticket.id)}
-                            disabled={restoringId === ticket.id}
-                          >
-                            {restoringId === ticket.id ? 'กำลังกู้คืน...' : 'กู้คืน'}
-                          </Button>
+                        <td className="px-2 py-1">{ticket.bill_name || '-'}</td>
+                        <td className="px-2 py-1 text-center">
+                          <Button size="sm" variant="outline" onClick={e => { e.stopPropagation(); setSelectedBillNumber(ticket.bill_number); setBillDrawerOpen(true); }}>ดูรายละเอียด</Button>
                         </td>
                       </tr>
                     );
@@ -262,6 +257,7 @@ export default function RemoveLogsPage() {
               </tbody>
             </table>
           </div>
+          <BillDetailDrawer isOpen={billDrawerOpen} onOpenChange={setBillDrawerOpen} billNumber={selectedBillNumber || undefined} />
         </CardContent>
       </Card>
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>

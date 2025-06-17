@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DirectionProvider } from "@radix-ui/react-direction";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 const ICONS: Record<string, any> = {
   purchase: ShoppingCart,
   refund: RefreshCw,
@@ -80,6 +81,16 @@ export default function CreditTransactionsPage() {
     );
   });
 
+  // Group transactions by date (YYYY-MM-DD)
+  const groupedByDate = filtered.reduce((acc, item) => {
+    const dateKey = format(new Date(item.created_at), "yyyy-MM-dd");
+    if (!acc[dateKey]) acc[dateKey] = [];
+    acc[dateKey].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+  // Sort dates descending
+  const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
+
   return (
     <DirectionProvider dir="ltr">
     <SidebarProvider>
@@ -102,10 +113,10 @@ export default function CreditTransactionsPage() {
             </Breadcrumb>
           </div>
         </header>
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-6 px-2 md:px-0 flex flex-col items-center">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-6 px-2 md:px-0 flex flex-col items-center ">
+      <div className="w-full p-6">
         <h1 className="text-2xl font-bold mb-2 text-blue-900">ธุรกรรมเครดิต</h1>
-        <p className="text-muted-foreground mb-4">รวมธุรกรรมการสั่งซื้อและเคลื่อนไหวเ</p>
+        <p className="text-muted-foreground mb-4">รวมธุรกรรมการสั่งซื้อและเคลื่อนไหวของบัญชี</p>
         <Input
           placeholder="ค้นหาด้วยชื่อ, อีเมล, ประเภท, จำนวน, วันที่..."
           className="mb-4"
@@ -115,7 +126,7 @@ export default function CreditTransactionsPage() {
         {loading ? (
           <SpectacularLoader message="กำลังโหลดธุรกรรม..." baseColor="indigo" />
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6 w-full">
             <AnimatePresence>
               {filtered.length === 0 ? (
                 <motion.div
@@ -128,83 +139,82 @@ export default function CreditTransactionsPage() {
                   ไม่พบข้อมูลธุรกรรม
                 </motion.div>
               ) : (
-                filtered.map((item, idx) => {
-                  const Icon = getIcon(item.transaction_type);
-                  return (
-                    <Drawer key={item.id} open={openId === item.id} onOpenChange={open => setOpenId(open ? item.id : null)}>
-                      <DrawerTrigger asChild>
-                        <motion.div
-                          initial={{ opacity: 0, y: 30 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 30 }}
-                          transition={{ delay: idx * 0.04 }}
-                        >
-                          <Card className="flex items-center gap-4 p-4 shadow-md hover:shadow-xl transition-shadow bg-white/90 cursor-pointer relative">
-                            <div className="flex-shrink-0">
-                              <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100">
-                                <Icon className="w-7 h-7 text-blue-600" />
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <CardHeader className="p-0 pb-1 flex flex-row items-start justify-between">
-                                <div>
-                                  <CardTitle className="text-base font-semibold text-blue-900 flex items-center gap-2">
-                                    {getTypeLabel(item.transaction_type)}
-                                    <span className="text-xs text-muted-foreground font-normal">{item.description}</span>
-                                  </CardTitle>
-                                  <CardDescription className="text-xs text-muted-foreground">
-                                    {format(new Date(item.created_at), "dd MMM yyyy HH:mm", { locale: th })}
-                                  </CardDescription>
-                                </div>
-                                <div className="font-medium text-sm truncate text-right ml-2 min-w-[60px]">{item.profiles?.name || "-"}</div>
-                              </CardHeader>
-                              <CardContent className="p-0 pt-1 flex items-center gap-2">
-                                <Avatar className="w-8 h-8">
-                                  <AvatarFallback>{item.profiles?.name?.[0] || item.profiles?.email?.[0] || "?"}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    {item.related_bill_number ? `บิล: ${item.related_bill_number}` : (item.description || "-")}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className={`font-bold text-lg ${item.amount > 0 ? "text-green-600" : "text-red-500"}`}>
-                                    {item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}
-                                  </div>
-                                </div>
-                              </CardContent>
-                              {item.transaction_type === "purchase" && (
-                                <div className="pt-2">
-                                  <Progress value={100} className="h-1 bg-blue-200" />
-                                </div>
-                              )}
-                            </div>
-                          </Card>
-                        </motion.div>
-                      </DrawerTrigger>
-                      <DrawerContent>
-                        <DrawerHeader>
-                          <DrawerTitle>รายละเอียดธุรกรรม</DrawerTitle>
-                          <DrawerDescription>ข้อมูลธุรกรรมเครดิตอย่างละเอียด</DrawerDescription>
-                        </DrawerHeader>
-                        <div className="px-4 pb-4 space-y-2">
-                          <div><b>รหัสธุรกรรม:</b> {item.id}</div>
-                          <div><b>ชื่อผู้ใช้:</b> {item.profiles?.name || "-"}</div>
-                          <div><b>ประเภท:</b> {getTypeLabel(item.transaction_type)}</div>
-                          <div><b>จำนวน:</b> <span className={item.amount > 0 ? "text-green-600" : "text-red-500"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</span></div>
-                          <div><b>วันที่:</b> {format(new Date(item.created_at), "dd MMM yyyy HH:mm", { locale: th })}</div>
-                          <div><b>ชื่อบิล:</b> {item.related_bill_number || "-"}</div>
-                          <div><b>คำอธิบาย:</b> {item.description || "-"}</div>
-                        </div>
-                        <DrawerFooter>
-                          <DrawerClose asChild>
-                            <button className="w-full py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">ปิด</button>
-                          </DrawerClose>
-                        </DrawerFooter>
-                      </DrawerContent>
-                    </Drawer>
-                  );
-                })
+                sortedDates.map((dateKey, groupIdx) => (
+                  <motion.div
+                    key={dateKey}
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 40 }}
+                    transition={{ duration: 0.35, delay: groupIdx * 0.05 }}
+                    className="rounded-xl shadow border border-green-800/20 bg-white/90 overflow-x-auto w-full"
+                  >
+                    <div className="sticky top-0 z-10 bg-green-800 text-white px-4 py-2 rounded-t-xl flex items-center gap-2">
+                      <span className="font-bold text-lg md:text-xl"><span className="hidden md:inline">วันที่</span> {format(new Date(dateKey), "d MMM yyyy", { locale: th })}</span>
+                    </div>
+                    <Table className="min-w-full text-xs md:text-sm">
+                      <TableHeader>
+                        <TableRow className="bg-green-100">
+                          <TableHead className="w-12"></TableHead>
+                          <TableHead>เวลา</TableHead>
+                          <TableHead>ประเภท</TableHead>
+                          <TableHead>ชื่อผู้ใช้</TableHead>
+                          <TableHead>จำนวน</TableHead>
+                          <TableHead>บิล</TableHead>
+                          <TableHead>รายละเอียด</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {groupedByDate[dateKey].map((item: any, idx: number) => {
+                          const Icon = getIcon(item.transaction_type);
+                          return (
+                            <motion.tr
+                              key={item.id}
+                              initial={{ opacity: 0, y: 30 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 30 }}
+                              transition={{ delay: idx * 0.03 }}
+                              className="hover:bg-green-50 transition cursor-pointer"
+                            >
+                              <TableCell className="text-center"><span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100"><Icon className="w-5 h-5 text-green-700" /></span></TableCell>
+                              <TableCell>{format(new Date(item.created_at), "HH:mm")}</TableCell>
+                              <TableCell>{getTypeLabel(item.transaction_type)}</TableCell>
+                              <TableCell>{item.profiles?.name || "-"}</TableCell>
+                              <TableCell className={item.amount > 0 ? "text-green-700 font-bold" : "text-red-500 font-bold"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</TableCell>
+                              <TableCell>{item.related_bill_number || "-"}</TableCell>
+                              <TableCell>
+                                <Drawer open={openId === item.id} onOpenChange={open => setOpenId(open ? item.id : null)}>
+                                  <DrawerTrigger asChild>
+                                    <button className="underline text-green-700 hover:text-green-900">ดูรายละเอียด</button>
+                                  </DrawerTrigger>
+                                  <DrawerContent>
+                                    <DrawerHeader>
+                                      <DrawerTitle>รายละเอียดธุรกรรม</DrawerTitle>
+                                      <DrawerDescription>ข้อมูลธุรกรรมเครดิตอย่างละเอียด</DrawerDescription>
+                                    </DrawerHeader>
+                                    <div className="px-4 pb-4 space-y-2">
+                                      <div><b>รหัสธุรกรรม:</b> {item.id}</div>
+                                      <div><b>ชื่อผู้ใช้:</b> {item.profiles?.name || "-"}</div>
+                                      <div><b>ประเภท:</b> {getTypeLabel(item.transaction_type)}</div>
+                                      <div><b>จำนวน:</b> <span className={item.amount > 0 ? "text-green-700" : "text-red-500"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</span></div>
+                                      <div><b>วันที่:</b> {format(new Date(item.created_at), "dd MMM yyyy HH:mm", { locale: th })}</div>
+                                      <div><b>ชื่อบิล:</b> {item.related_bill_number || "-"}</div>
+                                      <div><b>คำอธิบาย:</b> {item.description || "-"}</div>
+                                    </div>
+                                    <DrawerFooter>
+                                      <DrawerClose asChild>
+                                        <button className="w-full py-2 rounded bg-green-700 text-white font-semibold hover:bg-green-800 transition">ปิด</button>
+                                      </DrawerClose>
+                                    </DrawerFooter>
+                                  </DrawerContent>
+                                </Drawer>
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </motion.div>
+                ))
               )}
             </AnimatePresence>
           </div>

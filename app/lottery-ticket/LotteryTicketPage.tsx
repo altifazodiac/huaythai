@@ -344,7 +344,7 @@ export default function LotteryTicketPage() {
       //ฮ Removed: singleRawNumProcessedNumbers = Array.from(new Set(singleRawNumProcessedNumbers));
       if (singleRawNumProcessedNumbers.length === 0) return;
   
-      const uniqueKeyForThisSet = `<span class="math-inline">\{processingTimestampKey\}\_</span>{rawNumIndex}_${Math.random().toString(36).slice(2, 8)}`;
+      const uniqueKeyForThisSet = `${processingTimestampKey}_${rawNumIndex}_${Math.random().toString(36).slice(2, 8)}`;
   
       if (selectedTypes.length > 1) {
         let typeAmountsAreValid = true;
@@ -539,8 +539,17 @@ export default function LotteryTicketPage() {
       let formattedCloseTime = selectedDraw.schedule.close_time;
       const timeParts = selectedDraw.schedule.close_time.split(':');
       if (timeParts.length >= 2) formattedCloseTime = `${timeParts[0]}:${timeParts[1]}`;
-
-      const totalAmount = ticketList.reduce((sum, item) => sum + (item.amount * item.numbers.length), 0);
+      
+      // ================= START: EDITED CODE =================
+      let totalAmount = 0;
+      Array.from(groups.values()).forEach((group: Grouped) => {
+        const allLabels = group.typeLabels || [];
+        const groupTotal = allLabels.reduce((sum: number, label: string) => {
+          return sum + (group.amounts[label] ?? 0) * group.numbers.length;
+        }, 0);
+        totalAmount += groupTotal;
+      });
+      // ================= END: EDITED CODE =================
 
       // 1. Fetch current credit
       const { data: profile, error: profileError } = await supabase
