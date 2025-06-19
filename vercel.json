@@ -1,7 +1,7 @@
 {
-    "cron": [
+    "crons": [
       {
-        "path": "/api/send-message",
+        "path": "/api/cron",
         "schedule": "*/2 * * * *"
       }
     ]

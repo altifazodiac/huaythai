@@ -49,11 +49,17 @@ function countryCodeToFlagEmoji(code: string): string {
 
 // --- Handler for Vercel Serverless Function ---
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+ 
     // --- Setup Clients ---
     const lineClient = new Client({
         channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     });
+    const authHeader = (req.headers['authorization'] as string | undefined) ?? '';
 
+    const expected = `Bearer ${process.env.CRON_SECRET}`;
+    if (authHeader !== expected) {
+      return res.status(401).send("Unauthorized");
+    }
     const supabaseClient = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -220,4 +226,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error('An error occurred during script execution:', error);
         res.status(500).send('An error occurred: ' + (error?.message || error));
     }
+    return new Response("Success", { status: 200 });
 }
