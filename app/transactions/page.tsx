@@ -146,14 +146,14 @@ export default function CreditTransactionsPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 40 }}
                     transition={{ duration: 0.35, delay: groupIdx * 0.05 }}
-                    className="rounded-xl shadow border border-green-800/20 bg-white/90 overflow-x-auto w-full"
+                    className="rounded-xl shadow border border-red-800/20 bg-white/90 overflow-x-auto w-full"
                   >
-                    <div className="sticky top-0 z-10 bg-green-800 text-white px-4 py-2 rounded-t-xl flex items-center gap-2">
+                    <div className="sticky top-0 z-10 bg-red-800 text-white px-4 py-2 rounded-t-xl flex items-center gap-2">
                       <span className="font-bold text-lg md:text-xl"><span className="hidden md:inline">วันที่</span> {format(new Date(dateKey), "d MMM yyyy", { locale: th })}</span>
                     </div>
                     <Table className="min-w-full text-xs md:text-sm">
                       <TableHeader>
-                        <TableRow className="bg-green-100">
+                        <TableRow className="bg-red-100">
                           <TableHead className="w-12"></TableHead>
                           <TableHead>เวลา</TableHead>
                           <TableHead>ประเภท</TableHead>
@@ -173,18 +173,18 @@ export default function CreditTransactionsPage() {
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: 30 }}
                               transition={{ delay: idx * 0.03 }}
-                              className="hover:bg-green-50 transition cursor-pointer"
+                              className="hover:bg-red-50 transition cursor-pointer"
                             >
-                              <TableCell className="text-center"><span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100"><Icon className="w-5 h-5 text-green-700" /></span></TableCell>
+                              <TableCell className="text-center"><span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100"><Icon className="w-5 h-5 text-red-700" /></span></TableCell>
                               <TableCell>{format(new Date(item.created_at), "HH:mm")}</TableCell>
                               <TableCell>{getTypeLabel(item.transaction_type)}</TableCell>
                               <TableCell>{item.profiles?.name || "-"}</TableCell>
-                              <TableCell className={item.amount > 0 ? "text-green-700 font-bold" : "text-red-500 font-bold"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</TableCell>
+                              <TableCell className={item.amount > 0 ? "text-red-700 font-bold" : "text-red-500 font-bold"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</TableCell>
                               <TableCell>{item.related_bill_number || "-"}</TableCell>
                               <TableCell>
                                 <Drawer open={openId === item.id} onOpenChange={open => setOpenId(open ? item.id : null)}>
                                   <DrawerTrigger asChild>
-                                    <button className="underline text-green-700 hover:text-green-900">ดูรายละเอียด</button>
+                                    <button className="underline text-red-700 hover:text-red-900">ดูรายละเอียด</button>
                                   </DrawerTrigger>
                                   <DrawerContent>
                                     <DrawerHeader>
@@ -195,14 +195,14 @@ export default function CreditTransactionsPage() {
                                       <div><b>รหัสธุรกรรม:</b> {item.id}</div>
                                       <div><b>ชื่อผู้ใช้:</b> {item.profiles?.name || "-"}</div>
                                       <div><b>ประเภท:</b> {getTypeLabel(item.transaction_type)}</div>
-                                      <div><b>จำนวน:</b> <span className={item.amount > 0 ? "text-green-700" : "text-red-500"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</span></div>
+                                      <div><b>จำนวน:</b> <span className={item.amount > 0 ? "text-red-700" : "text-red-500"}>{item.amount > 0 ? "+" : ""}{Number(item.amount).toLocaleString()}</span></div>
                                       <div><b>วันที่:</b> {format(new Date(item.created_at), "dd MMM yyyy HH:mm", { locale: th })}</div>
                                       <div><b>ชื่อบิล:</b> {item.related_bill_number || "-"}</div>
                                       <div><b>คำอธิบาย:</b> {item.description || "-"}</div>
                                     </div>
                                     <DrawerFooter>
                                       <DrawerClose asChild>
-                                        <button className="w-full py-2 rounded bg-green-700 text-white font-semibold hover:bg-green-800 transition">ปิด</button>
+                                        <button className="w-full py-2 rounded bg-red-700 text-white font-semibold hover:bg-red-800 transition">ปิด</button>
                                       </DrawerClose>
                                     </DrawerFooter>
                                   </DrawerContent>

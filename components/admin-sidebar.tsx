@@ -139,8 +139,8 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       className={cn(
         // --- CHANGE HERE: Added flex and flex-col ---
         "flex flex-col",
-        "fixed md:static inset-y-0 left-0 h-full bg-white dark:bg-zinc-900 z-50 transition-all duration-300 transform",
-        "md:border-r md:dark:border-zinc-800 shadow-lg md:shadow-none",
+        "fixed md:static inset-y-0 left-0 h-full bg-white dark:bg-warning-900 z-50 transition-all duration-300 transform",
+        "md:border-r md:dark:border-warning-800 shadow-lg md:shadow-none",
         open ? "translate-x-0" : "-translate-x-full",
         "md:translate-x-0",
         collapsed ? "w-64 md:w-16" : "w-64"
@@ -148,7 +148,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       aria-label="Sidebar"
     >
       {/* Sidebar Header (Stays fixed at the top) */}
-      <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b dark:border-zinc-800">
+      <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b dark:border-warning-800">
         <span className={cn("font-bold", collapsed && "hidden md:hidden")}>
           เมนู
         </span>
@@ -165,8 +165,8 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       </div>
 
       {/* Back to Home Link (Stays fixed at the top) */}
-      <div className="flex-shrink-0 px-4 py-3 border-b dark:border-zinc-800">
-        <Link href="/" className="flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 font-medium">
+      <div className="flex-shrink-0 px-4 py-3 border-b dark:border-warning-800">
+        <Link href="/" className="flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 font-medium">
           <Home className="h-5 w-5" />
           <span className={cn(collapsed && "hidden md:hidden")}>กลับหน้าหลัก</span>
         </Link>
@@ -183,7 +183,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
                    setOpenSubMenu(openSubMenu === item.title ? null : item.title)
                 }}
                 className={cn(
-                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors",
+                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 transition-colors",
                   collapsed && "justify-center"
                 )}
               >
@@ -207,8 +207,8 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
                       key={subItem.href}
                       href={subItem.href}
                       className={cn(
-                        "flex items-center gap-2 py-2 px-4 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-sm",
-                        pathname === subItem.href && "bg-gray-100 dark:bg-zinc-800"
+                        "flex items-center gap-2 py-2 px-4 rounded hover:bg-gray-100 dark:hover:bg-warning-800 transition-colors text-sm",
+                        pathname === subItem.href && "bg-gray-100 dark:bg-warning-800"
                       )}
                     >
                       <span className="whitespace-nowrap">{subItem.title}</span>
@@ -222,8 +222,8 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
               key={item.href}
               href={item.href!}
               className={cn(
-                "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors",
-                pathname === item.href && "bg-gray-100 dark:bg-zinc-800",
+                "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 transition-colors",
+                pathname === item.href && "bg-gray-100 dark:bg-warning-800",
                  collapsed && "justify-center"
               )}
             >
@@ -235,26 +235,26 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       </nav>
       
       {/* Theme Switcher (Stays fixed at the bottom) */}
-      <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t dark:border-zinc-800 p-3 flex justify-center bg-white dark:bg-zinc-900">
+      <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t dark:border-warning-800 p-3 flex justify-center bg-white dark:bg-warning-900">
         <div className={cn(collapsed && "hidden md:hidden")}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-lg text-zinc-700 hover:bg-gray-100 dark:text-zinc-200 dark:hover:text-white dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-green-500">
+              <Button variant="ghost" size="icon" className="rounded-lg text-warning-700 hover:bg-gray-100 dark:text-warning-200 dark:hover:text-white dark:hover:bg-warning-800 focus:outline-none focus:ring-2 focus:ring-red-500">
                 <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
                 <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 <span className="sr-only">Toggle theme</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[130px] z-[9999] bg-zinc-900 text-slate-100 border-zinc-700 shadow-xl">
-              <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-zinc-800 focus:!bg-zinc-800 !text-slate-100">
+            <DropdownMenuContent align="end" className="w-[130px] z-[9999] bg-warning-900 text-slate-100 border-warning-700 shadow-xl">
+              <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-800 focus:!bg-warning-800 !text-slate-100">
                 <Sun className="h-4 w-4" />
                 Light
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-zinc-800 focus:!bg-zinc-800 !text-slate-100">
+              <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-800 focus:!bg-warning-800 !text-slate-100">
                 <Moon className="h-4 w-4" />
                 Dark
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-zinc-800 focus:!bg-zinc-800 !text-slate-100">
+              <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-800 focus:!bg-warning-800 !text-slate-100">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
                 System
               </DropdownMenuItem>

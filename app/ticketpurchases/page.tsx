@@ -305,7 +305,7 @@ export default function LotteryPurchasePage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'text-green-600';
+      case 'confirmed': return 'text-red-600';
       case 'pending': return 'text-yellow-600';
       case 'cancelled': return 'text-red-600';
       default: return 'text-gray-600';
@@ -516,7 +516,7 @@ export default function LotteryPurchasePage() {
                                 <div className={`text-xs font-medium ${getStatusColor(ticket.status)}`}> {/* Reduced font size */}
                                   {getStatusText(ticket.status)}
                                 </div>
-                                <div className="text-base font-semibold text-green-600 mt-0.5"> {/* Reduced font size and margin */}
+                                <div className="text-base font-semibold text-red-600 mt-0.5"> {/* Reduced font size and margin */}
                                   {billTotal.toLocaleString()} ฿
                                 </div>
                               </div>

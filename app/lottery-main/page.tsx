@@ -103,7 +103,7 @@ export default async function Page() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  const imageUrl = 'https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//BG.png';
+  const imageUrl = 'https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//BG2.png';
   const [{ data: typesData }, { data: subTypesData }, { data: schedulesData }] = await Promise.all([
     supabase.from("lottery_types").select(),
     supabase.from("lottery_sub_types").select(),
@@ -144,7 +144,7 @@ export default async function Page() {
           </div>
         </header>
       
-        <div className="animated-green-border overflow-hidden rounded-2xl p-0.5 sm:p-1">  
+        <div className="animated-red-border overflow-hidden rounded-2xl p-0.5 sm:p-1">  
             
             <div 
               className="
@@ -168,8 +168,8 @@ export default async function Page() {
             <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white drop-shadow-lg modern-text-glow mb-1 sm:mb-2 tracking-wide text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
               ยินดีต้อนรับสู่
             </h1>
-            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-green-200 to-teal-300 modern-text-glow animate-pulse text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
-              หวยเศรษฐี 789
+            <p className="mt-1 sm:mt-2 text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-red-200 to-teal-300 modern-text-glow animate-pulse text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
+              สิงโตทองคำ 77
             </p>
             <p className="mt-2 sm:mt-4 text-xs sm:text-sm md:text-base lg:text-lg text-white/80 text-right sm:text-center"> {/* MODIFIED: Font size, margin, text-alignment */}
               เริ่มต้นการเดินทางสู่ความมั่งคั่งได้แล้ววันนี้!

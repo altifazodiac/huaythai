@@ -174,7 +174,7 @@ export default function SetupPage() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               {connectionStatus.data.environment.hasUrl ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-red-500" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-red-500" />
                               )}
@@ -182,7 +182,7 @@ export default function SetupPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               {connectionStatus.data.environment.hasAnonKey ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-red-500" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-red-500" />
                               )}
@@ -190,7 +190,7 @@ export default function SetupPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               {connectionStatus.data.environment.hasServiceRoleKey ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-red-500" />
                               ) : (
                                 <AlertCircle className="h-4 w-4 text-yellow-500" />
                               )}
@@ -206,14 +206,14 @@ export default function SetupPage() {
                           <h4 className="font-semibold">สถานะฐานข้อมูล</h4>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <CheckCircle className="h-4 w-4 text-red-500" />
                               <span className="text-sm">
                                 ticket_sub_types: {connectionStatus.data.ticketSubTypesCount} รายการ
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
                               {connectionStatus.data.lotteryTablesExist ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-red-500" />
                               ) : (
                                 <XCircle className="h-4 w-4 text-red-500" />
                               )}
@@ -223,7 +223,7 @@ export default function SetupPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               {connectionStatus.data.lotteryResultsCount > 0 ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-red-500" />
                               ) : (
                                 <AlertCircle className="h-4 w-4 text-yellow-500" />
                               )}
@@ -258,7 +258,7 @@ export default function SetupPage() {
                       จำเป็นต้องมีข้อมูลประเภทรางวัล (สามตัวบน, สองตัวบน, ฯลฯ) ก่อนที่จะสามารถบันทึกผลรางวัลได้
                     </p>
                     {connectionStatus?.data && connectionStatus.data.ticketSubTypesCount > 0 && (
-                      <Badge variant="outline" className="text-green-600">
+                      <Badge variant="outline" className="text-red-600">
                         ✓ มีข้อมูลแล้ว ({connectionStatus.data.ticketSubTypesCount} รายการ)
                       </Badge>
                     )}
@@ -290,7 +290,7 @@ export default function SetupPage() {
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">สร้างตารางสำหรับเก็บข้อมูลงวดสลากและผลรางวัลแต่ละประเภท</p>
                     {connectionStatus?.data && connectionStatus.data.lotteryTablesExist && (
-                      <Badge variant="outline" className="text-green-600">
+                      <Badge variant="outline" className="text-red-600">
                         ✓ ตารางมีอยู่แล้ว
                       </Badge>
                     )}
@@ -322,7 +322,7 @@ export default function SetupPage() {
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">ดึงข้อมูลผลสลากกินแบ่งล่าสุดและบันทึกลงในฐานข้อมูลเพื่อทดสอบระบบ</p>
                     {connectionStatus?.data && connectionStatus.data.lotteryResultsCount > 0 && (
-                      <Badge variant="outline" className="text-green-600">
+                      <Badge variant="outline" className="text-red-600">
                         ✓ มีข้อมูลแล้ว ({connectionStatus.data.lotteryResultsCount} รายการ)
                       </Badge>
                     )}

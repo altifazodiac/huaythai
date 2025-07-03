@@ -2,7 +2,7 @@ import React from 'react';
 
 interface SpectacularLoaderProps {
   message?: string;
-  baseColor?: 'sky' | 'green' | 'pink' | 'yellow' | 'indigo'; // Add more base colors as needed
+  baseColor?: 'sky' | 'red' | 'pink' | 'yellow' | 'indigo'; // Add more base colors as needed
 }
 
 const SpectacularLoader: React.FC<SpectacularLoaderProps> = ({

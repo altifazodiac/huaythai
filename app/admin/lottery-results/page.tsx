@@ -163,11 +163,11 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
 
   return (
     <motion.div variants={cardVariants}>
-     <Card className={`flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border ${isSuccessfullySaved ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700' : 'border-slate-200'}`}>
+     <Card className={`flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border ${isSuccessfullySaved ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700' : 'border-slate-200'}`}>
         <CardHeader className="p-2 bg-slate-50 border-b border-slate-200 flex flex-row justify-between items-center">
           <div className="flex-grow">
             <CardTitle className="text-xs font-semibold text-slate-800 truncate flex items-center">
-              {isSuccessfullySaved && <CheckCircle2 className="w-3 h-3 text-green-600 mr-1.5 flex-shrink-0" />}
+              {isSuccessfullySaved && <CheckCircle2 className="w-3 h-3 text-red-600 mr-1.5 flex-shrink-0" />}
               {subTypeName}
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">

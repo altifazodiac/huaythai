@@ -37,7 +37,7 @@ export function VersionSwitcher({
                 <Coins className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5 leading-none">
-                <span className="font-medium">หวยเศรษฐี 789</span>
+                <span className="font-medium">สิงโตทองคำ 77</span>
                 <span className="">v{selectedVersion}</span>
               </div>
               <ChevronsUpDown className="ml-auto" />

@@ -201,14 +201,14 @@ export default function LotteryWinningsReportPage() {
                       <TableRow key={`${date}-${index}`} className="hover:bg-gray-50 transition-colors">
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell className="text-right">{item.sum_amount.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-green-600">{item.sum_total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-red-600">{item.sum_total.toLocaleString()}</TableCell>
                         <TableCell className="text-right text-blue-600">{item.remain.toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold bg-gray-50">
                       <TableCell>ผลรวมทั้งหมด</TableCell>
                       <TableCell className="text-right">{records.reduce((acc, cur) => acc + cur.sum_amount, 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right text-green-600">{records.reduce((acc, cur) => acc + cur.sum_total, 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-red-600">{records.reduce((acc, cur) => acc + cur.sum_total, 0).toLocaleString()}</TableCell>
                       <TableCell className="text-right text-blue-600">{records.reduce((acc, cur) => acc + cur.remain, 0).toLocaleString()}</TableCell>
                     </TableRow>
                   </TableBody>

@@ -202,7 +202,7 @@ const LotterySummaryPage: React.FC = () => {
           <div className="min-h-screen bg-gradient-to-br from-background to-muted text-foreground p-2 md:p-4 transition-colors duration-500">
             <div className="container mx-auto text-xs md:text-sm">
               <header className="mb-4 text-center">
-                <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-green-500 to-green-500 dark:from-green-600 dark:via-green-400 dark:to-green-400">
+                <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-500 to-red-500 dark:from-red-600 dark:via-red-400 dark:to-red-400">
                   สรุปผลสลากกินแบ่งรัฐบาล
                 </h1>
                 <p className="text-xs text-muted-foreground mt-1">ดูและกรองประวัติการซื้อสลากและเงินรางวัลของคุณ</p>
@@ -316,10 +316,10 @@ const LotterySummaryPage: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                   >
-                    <Table className="min-w-full text-xs md:text-sm border border-green-800/30 rounded-xl overflow-hidden shadow-lg">
-                      <TableCaption className="text-green-800 font-semibold">ประวัติการซื้อสลากและเงินรางวัล</TableCaption>
+                    <Table className="min-w-full text-xs md:text-sm border border-red-800/30 rounded-xl overflow-hidden shadow-lg">
+                      <TableCaption className="text-red-800 font-semibold">ประวัติการซื้อสลากและเงินรางวัล</TableCaption>
                       <TableHeader>
-                        <TableRow className="bg-green-800/90 text-white">
+                        <TableRow className="bg-red-800/90 text-white">
                           <TableHead className="text-white">เลขบิล</TableHead>
                           <TableHead className="text-white">ประเภทหวย</TableHead>
                           <TableHead className="text-white">วันเวลาซื้อ</TableHead>
@@ -339,29 +339,29 @@ const LotterySummaryPage: React.FC = () => {
                               transition={{ duration: 0.3 }}
                               className={
                                 (item.total_prize > 0
-                                  ? "bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40"
+                                  ? "bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40"
                                   : "hover:bg-gray-50 dark:hover:bg-slate-800/40") +
                                 " cursor-pointer transition-colors"
                               }
                               onClick={() => { setSelectedBillNumber(item.bill_number); setBillDrawerOpen(true); }}
                             >
-                              <TableCell className="font-bold text-green-900">{item.bill_number}</TableCell>
+                              <TableCell className="font-bold text-red-900">{item.bill_number}</TableCell>
                               <TableCell>
                                 <span className="flex items-center gap-2">
                                   {item.country_origin ? (
-                                    <img src={countryFlagImg(item.country_origin)} alt={item.country_origin} className="h-6 w-8 rounded object-cover border border-green-700" />
+                                    <img src={countryFlagImg(item.country_origin)} alt={item.country_origin} className="h-6 w-8 rounded object-cover border border-red-700" />
                                   ) : (
                                     <span>-</span>
                                   )}
-                                  <span className="text-green-800 font-semibold">{item.sub_type_name || '-'}</span>
+                                  <span className="text-red-800 font-semibold">{item.sub_type_name || '-'}</span>
                                 </span>
                               </TableCell>
                               <TableCell>{item.purchase_date ? formatDateTime(item.purchase_date) : '-'}</TableCell>
                               <TableCell className="text-gray-400">{item.draw_date ? formatDateTime(item.draw_date, item.draw_time) : '-'}</TableCell>
-                              <TableCell className="text-green-700 font-bold">{formatCurrency(item.total_amount)}</TableCell>
-                              <TableCell className={item.total_prize > 0 ? "text-green-700 font-bold" : "text-red-500 font-bold"}>
+                              <TableCell className="text-red-700 font-bold">{formatCurrency(item.total_amount)}</TableCell>
+                              <TableCell className={item.total_prize > 0 ? "text-red-700 font-bold" : "text-red-500 font-bold"}>
                                 {item.total_prize > 0 ? (
-                                  <span className="inline-flex items-center gap-1">{formatCurrency(item.total_prize)}<Badge className="bg-green-700 text-white ml-1">🎉</Badge></span>
+                                  <span className="inline-flex items-center gap-1">{formatCurrency(item.total_prize)}<Badge className="bg-red-700 text-white ml-1">🎉</Badge></span>
                                 ) : (
                                   <span className="text-red-500 font-bold">ไม่ถูกรางวัล</span>
                                 )}
@@ -377,10 +377,10 @@ const LotterySummaryPage: React.FC = () => {
                         )}
                         {/* Total Row */}
                         {filteredData.length > 0 && (
-                          <TableRow className="bg-green-100 dark:bg-green-900/40">
+                          <TableRow className="bg-red-100 dark:bg-red-900/40">
                             <TableCell colSpan={4} className="text-right font-bold">รวมทั้งหมด</TableCell>
-                            <TableCell className="text-right font-bold text-green-800">{formatCurrency(totalAmount)}</TableCell>
-                            <TableCell className="text-right font-bold text-green-700">{formatCurrency(totalPrize)}</TableCell>
+                            <TableCell className="text-right font-bold text-red-800">{formatCurrency(totalAmount)}</TableCell>
+                            <TableCell className="text-right font-bold text-red-700">{formatCurrency(totalPrize)}</TableCell>
                           </TableRow>
                         )}
                       </TableBody>

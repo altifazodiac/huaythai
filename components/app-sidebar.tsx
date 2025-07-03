@@ -61,7 +61,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar
-      className={`z-50 bg-gradient-to-b from-green-800 to-green-950 shadow-xl transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`} //
+      className={`z-50 bg-gradient-to-b from-red-800 to-red-950 shadow-xl transition-all duration-300 ease-in-out ${collapsed ? 'w-16' : 'w-64'}`} //
       style={{ minHeight: '100vh' }}
       {...props}
     >
@@ -86,7 +86,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <div className="flex items-center gap-3 group">
             {/* --- โลโก้ --- */}
             <Image
-              src="https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//Logo.png"
+              src="https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//Logo2.png"
               alt="logo"
               width={60}
               height={60}
@@ -97,7 +97,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 group-hover:scale-125
                 group-hover:rotate-[15deg]
                 group-hover:shadow-2xl
-                group-hover:shadow-green-500/40 /* ปรับสีเงาให้เข้มขึ้นเล็กน้อย */
+                group-hover:shadow-red-500/40 /* ปรับสีเงาให้เข้มขึ้นเล็กน้อย */
                 animate-fade-in-up 
               `}
               style={{ animationDelay: '0.2s' }}
@@ -106,7 +106,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <div
               className={`
                 text-lg font-bold
-                text-gradient-green /* ใช้ custom class สำหรับ gradient text */
+                text-gradient-red /* ใช้ custom class สำหรับ gradient text */
                 transition-all duration-700 ease-out
                 transform
                 group-hover:scale-105
@@ -115,7 +115,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               `}
               style={{ animationDelay: '0.4s' }}
             >
-              หวยเศรษฐี 789
+              สิงโตทองคำ 77
             </div>
           </div>
         )}
@@ -133,8 +133,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 py-2.5 rounded-lg
                 transition-all duration-200 ease-in-out
                 ${pathname === item.url
-                  ? 'bg-green-600 text-white font-medium shadow-md' // Active: Dark green bg, white text //
-                  : 'text-green-700 hover:bg-green-50 hover:text-green-800 focus:bg-green-100 focus:text-green-800 focus:outline-none dark:text-slate-50 dark:hover:bg-green-700 dark:hover:text-white dark:focus:bg-green-700 dark:focus:text-white' // Default: Dark green text on light bg, **ปรับเป็น text-slate-50 (เกือบขาว) ใน dark mode**
+                  ? 'bg-red-600 text-white font-medium shadow-md' // Active: Dark red bg, white text //
+                  : 'text-red-700 hover:bg-red-50 hover:text-red-800 focus:bg-red-100 focus:text-red-800 focus:outline-none dark:text-slate-50 dark:hover:bg-red-700 dark:hover:text-white dark:focus:bg-red-700 dark:focus:text-white' // Default: Dark red text on light bg, **ปรับเป็น text-slate-50 (เกือบขาว) ใน dark mode**
                 }
                 relative group
               `} //
@@ -145,7 +145,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   className={`h-5 w-5 flex-shrink-0  {/* เพิ่ม flex-shrink-0 ป้องกันการหดตัวของไอคอน */}
                     ${pathname === item.url
                       ? 'text-white' // Active icon: white //
-                      : 'text-green-600 dark:text-green-300'} {/* Default icon: Darker green on light, **ปรับเป็น text-green-300 ใน dark mode** */}
+                      : 'text-red-600 dark:text-red-300'} {/* Default icon: Darker red on light, **ปรับเป็น text-red-300 ใน dark mode** */}
                   `} //
                   strokeWidth={pathname === item.url ? 2.5 : 2} //
                 />
@@ -154,13 +154,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <span className={`font-normal text-sm tracking-tight text-left {/* เพิ่ม text-left */}
                   ${pathname === item.url
                     ? 'text-white' // Active text: white //
-                    : 'inherit' // Inherits from button: text-green-700 dark:text-slate-50 //
+                    : 'inherit' // Inherits from button: text-red-700 dark:text-slate-50 //
                   }`}>
                   {item.title} {/* */}
                 </span>
               )}
               {collapsed && (
-                <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-green-950 border border-green-700/70 text-slate-100 text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none whitespace-nowrap shadow-lg z-50 transition-opacity duration-150 delay-200"> {/* */}
+                <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-red-950 border border-red-700/70 text-slate-100 text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none whitespace-nowrap shadow-lg z-50 transition-opacity duration-150 delay-200"> {/* */}
                   {item.title} {/* */}
                 </span>
               )}
@@ -171,7 +171,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {role === "admin" && ( //
           <div className="mt-6 space-y-1"> {/* */}
             <div className={`px-2 mb-2 ${collapsed ? 'hidden' : ''}`}> {/* */}
-              <h2 className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">Admin Panel</h2> {/* */}
+              <h2 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">Admin Panel</h2> {/* */}
             </div>
             {adminNavItems.map((item) => (
               <button
@@ -183,8 +183,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   py-2.5 rounded-lg
                   transition-all duration-200 ease-in-out
                   ${pathname === item.url
-                    ? 'bg-green-600 text-white font-medium shadow-md' //
-                    : 'text-green-700 hover:bg-green-50 hover:text-green-800 focus:bg-green-100 focus:text-green-800 focus:outline-none dark:text-slate-50 dark:hover:bg-green-700 dark:hover:text-white dark:focus:bg-green-700 dark:focus:text-white' //
+                    ? 'bg-red-600 text-white font-medium shadow-md' //
+                    : 'text-red-700 hover:bg-red-50 hover:text-red-800 focus:bg-red-100 focus:text-red-800 focus:outline-none dark:text-slate-50 dark:hover:bg-red-700 dark:hover:text-white dark:focus:bg-red-700 dark:focus:text-white' //
                   }
                   relative group
                 `} //
@@ -195,7 +195,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     className={`h-5 w-5 flex-shrink-0 {/* เพิ่ม flex-shrink-0 */}
                       ${pathname === item.url
                         ? 'text-white' //
-                        : 'text-green-600 dark:text-green-300'} {/* */}
+                        : 'text-red-600 dark:text-red-300'} {/* */}
                     `} //
                     strokeWidth={pathname === item.url ? 2.5 : 2} //
                   />
@@ -210,7 +210,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </span>
                 )}
                 {collapsed && (
-                  <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-green-950 border border-green-700/70 text-slate-100 text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none whitespace-nowrap shadow-lg z-50 transition-opacity duration-150 delay-200"> {/* */}
+                  <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-red-950 border border-red-700/70 text-slate-100 text-xs rounded-md px-2.5 py-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none whitespace-nowrap shadow-lg z-50 transition-opacity duration-150 delay-200"> {/* */}
                     {item.title} {/* */}
                   </span>
                 )}
@@ -220,7 +220,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
        </SidebarContent>
 
-      <SidebarFooter className={`border-t border-green-700/60 ${collapsed ? 'px-2' : 'px-3'} bg-transparent`}> {/* */}
+      <SidebarFooter className={`border-t border-red-700/60 ${collapsed ? 'px-2' : 'px-3'} bg-transparent`}> {/* */}
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} py-3 w-full`}> {/* */}
           {!collapsed && (
             <NavUser />
@@ -228,7 +228,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
          
           <DropdownMenu> {/* */}
           <DropdownMenuTrigger asChild>  
-              <Button variant="ghost" size="icon" className="rounded-lg text-green-700 hover:bg-green-100 dark:text-green-200 dark:hover:text-white dark:hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 data-[state=open]:bg-green-100 dark:data-[state=open]:bg-green-700">
+              <Button variant="ghost" size="icon" className="rounded-lg text-red-700 hover:bg-red-100 dark:text-red-200 dark:hover:text-white dark:hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 data-[state=open]:bg-red-100 dark:data-[state=open]:bg-red-700">
                 <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
                 <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 <span className="sr-only">Toggle theme</span>
@@ -236,18 +236,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="w-[130px] z-[9999] bg-green-900 text-slate-100 border-green-700/70 shadow-xl" // Menu itself is dark //
+              className="w-[130px] z-[9999] bg-red-900 text-slate-100 border-red-700/70 shadow-xl" // Menu itself is dark //
               sideOffset={collapsed ? 12 : 8} //
             >
-              <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-green-700 focus:!bg-green-700 !text-slate-100"> {/* */}
-                <Sun className="h-4 w-4" /> {/* */}
+              <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer flex items-center text-red-700 gap-2.5 py-2 px-3 text-sm hover:!bg-red-700 focus:!bg-red-700 !text-slate-100"> {/* */}
+                <Sun className="h-4 w-4"  /> {/* */}
                 Light {/* */}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-green-700 focus:!bg-green-700 !text-slate-100"> {/* */}
+              <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-red-700 focus:!bg-red-700 !text-slate-100"> {/* */}
                 <Moon className="h-4 w-4" /> {/* */}
                 Dark {/* */}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-green-700 focus:!bg-green-700 !text-slate-100"> {/* */}
+              <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer flex items-center text-red-700  gap-2.5 py-2 px-3 text-sm hover:!bg-red-700 focus:!bg-red-700 !text-slate-100"> {/* */}
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg> {/* */}
                 System {/* */}
               </DropdownMenuItem>

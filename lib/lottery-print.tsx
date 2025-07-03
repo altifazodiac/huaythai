@@ -423,7 +423,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
         </head>
         <body>
           <div class="container">
-            <div class="watermark"><i class='fa fa-leaf'></i> หวยเศรษฐี 789 ออนไลน์</div>
+            <div class="watermark"><i class='fa fa-leaf'></i> สิงโตทองคำ 77 ออนไลน์</div>
             <div class="header">
               <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                 <h1 style="font-size: 20px; margin: 0;font-weight: 700;color: #fff; letter-spacing:1px;"><i class='fa fa-receipt' style='margin-right:6px;'></i>บันทึกช่วยจำ</h1>
@@ -456,7 +456,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               <span style="font-size: 16px; font-weight: 400; margin-left: 6px;">บาท</span>
             </div>
             <div class="footer">
-              <p><i class='fa fa-leaf'></i> หวยเศรษฐี 789 ออนไลน์ &copy; ${new Date().getFullYear()} | <i class='fa fa-phone'></i> ติดต่อแอดมิน</p>
+              <p><i class='fa fa-leaf'></i> สิงโตทองคำ 77 ออนไลน์ &copy; ${new Date().getFullYear()} | <i class='fa fa-phone'></i> ติดต่อแอดมิน</p>
             </div>
           </div>
         </body>

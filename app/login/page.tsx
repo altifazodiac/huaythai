@@ -24,19 +24,19 @@ const LoginPage = () => {
 
   const particlesInit = useCallback(async (engine: Engine) => { await loadFull(engine); }, []);
 
-  // Particle: เขียวเข้ม-เขียวอ่อน-เหลือง-ขาว
+  // Particle: แดงเข้ม-แดงกลาง-แดงอ่อน-ขาว-เหลือง
   const particlesOptions: ISourceOptions = {
     fullScreen: { enable: false },
     background: { color: { value: "transparent" } },
     fpsLimit: 60,
     particles: {
-      color: { value: ["#00ff99", "#00ffcc", "#39ff14", "#baffc9", "#fff", "#ffe066"] },
+      color: { value: ["#ff1439", "#ff6347", "#b91c1c", "#dc2626", "#fff", "#ffe066"] },
       number: { value: 60, density: { enable: true, area: 800 } },
       size: { value: { min: 2, max: 6 } },
       move: { enable: true, speed: 1.2, direction: "none", outModes: { default: "bounce" } },
       opacity: { value: 0.5, anim: { enable: true, speed: 1, opacity_min: 0.2, sync: false } },
       shape: { type: "circle" },
-      links: { enable: true, color: "#39ff14", distance: 120, opacity: 0.2, width: 2 },
+      links: { enable: true, color: "#ff1439", distance: 120, opacity: 0.2, width: 2 },
     },
     detectRetina: true,
   };
@@ -88,10 +88,10 @@ const LoginPage = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full relative overflow-hidden">
       {/* Animated neon gradient background */}
-      <div className="absolute inset-0 z-0 animate-gradient-move bg-gradient-to-br from-green-900 via-green-700 via-40% to-lime-400 opacity-95" />
+      <div className="absolute inset-0 z-0 animate-gradient-move bg-gradient-to-br from-red-900 via-red-700 via-40% to-red-400 opacity-95" />
       {/* Animated glowing lines */}
-      <div className="absolute top-0 left-0 w-full h-2 z-10 bg-gradient-to-r from-lime-400 via-green-700 to-green-900 animate-glow-x" />
-      <div className="absolute bottom-0 right-0 w-full h-2 z-10 bg-gradient-to-l from-lime-400 via-green-700 to-green-900 animate-glow-x" />
+      <div className="absolute top-0 left-0 w-full h-2 z-10 bg-gradient-to-r from-red-400 via-red-700 to-red-900 animate-glow-x" />
+      <div className="absolute bottom-0 right-0 w-full h-2 z-10 bg-gradient-to-l from-red-400 via-red-700 to-red-900 animate-glow-x" />
       {/* Particles */}
       <Particles id="tsparticles" init={particlesInit} options={particlesOptions} className="absolute inset-0 w-full h-full z-0" />
 
@@ -100,22 +100,22 @@ const LoginPage = () => {
         variants={cardVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-20 mt-20 md:mt-32 w-full max-w-4xl bg-white/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[540px] backdrop-blur-md border-4 border-lime-400/60"
-        style={{ boxShadow: "0 0 40px 10px #39ff14, 0 0 0 4px #166534" }}
+        className="relative z-20 mt-20 md:mt-32 w-full max-w-4xl bg-white/90 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row min-h-[540px] backdrop-blur-md border-4 border-red-400/60"
+        style={{ boxShadow: "0 0 40px 10px #ff1439, 0 0 0 4px #b91c1c" }}
       >
         {/* Image section */}
-        <div className="w-full md:w-1/2 h-48 md:h-auto relative flex items-center justify-center bg-gradient-to-br from-green-800 via-green-600 to-lime-300">
+        <div className="w-full md:w-1/2 h-48 md:h-auto relative flex items-center justify-center bg-gradient-to-br from-red-800 via-red-600 to-red-300">
           <img
             src="https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//BgLogin.png"
             alt="Login Background"
             className="w-full h-full object-cover object-center opacity-80"
-            style={{ mixBlendMode: "screen", filter: "drop-shadow(0 0 40px #39ff14)" }}
+            style={{ mixBlendMode: "screen", filter: "drop-shadow(0 0 40px #ff1439)" }}
           />
           {/* Overlay for better contrast */}
-          <div className="absolute inset-0 bg-gradient-to-t from-green-900/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-red-900/70 to-transparent" />
           {/* Neon sparkles */}
-          <Sparkles className="absolute top-6 left-6 text-lime-300 animate-pulse" size={36} />
-          <Zap className="absolute bottom-6 right-6 text-lime-400 animate-blink" size={32} />
+          <Sparkles className="absolute top-6 left-6 text-red-400 animate-pulse" size={36} />
+          <Zap className="absolute bottom-6 right-6 text-red-400 animate-blink" size={32} />
         </div>
         {/* Form section */}
         <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white/90">
@@ -125,24 +125,24 @@ const LoginPage = () => {
             variants={{ visible: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } } }}
             className="w-full"
           >
-            <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-green-900 drop-shadow-neon">
-              <span className="text-lime-400 animate-glow-text">เข้าสู่ระบบ</span>
+            <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-red-900 drop-shadow-neon">
+              <span className="text-red-400 animate-glow-text">เข้าสู่ระบบ</span>
             </motion.h1>
-            <motion.p variants={itemVariants} className="mt-2 text-lg text-green-700 mb-8 font-semibold animate-glow-text2">
-              ยินดีต้อนรับสู่ <span className="text-lime-400 font-bold">หวยเศรษฐี 789</span>
+            <motion.p variants={itemVariants} className="mt-2 text-lg text-red-700 mb-8 font-semibold animate-glow-text2">
+              ยินดีต้อนรับสู่ <span className="text-red-400 font-bold">สิงโตทองคำ 77</span>
             </motion.p>
             <form onSubmit={handleLogin} className="space-y-7">
               <motion.div variants={itemVariants}>
                 <div className="relative mt-1">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                    <User className="h-6 w-6 text-lime-400 animate-glow-text2" />
+                    <User className="h-6 w-6 text-red-400 animate-glow-text2" />
                   </span>
                   <Input
                     id="username"
                     type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-3 pl-12 pr-3 border-2 border-lime-400 placeholder-green-400 text-green-900 rounded-lg focus:ring-2 focus:ring-lime-400 focus:border-lime-500 transition-all bg-white/80 shadow-lg"
+                    className="w-full p-3 pl-12 pr-3 border-2 border-red-400 placeholder-red-400 text-red-900 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-500 transition-all bg-white/80 shadow-lg"
                     placeholder="อีเมล"
                     required
                   />
@@ -151,21 +151,21 @@ const LoginPage = () => {
               <motion.div variants={itemVariants}>
                 <div className="relative mt-1">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                    <Lock className="h-6 w-6 text-lime-400 animate-glow-text2" />
+                    <Lock className="h-6 w-6 text-red-400 animate-glow-text2" />
                   </span>
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full p-3 pl-12 pr-12 border-2 border-lime-400 placeholder-green-400 text-green-900 rounded-lg focus:ring-2 focus:ring-lime-400 focus:border-lime-500 transition-all bg-white/80 shadow-lg"
+                    className="w-full p-3 pl-12 pr-12 border-2 border-red-400 placeholder-red-400 text-red-900 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-500 transition-all bg-white/80 shadow-lg"
                     placeholder="รหัสผ่าน"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-lime-400 hover:text-green-700 animate-blink"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-red-400 hover:text-red-700 animate-blink"
                     aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                   >
                     {showPassword ? <EyeOff className="h-6 w-6" /> : <Eye className="h-6 w-6" />}
@@ -188,8 +188,8 @@ const LoginPage = () => {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 font-bold text-white text-xl bg-gradient-to-r from-green-700 via-lime-400 to-green-900 hover:from-lime-400 hover:to-green-700 rounded-lg shadow-xl focus:outline-none focus:ring-4 focus:ring-lime-400 transition-all duration-150 ease-in-out flex items-center justify-center animate-glow-btn"
-                  style={{ boxShadow: "0 0 24px 6px #39ff14, 0 0 0 4px #166534" }}
+                  className="w-full py-3 font-bold text-white text-xl bg-gradient-to-r from-red-700 via-red-400 to-red-900 hover:from-red-400 hover:to-red-700 rounded-lg shadow-xl focus:outline-none focus:ring-4 focus:ring-red-400 transition-all duration-150 ease-in-out flex items-center justify-center animate-glow-btn"
+                  style={{ boxShadow: "0 0 24px 6px #ff1439, 0 0 0 4px #b91c1c" }}
                 >
                   {loading ? (
                     <>
@@ -212,8 +212,8 @@ const LoginPage = () => {
         transition={{ delay: 0.2, duration: 0.8, type: "spring" }}
         className="fixed top-6 left-1/2 -translate-x-1/2 z-30 flex items-center space-x-3"
       >
-        <Ticket className="h-12 w-12 text-lime-400 drop-shadow-neon animate-glow-text2" />
-        <span className="text-3xl font-extrabold text-white drop-shadow-neon animate-glow-text">หวยเศรษฐี 789</span>
+        <Ticket className="h-12 w-12 text-red-400 drop-shadow-neon animate-glow-text2" />
+        <span className="text-3xl font-extrabold text-white drop-shadow-neon animate-glow-text">สิงโตทองคำ 77</span>
       </motion.div>
       {/* Custom CSS for animation */}
       <style>{`
@@ -227,29 +227,29 @@ const LoginPage = () => {
           animation: gradient-move 7s ease-in-out infinite;
         }
         @keyframes glow-x {
-          0%, 100% { filter: drop-shadow(0 0 16px #39ff14); opacity: 0.7; }
-          50% { filter: drop-shadow(0 0 32px #fff700); opacity: 1; }
+          0%, 100% { filter: drop-shadow(0 0 16px #ff1439); opacity: 0.7; }
+          50% { filter: drop-shadow(0 0 32px #ff6347); opacity: 1; }
         }
         .animate-glow-x { animation: glow-x 2s infinite alternate; }
         @keyframes glow-text {
-          0%, 100% { text-shadow: 0 0 16px #39ff14, 0 0 32px #fff700; }
-          50% { text-shadow: 0 0 32px #fff, 0 0 64px #39ff14; }
+          0%, 100% { text-shadow: 0 0 16px #ff1439, 0 0 32px #ff6347; }
+          50% { text-shadow: 0 0 32px #fff, 0 0 64px #ff1439; }
         }
         .animate-glow-text { animation: glow-text 2s infinite alternate; }
         @keyframes glow-text2 {
-          0%, 100% { filter: drop-shadow(0 0 8px #39ff14); }
-          50% { filter: drop-shadow(0 0 24px #fff700); }
+          0%, 100% { filter: drop-shadow(0 0 8px #ff1439); }
+          50% { filter: drop-shadow(0 0 24px #ff6347); }
         }
         .animate-glow-text2 { animation: glow-text2 1.5s infinite alternate; }
-        .drop-shadow-neon { filter: drop-shadow(0 0 12px #39ff14) drop-shadow(0 0 24px #fff700); }
+        .drop-shadow-neon { filter: drop-shadow(0 0 12px #ff1439) drop-shadow(0 0 24px #ff6347); }
         @keyframes blink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.3; }
         }
         .animate-blink { animation: blink 1.2s infinite; }
         @keyframes glow-btn {
-          0%, 100% { box-shadow: 0 0 24px 6px #39ff14, 0 0 0 4px #166534; }
-          50% { box-shadow: 0 0 48px 12px #fff700, 0 0 0 8px #39ff14; }
+          0%, 100% { box-shadow: 0 0 24px 6px #ff1439, 0 0 0 4px #b91c1c; }
+          50% { box-shadow: 0 0 48px 12px #ff6347, 0 0 0 8px #ff1439; }
         }
         .animate-glow-btn { animation: glow-btn 1.5s infinite alternate; }
       `}</style>

@@ -23,7 +23,7 @@ const kanit = Kanit({
 });
 
 export const metadata: Metadata = {
-  title: "หวยเศรษฐี 789",
+  title: "สิงโตทองคำ 77",
   description: "เว็บหวยออนไลน์ที่ครบทุกชนิด",
 };
 

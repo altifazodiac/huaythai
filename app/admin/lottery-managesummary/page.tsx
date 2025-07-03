@@ -213,13 +213,13 @@ const LotteryManageSummaryPage: React.FC = () => {
                     <TableRow key={item.draw_date}>
                       <TableCell>{formatDate(item.draw_date)}</TableCell>
                       <TableCell>{formatCurrency(item.total_amount)}</TableCell>
-                      <TableCell className="text-green-600 font-bold">{formatCurrency(item.total_prize)}</TableCell>
-                      <TableCell className={item.balance < 0 ? "text-red-500 font-bold" : "text-green-600 font-bold"}>
+                      <TableCell className="text-red-600 font-bold">{formatCurrency(item.total_prize)}</TableCell>
+                      <TableCell className={item.balance < 0 ? "text-red-500 font-bold" : "text-red-600 font-bold"}>
                         {item.balance < 0 ? formatCurrency(item.balance, true) : formatCurrency(item.balance)}
                       </TableCell>
                       <TableCell>{formatCurrency(percentValue1)}</TableCell>
                       <TableCell>{formatCurrency(percentValue2)}</TableCell>
-                      <TableCell className={net_balance < 0 ? "text-red-500 font-bold" : "text-green-600 font-bold"}>
+                      <TableCell className={net_balance < 0 ? "text-red-500 font-bold" : "text-red-600 font-bold"}>
                         {net_balance < 0 ? formatCurrency(net_balance, true) : formatCurrency(net_balance)}
                       </TableCell>
                     </TableRow>
@@ -237,13 +237,13 @@ const LotteryManageSummaryPage: React.FC = () => {
                 <TableRow className="bg-yellow-100 dark:bg-yellow-900/40">
                   <TableCell className="text-right font-bold" colSpan={1}>รวมทั้งหมด</TableCell>
                   <TableCell className="font-bold">{formatCurrency(totalAmount)}</TableCell>
-                  <TableCell className="font-bold text-green-600">{formatCurrency(totalPrize)}</TableCell>
-                  <TableCell className={totalBalance < 0 ? "font-bold text-red-500" : "font-bold text-green-600"}>
+                  <TableCell className="font-bold text-red-600">{formatCurrency(totalPrize)}</TableCell>
+                  <TableCell className={totalBalance < 0 ? "font-bold text-red-500" : "font-bold text-red-600"}>
                     {totalBalance < 0 ? formatCurrency(totalBalance, true) : formatCurrency(totalBalance)}
                   </TableCell>
                   <TableCell className="font-bold">{formatCurrency(totalPercent1)}</TableCell>
                   <TableCell className="font-bold">{formatCurrency(totalPercent2)}</TableCell>
-                  <TableCell className={totalNetBalance < 0 ? "font-bold text-red-500" : "font-bold text-green-600"}>
+                  <TableCell className={totalNetBalance < 0 ? "font-bold text-red-500" : "font-bold text-red-600"}>
                     {totalNetBalance < 0 ? formatCurrency(totalNetBalance, true) : formatCurrency(totalNetBalance)}
                   </TableCell>
                 </TableRow>

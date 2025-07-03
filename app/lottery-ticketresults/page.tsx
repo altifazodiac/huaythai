@@ -255,7 +255,7 @@ export default function LotteryTicketResultsPage() {
                     boxShadow: isMobile ? '0 2px 8px 0 rgba(30,60,114,0.10)' : '0 4px 32px 0 rgba(30,60,114,0.15)',
                   }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-tr from-green-900/60 to-green-400/40 animate-gradient-move z-0" />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-red-900/60 to-red-400/40 animate-gradient-move z-0" />
                   <div className={`relative z-10 flex flex-col ${isMobile ? 'gap-1' : 'sm:flex-row gap-4'} items-center justify-between`}>
                     <div className={`flex items-center gap-${isMobile ? '0.5' : '3'}`}>
                       <FaCrown className={`text-yellow-300 ${isMobile ? 'text-base' : 'text-lg'} drop-shadow-glow`} />
@@ -265,7 +265,7 @@ export default function LotteryTicketResultsPage() {
                       <Input placeholder="ค้นหาบิล..." value={filterBill} onChange={e => setFilterBill(e.target.value)} className={`rounded-full bg-white/20 border-none text-white placeholder:text-white/70 shadow-inner focus:ring-2 focus:ring-yellow-300 ${isMobile ? 'text-[11px] py-0.5 px-2 h-7 min-h-0' : ''}`} />
                       <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} className={`rounded-full bg-white/20 border-none text-white placeholder:text-white/70 shadow-inner focus:ring-2 focus:ring-yellow-300 ${isMobile ? 'text-[11px] py-0.5 px-2 h-7 min-h-0' : ''}`} />
                     </div>
-                    <div className={`flex items-center md:w-54 pl-12 gap-1 bg-gradient-to-r from-green-600 to-green-800 rounded-full ${isMobile ? 'px-1 py-0.5 pl-5 w-40' : 'px-4 py-2 pl-5 w-40'} shadow border border-white/20`}>
+                    <div className={`flex items-center md:w-54 pl-12 gap-1 bg-gradient-to-r from-red-600 to-red-800 rounded-full ${isMobile ? 'px-1 py-0.5 pl-5 w-40' : 'px-4 py-2 pl-5 w-40'} shadow border border-white/20`}>
                       <FaCoins className={`text-yellow-200 ${isMobile ? 'text-base' : 'text-lg'} animate-bounce`} />
                       <div className="flex flex-col text-right">
                         <span className={`text-[10px] text-white/80`}>ยอดรวมรางวัล</span>
@@ -291,7 +291,7 @@ export default function LotteryTicketResultsPage() {
                         }
                         return (
                           <Collapsible key={win.bill_number} className="w-full">
-                            <div className={`flex flex-col ${isMobile ? 'gap-0.5 px-1 py-0.5 text-[11px]' : 'sm:flex-row gap-1 px-2 py-1 text-xs'} items-center w-full bg-green-600/90 rounded-lg cursor-pointer`}>
+                            <div className={`flex flex-col ${isMobile ? 'gap-0.5 px-1 py-0.5 text-[11px]' : 'sm:flex-row gap-1 px-2 py-1 text-xs'} items-center w-full bg-red-600/90 rounded-lg cursor-pointer`}>
                               <CollapsibleTrigger asChild>
                                 <button className={`flex flex-1 items-center gap-${isMobile ? '1' : '2'} w-full text-left focus:outline-none`}>
                                   <FaCrown className={`text-yellow-300 ${isMobile ? 'text-base' : ''}`} />
@@ -352,7 +352,7 @@ export default function LotteryTicketResultsPage() {
                                     {statusLoading === win.bill_number ? 'กำลังอัปเดต...' : 'รอจ่าย'}
                                   </Button>
                                 ) : (
-                                  <Button className={`bg-green-500 text-white rounded-full ${isMobile ? 'px-2 py-0.5 text-[11px] h-5' : 'px-3 py-1 text-xs h-6'} min-w-0 shadow font-semibold`} disabled>
+                                  <Button className={`bg-red-500 text-white rounded-full ${isMobile ? 'px-2 py-0.5 text-[11px] h-5' : 'px-3 py-1 text-xs h-6'} min-w-0 shadow font-semibold`} disabled>
                                     จ่ายแล้ว {paidAtThai}
                                   </Button>
                                 )}
@@ -378,7 +378,7 @@ export default function LotteryTicketResultsPage() {
                                       const isWing = item.prize_code.includes('วิ่ง');
                                       const isStraight = !isTod && !isWing;
                                       const matchedNumbers = item.winning_number.split(',').map(s => s.trim()).filter(Boolean);
-                                      let icon = isStraight ? <FaMedal className={`text-green-500 mr-1 inline ${isMobile ? 'text-xs' : ''}`} /> : isTod ? <FaRandom className={`text-yellow-500 mr-1 inline ${isMobile ? 'text-xs' : ''}`} /> : <FaRunning className={`text-green-500 mr-1 inline ${isMobile ? 'text-xs' : ''}`} />;
+                                      let icon = isStraight ? <FaMedal className={`text-red-500 mr-1 inline ${isMobile ? 'text-xs' : ''}`} /> : isTod ? <FaRandom className={`text-yellow-500 mr-1 inline ${isMobile ? 'text-xs' : ''}`} /> : <FaRunning className={`text-red-500 mr-1 inline ${isMobile ? 'text-xs' : ''}`} />;
                                       return (
                                         <motion.tr
                                           initial={{ opacity: 0, x: 20 }}
@@ -387,7 +387,7 @@ export default function LotteryTicketResultsPage() {
                                           key={item.id + '-' + idx2}
                                           className={`bg-[#E3EAFD] hover:bg-[#D1DBF5] transition ${isMobile ? 'text-[11px]' : 'text-xs'}`}
                                         >
-                                          <TableCell className={`font-bold text-[#17469c] ${isMobile ? 'px-0.5 py-0.5' : 'px-1 py-1'}`}>{icon}<Badge variant='outline' className={`bg-green-100 text-[#17469c] font-bold rounded-full shadow ${isMobile ? 'px-1 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'}`}>{item.prize_code}</Badge></TableCell>
+                                          <TableCell className={`font-bold text-[#17469c] ${isMobile ? 'px-0.5 py-0.5' : 'px-1 py-1'}`}>{icon}<Badge variant='outline' className={`bg-red-100 text-[#17469c] font-bold rounded-full shadow ${isMobile ? 'px-1 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'}`}>{item.prize_code}</Badge></TableCell>
                                           <TableCell className={`${isMobile ? 'px-0.5 py-0.5' : 'px-1 py-1'}`}>
                                             {isTod || isWing ? (
                                               <Badge className={`bg-pink-500 text-white ${isMobile ? 'text-[10px]' : 'text-xs'}`}>{matchedNumbers.join(', ')}</Badge>

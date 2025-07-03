@@ -239,11 +239,11 @@ export default function RemoveLogsPage() {
                     const daysPassed = differenceInDays(new Date(), new Date(ticket.deleted_at));
                     const daysLeft = Math.max(0, 30 - daysPassed);
                     return (
-                      <tr key={ticket.id} className="border-b hover:bg-green-50 cursor-pointer" onClick={() => { setSelectedBillNumber(ticket.bill_number); setBillDrawerOpen(true); }}>
+                      <tr key={ticket.id} className="border-b hover:bg-red-50 cursor-pointer" onClick={() => { setSelectedBillNumber(ticket.bill_number); setBillDrawerOpen(true); }}>
                         <td className="px-2 py-1 text-center">{idx + 1}</td>
                         <td className="px-2 py-1">{ticket.deleted_at ? format(new Date(ticket.deleted_at), 'd MMM yyyy HH:mm', { locale: th }) : '-'}</td>
                         <td className="px-2 py-1">{ticket.user_id}</td>
-                        <td className="px-2 py-1 font-bold text-green-700">{ticket.bill_number}</td>
+                        <td className="px-2 py-1 font-bold text-red-700">{ticket.bill_number}</td>
                         <td className="px-2 py-1">{ticket.draw_date ? format(new Date(ticket.draw_date), 'd MMM yyyy', { locale: th }) : '-'}</td>
                         <td className="px-2 py-1">{ticket.close_time || '-'}</td>
                         <td className="px-2 py-1">{ticket.bill_name || '-'}</td>

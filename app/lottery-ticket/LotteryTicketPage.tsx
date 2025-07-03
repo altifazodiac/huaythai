@@ -40,6 +40,7 @@ import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useSearchParams, useRouter } from "next/navigation";
 import NumberSelectionDrawer from "@/components/shared/NumberSelectionDrawer";
+import NumberPadDrawer from "@/components/shared/NumberPadDrawer";
 import SpectacularLoader from "@/components/ui/SpectacularLoader";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import debounce from "lodash.debounce";
@@ -185,11 +186,67 @@ export default function LotteryTicketPage() {
     return Math.floor(100000 + Math.random() * 900000).toString();
   });
   const [isNumberDrawerOpen, setIsNumberDrawerOpen] = useState(false);
+  const [isNumberPadOpen, setIsNumberPadOpen] = useState(false);
   const [billName, setBillName] = useState("");
   const [isLoadingPrint, setIsLoadingPrint] = useState(false);
   const [countdownText, setCountdownText] = useState("");
 
   const debouncedSetNumberInput = useRef(debounce((val: string) => setNumberInput(val), 200)).current;
+
+  // ฟังก์ชันจัดการการเพิ่มเว้นวรรคอัตโนมัติสำหรับทั้ง NumberPad และ Keyboard
+  const processAutoSpacing = (currentValue: string, newChar: string, digit: number) => {
+    if (newChar.match(/^\d$/)) { // ถ้าเป็นตัวเลข 0-9
+      // หาตำแหน่งสุดท้ายที่ไม่ใช่เว้นวรรค, คอมม่า, หรือขึ้นบรรทัดใหม่
+      const trimmedValue = currentValue.replace(/[\s,\n]+$/, ''); // ลบ separator ท้าย
+      const lastGroup = trimmedValue.split(/[\s,\n]+/).pop() || ''; // กลุ่มตัวเลขสุดท้าย
+      
+      // ถ้ากลุ่มสุดท้ายมีความยาวครบตามจำนวนหลักที่เลือก ให้เพิ่มเว้นวรรคก่อน
+      if (lastGroup.length >= digit) {
+        return currentValue + ` ${newChar}`;
+      } else {
+        return currentValue + newChar;
+      }
+    } else {
+      // ถ้าไม่ใช่ตัวเลข ให้ใช้ตามปกติ
+      return currentValue + newChar;
+    }
+  };
+
+  // NumberPad functions
+  const handleNumberPadClick = (value: string) => {
+    if (selectedDigit && value.match(/^\d$/)) {
+      // ใช้ auto-spacing สำหรับตัวเลข
+      setNumberInput(prev => processAutoSpacing(prev, value, selectedDigit));
+    } else {
+      // ใช้ตามปกติสำหรับ separator
+      setNumberInput(prev => prev + value);
+    }
+  };
+
+  const handleNumberPadBackspace = () => {
+    setNumberInput(prev => prev.slice(0, -1));
+  };
+
+  const handleNumberPadClear = () => {
+    setNumberInput("");
+  };
+
+  const handleTextareaFocus = () => {
+    if (selectedDigit) {
+      setIsNumberPadOpen(true);
+    }
+  };
+
+  // จัดการการพิมพ์ด้วยคีย์บอร์ดใน Textarea
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (selectedDigit && e.key.match(/^\d$/)) {
+      // ถ้าเป็นตัวเลข 0-9 ให้ใช้ auto-spacing
+      e.preventDefault();
+      const newValue = processAutoSpacing(numberInput, e.key, selectedDigit);
+      setNumberInput(newValue);
+    }
+    // ปล่อยให้ตัวอักษรอื่นๆ ทำงานตามปกติ (เว้นวรรค, คอมม่า, Enter, Backspace, etc.)
+  };
 
   useEffect(() => {
     supabase.from("lottery_sub_types").select("lottery_sub_type_id, sub_type_name, country_origin").then(({ data }) => {
@@ -891,7 +948,7 @@ export default function LotteryTicketPage() {
           </div>
           <DialogFooter className="sticky bottom-0 bg-white dark:bg-slate-800 pt-4 z-10">
             <Button variant="outline" onClick={() => setConfirmDialogOpen(false)} disabled={isSubmitting} className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">ยกเลิก</Button>
-            <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={handleConfirmSubmit} disabled={isSubmitting} className="min-w-[120px] bg-red-600 hover:bg-red-700 text-white">
               {isSubmitting ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />กำลังบันทึก...</>) : ("ยืนยัน")}
             </Button>
           </DialogFooter>
@@ -960,7 +1017,7 @@ export default function LotteryTicketPage() {
               className="flex flex-row items-start bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 mb-2 gap-3 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
             >
               <div className="flex flex-col items-center justify-start min-w-[80px] max-w-[100px] text-center flex-shrink-0 pt-1">
-                <div className="text-sm font-bold text-green-600 dark:text-green-400 leading-tight">{group.digit_number} ตัว</div>
+                <div className="text-sm font-bold text-red-600 dark:text-red-400 leading-tight">{group.digit_number} ตัว</div>
                 <div className="text-xs text-slate-600 dark:text-slate-300 leading-tight break-words">
                   {group.typeLabels.join(' x ')}
                   {group._inferredPivotForSort ? ` (รูด19:${group._inferredPivotForSort})` : ''}
@@ -975,7 +1032,7 @@ export default function LotteryTicketPage() {
                   value={group.numbers.join('  ')}
                   readOnly
                   rows={Math.min(3, Math.ceil(group.numbers.join('  ').length / 35))}
-                  className="rounded-md p-1.5 w-full text-xs leading-snug resize-none bg-slate-50 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 focus-visible:ring-1 focus-visible:ring-green-500 placeholder-slate-400 dark:placeholder-slate-500"
+                  className="rounded-md p-1.5 w-full text-xs leading-snug resize-none bg-slate-50 dark:bg-slate-700/60 border border-slate-300 dark:border-slate-600 focus-visible:ring-1 focus-visible:ring-red-500 placeholder-slate-400 dark:placeholder-slate-500"
                   style={{ textAlign: 'left', wordBreak: 'break-all', whiteSpace: 'pre-wrap', fontFamily: 'inherit', minHeight: '28px' }}
                 />
                 <button
@@ -1024,11 +1081,11 @@ export default function LotteryTicketPage() {
               className="mx-auto w-full max-w-2xl md:max-w-3xl lg:max-w-4xl px-2 md:px-6 lg:px-8"
             >
               <Card className="mb-8 shadow-lg border-0 rounded-xl bg-white dark:bg-slate-800">
-                <CardHeader className="h-20 bg-green-800 dark:bg-green-700 rounded-t-xl shadow-lg flex flex-col items-start justify-center">
+                <CardHeader className="h-20 bg-red-800 dark:bg-red-700 rounded-t-xl shadow-lg flex flex-col items-start justify-center">
                   <div className="w-full">
                     <div className="flex items-center space-x-3 w-full justify-between">
                       <div className="flex items-center gap-3">
-                        <TicketIcon className="w-12 h-12 text-green-100" />
+                        <TicketIcon className="w-12 h-12 text-red-100" />
                         <span className="text-lg md:text-xl font-bold text-white">สร้างรายการหวย</span>
                       </div>
                       {subTypeObj && (
@@ -1041,24 +1098,24 @@ export default function LotteryTicketPage() {
                         </div>
                       )}
                     </div>
-                    <span className="text-sm text-green-100 dark:text-green-200 font-medium block mt-1">กรอกรายละเอียดเพื่อเพิ่มรายการซื้อหวยของคุณ</span>
+                    <span className="text-sm text-red-100 dark:text-red-200 font-medium block mt-1">กรอกรายละเอียดเพื่อเพิ่มรายการซื้อหวยของคุณ</span>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 md:p-6">  
                 <div className="flex gap-2 items-end mb-4">  
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1 text-gray-300">
-                        <Hash className="w-4 h-4 text-green-800" />
+                        <Hash className="w-4 h-4 text-red-800" />
                         เลขบิล (Bill Number)
                       </label>
-                      <Input value={billNumber} readOnly className="bg-white dark:bg-slate-900 text-sm cursor-not-allowed border-none focus:ring-green-500" />
+                      <Input value={billNumber} readOnly className="bg-white dark:bg-slate-900 text-sm cursor-not-allowed border-none focus:ring-red-500" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap- text-gray-300">
-                        <Tag className="w-4 h-4 text-green-800" />
+                        <Tag className="w-4 h-4 text-red-800" />
                         ชื่อบิล (Bill Name)
                       </label>
-                      <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" className="border-slate-300 dark:border-slate-600 rounded-lg focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500" />
+                      <Input value={billName} onChange={e => setBillName(e.target.value)} placeholder="ระบุชื่อบิล (ถ้ามี)" className="border-slate-300 dark:border-slate-600 rounded-lg focus:ring-red-500 focus:border-red-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500" />
                     </div>
                    
                   </div>
@@ -1072,7 +1129,7 @@ export default function LotteryTicketPage() {
                       transition={{ duration: 0.35, ease: "easeOut" }}
                     >
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                        <FileText className="w-4 h-4 text-green-800" />
+                        <FileText className="w-4 h-4 text-red-800" />
                         จำนวนหลัก
                       </label>
                         <div className="flex gap-2 mt-1 flex-wrap">
@@ -1089,8 +1146,8 @@ export default function LotteryTicketPage() {
                             }}
                               className={`rounded-full px-4 py-2 text-sm font-medium transition-colors
                                 ${selectedDigit === d 
-                                  ? 'bg-green-600 text-white hover:bg-green-700 border-green-600' 
-                                : 'bg-green-50 border border-green-100 text-green-800 hover:bg-green-250'
+                                  ? 'bg-red-600 text-white hover:bg-red-700 border-red-600' 
+                                : 'bg-red-50 border border-red-100 text-red-800 hover:bg-red-250'
                                 }`}
                             >
                               {d} ตัว
@@ -1110,7 +1167,7 @@ export default function LotteryTicketPage() {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                          <ListChecks className="w-4 h-4 text-green-800" />
+                          <ListChecks className="w-4 h-4 text-red-800" />
                           เลือกประเภท/รูปแบบ <span className="text-xs text-slate-500 dark:text-slate-400">(เลือกได้หลายแบบ)</span>
                         </label>
                         <div className={`flex gap-2 flex-wrap mt-1 transition-all duration-300 ${selectedTypes.length === 0 && selectedDigit ? 'animate-shake border-2 border-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-md' : 'p-2'}`}>
@@ -1119,7 +1176,7 @@ export default function LotteryTicketPage() {
                               key={type.id} 
                               className={`flex items-center gap-1.5 border rounded-md px-3 py-1.5 cursor-pointer shadow-sm transition-all
                                 ${selectedTypes.includes(type.id) 
-                                  ? 'bg-green-50 dark:bg-green-900/30 border-green-500 dark:border-green-600 ring-1 ring-green-500' 
+                                  ? 'bg-red-50 dark:bg-red-900/30 border-red-500 dark:border-red-600 ring-1 ring-red-500' 
                                   : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700'
                                 }`}
                             >
@@ -1128,7 +1185,7 @@ export default function LotteryTicketPage() {
                                 checked={selectedTypes.includes(type.id)}
                                 onChange={() => handleTypeToggle(type.id)}
                                 disabled={(permuteThreeDigits && selectedDigit === 3 && (type.type_number === "เต็ง" || type.type_number === "โต๊ด"))}
-                                className="h-4 w-4 text-green-600 border-slate-300 rounded focus:ring-green-500 dark:accent-green-500"
+                                className="h-4 w-4 text-red-600 border-slate-300 rounded focus:ring-red-500 dark:accent-red-500"
                               />
                               <span className="text-slate-800 dark:text-slate-200 text-sm">{type.type_number || "-"}</span>
                               <span className="text-xs text-slate-500 dark:text-slate-400">(จ่าย {type.price_paid})</span>
@@ -1151,11 +1208,11 @@ export default function LotteryTicketPage() {
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">รูปแบบเลข 2 ตัว</label>
                         <RadioGroup value={twoDigitOperation} onValueChange={(value) => setTwoDigitOperation(value as any)} className="flex flex-wrap gap-x-4 gap-y-2 mt-1 items-center">
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-none" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">ไม่มี</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-reverse" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-swipeFront" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหน้า</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-swipeBack" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหลัง</label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" className="text-green-600 border-slate-400 dark:border-slate-500 focus:ring-green-500"/><label htmlFor="op-swipe19" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">19 ประตู</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="none" id="op-none" className="text-red-600 border-slate-400 dark:border-slate-500 focus:ring-red-500"/><label htmlFor="op-none" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">ไม่มี</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="reverse" id="op-reverse" className="text-red-600 border-slate-400 dark:border-slate-500 focus:ring-red-500"/><label htmlFor="op-reverse" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeFront" id="op-swipeFront" className="text-red-600 border-slate-400 dark:border-slate-500 focus:ring-red-500"/><label htmlFor="op-swipeFront" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหน้า</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipeBack" id="op-swipeBack" className="text-red-600 border-slate-400 dark:border-slate-500 focus:ring-red-500"/><label htmlFor="op-swipeBack" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูดหลัง</label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="swipe19" id="op-swipe19" className="text-red-600 border-slate-400 dark:border-slate-500 focus:ring-red-500"/><label htmlFor="op-swipe19" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">19 ประตู</label></div>
                         </RadioGroup>
                       </motion.div>
                     )}
@@ -1171,7 +1228,7 @@ export default function LotteryTicketPage() {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         className="flex items-center gap-2 mt-3"
                       >
-                        <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="h-4 w-4 text-green-600 border-slate-300 rounded focus:ring-green-500 dark:accent-green-500"/>
+                        <input type="checkbox" checked={permuteThreeDigits} onChange={e => handlePermuteThreeDigitsChange(e.target.checked)} id="permuteThreeDigits" className="h-4 w-4 text-red-600 border-slate-300 rounded focus:ring-red-500 dark:accent-red-500"/>
                         <label htmlFor="permuteThreeDigits" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">กลับเลข (รูด 6)</label>
                       </motion.div>
                     )}
@@ -1187,7 +1244,7 @@ export default function LotteryTicketPage() {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                         className="flex items-center gap-2 mt-3"
                       >
-                        <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="h-4 w-4 text-green-600 border-slate-300 rounded focus:ring-green-500 dark:accent-green-500"/>
+                        <input type="checkbox" checked={swipeNineSingleDigit} onChange={e => setSwipeNineSingleDigit(e.target.checked)} id="swipeNineSingleDigit" className="h-4 w-4 text-red-600 border-slate-300 rounded focus:ring-red-500 dark:accent-red-500"/>
                         <label htmlFor="swipeNineSingleDigit" className="text-sm cursor-pointer text-slate-700 dark:text-slate-300">รูด 9 (เพิ่ม 1-9 อัตโนมัติ)</label>
                       </motion.div>
                     )}
@@ -1204,13 +1261,13 @@ export default function LotteryTicketPage() {
                       >
                       <div className="flex justify-between items-center mb-1">
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                            <Hash className="w-4 h-4 text-green-800" />
+                            <Hash className="w-4 h-4 text-red-800" />
                             หมายเลขหวย <span className="text-xs text-slate-500 dark:text-slate-400">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span>
                           </label>
                         {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
                          !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) && 
                          !swipeNineSingleDigit && (
-                              <Button type="button" size="sm" onClick={() => setIsNumberDrawerOpen(true)} className="rounded-full text-xs px-3 py-1 border-green-500 bg-green-50 text-green-600 hover:bg-green-50 dark:border-green-400 dark:text-green-400 dark:hover:bg-green-900/30">เลือกจากชุดตัวเลข</Button>
+                              <Button type="button" size="sm" onClick={() => setIsNumberDrawerOpen(true)} className="rounded-full text-xs px-3 py-1 border-red-500 bg-red-50 text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-400 dark:hover:bg-red-900/30">เลือกจากชุดตัวเลข</Button>
                           )}
                       </div>
                       <Textarea
@@ -1223,8 +1280,10 @@ export default function LotteryTicketPage() {
                         }
                         value={numberInput}
                         onChange={e => debouncedSetNumberInput(e.target.value)}
+                        onFocus={handleTextareaFocus}
+                        onKeyDown={handleTextareaKeyDown}
                         disabled={!selectedDigit || (swipeNineSingleDigit && selectedDigit === 1)}
-                        className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+                        className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-red-500 focus:border-red-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
                       />
                       </motion.div>
                     )}
@@ -1240,7 +1299,7 @@ export default function LotteryTicketPage() {
                         transition={{ duration: 0.35, ease: "easeOut" }}
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                          <DollarSign className="w-4 h-4 text-green-800" />
+                          <DollarSign className="w-4 h-4 text-red-800" />
                           จำนวนเงิน (บาท)
                         </label>
                         {selectedTypes.length > 1 ? (
@@ -1263,7 +1322,7 @@ export default function LotteryTicketPage() {
           });
           setAmounts(newAmts);
         }}
-        className="w-32 text-green-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+        className="w-32 text-red-600 text-bold border-slate-300 dark:border-slate-600 rounded-md focus:ring-red-500 focus:border-red-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
       />
       {/* ปุ่ม 'ใช้ยอดนี้' ถูกลบออก */}
     </div>
@@ -1282,7 +1341,7 @@ export default function LotteryTicketPage() {
                 value={amounts[typeId] || ""}
                 onChange={e => setAmounts({ ...amounts, [typeId]: e.target.value })}
                 placeholder="฿"
-                className="h-8 w-20 px-2 text-xs border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500"
+                className="h-8 w-20 px-2 text-xs border-slate-300 dark:border-slate-600 rounded-md focus:ring-red-500 focus:border-red-500"
               />
               <div className="flex gap-1 ml-1">
                 {[5, 10, 20, 50, 100].map(qAmt => (
@@ -1290,7 +1349,7 @@ export default function LotteryTicketPage() {
                     key={qAmt}
                     type="button"
                     size="sm"
-                    className="h-7 w-8 px-0 text-xs rounded bg-white border border-green-800 text-green-800 hover:bg-green-50"
+                    className="h-7 w-8 px-0 text-xs rounded bg-white border border-red-800 text-red-800 hover:bg-red-50"
                     onClick={() => setAmounts({ ...amounts, [typeId]: qAmt.toString() })}
                   >
                     {qAmt}
@@ -1313,7 +1372,7 @@ export default function LotteryTicketPage() {
       value={amount}
       onChange={e => setAmount(e.target.value)}
       disabled={!selectedDigit || selectedTypes.length === 0}
-      className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-green-500 focus:border-green-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
+      className="border-slate-300 dark:border-slate-600 rounded-md focus:ring-red-500 focus:border-red-500 dark:bg-slate-800 placeholder-slate-400 dark:placeholder-slate-500"
     />
     <div className="flex gap-1 mt-1.5 flex-wrap">
       {[5, 10, 20, 50, 100].map(qAmt => (
@@ -1321,7 +1380,7 @@ export default function LotteryTicketPage() {
           key={qAmt}
           type="button"
           size="sm"
-          className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-green-800 hover:bg-green-50"
+          className="h-7 w-10 px-3 text-xs rounded-full bg-white border border-gray-300 text-red-800 hover:bg-red-50"
           onClick={() => setAmount(qAmt.toString())}
         >
           {qAmt}
@@ -1345,7 +1404,7 @@ export default function LotteryTicketPage() {
                         className="mb-4"
                       >
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                          <Calendar className="w-4 h-4 text-green-800" />
+                          <Calendar className="w-4 h-4 text-red-800" />
                           วันที่ออกรางวัล
                         </label>
                         {selectedDraw ? (
@@ -1369,7 +1428,7 @@ export default function LotteryTicketPage() {
                         type="button" 
                         onClick={handleAddTicket} 
                         disabled={!canAdd || loading} 
-                        className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
+                        className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-md shadow-sm disabled:opacity-50"
                       >
                         เพิ่มรายการ
                       </Button>
@@ -1386,14 +1445,14 @@ export default function LotteryTicketPage() {
                   <CardContent className="p-4 md:p-6"> 
                     {ticketList.length === 0 ? (
                     <div className="text-center text-slate-500 dark:text-slate-400 py-8">
-                      <FileText className="inline w-6 h-6 mr-2 text-green-400" />
+                      <FileText className="inline w-6 h-6 mr-2 text-red-400" />
                       ยังไม่มีรายการ
                     </div>  
                     ) : (
                       <>
                         <div className="mb-4 p-4 rounded-lg bg-slate-100/50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-700">
                           <div className="flex flex-wrap justify-between items-center border-b border-dashed border-slate-300 dark:border-slate-600 pb-2 mb-2 gap-2">
-                            <span className="font-semibold text-md text-green-600 dark:text-green-400 flex items-center gap-1.5">
+                            <span className="font-semibold text-md text-red-600 dark:text-red-400 flex items-center gap-1.5">
                             <TicketIcon className="w-5 h-5" />
                               หวย {subTypeObj?.sub_type_name || '-'}
                             </span>
@@ -1429,7 +1488,7 @@ export default function LotteryTicketPage() {
                       <div className="space-y-2.5">
                           <TicketListGroupComponent groupsMap={groups} handleRemoveGroupFn={handleRemoveGroup} />
                         </div>
-                      <div className="flex justify-end mt-6 text-xl font-bold text-green-600 dark:text-green-400 items-center gap-2">
+                      <div className="flex justify-end mt-6 text-xl font-bold text-red-600 dark:text-red-400 items-center gap-2">
                         <DollarSign className="w-6 h-6" />
                           ยอดรวมทั้งหมด: {(() => {
                             let total = 0;
@@ -1452,7 +1511,7 @@ export default function LotteryTicketPage() {
                   type="button" 
                   onClick={handleSubmit} 
                   disabled={loading || ticketList.length === 0 || isSubmitting} 
-                  className="px-10 py-3 text-base font-semibold bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-md min-w-[180px] flex items-center justify-center disabled:opacity-60"
+                  className="px-10 py-3 text-base font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-md min-w-[180px] flex items-center justify-center disabled:opacity-60"
                 >
                   {isSubmitting ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" /><span>กำลังดำเนินการ...</span></>) : 
                    loading ? ("กำลังโหลด...") : ("ยืนยันการสั่งซื้อ")}
@@ -1470,7 +1529,23 @@ export default function LotteryTicketPage() {
         let useReverseForDrawer = (selectedDigit === 2 && twoDigitOperation === 'reverse') || (selectedDigit === 3 && permuteThreeDigits);
         return (<NumberSelectionDrawer isOpen={isNumberDrawerOpen} onOpenChange={setIsNumberDrawerOpen} onApplyNumbers={handleApplyNumbersFromDrawer} maxDigits={selectedDigit as 1 | 2 | 3} initialUseReverseNumbers={useReverseForDrawer} />);
       })()}
-      {isLoadingPrint && (<SpectacularLoader message="กำลังเตรียมข้อมูลสำหรับพิมพ์..." baseColor="green" />)}
+      {isLoadingPrint && (<SpectacularLoader message="กำลังเตรียมข้อมูลสำหรับพิมพ์..." baseColor="red" />)}
+      <NumberPadDrawer
+        isOpen={isNumberPadOpen}
+        onClose={() => setIsNumberPadOpen(false)}
+        onNumberClick={handleNumberPadClick}
+        onBackspace={handleNumberPadBackspace}
+        onClear={handleNumberPadClear}
+        title={`กรอกหมายเลข ${selectedDigit || ''} หลัก`}
+        currentValue={numberInput}
+        selectedDigit={selectedDigit || 1}
+        placeholder={
+          swipeNineSingleDigit && selectedDigit === 1 ? "เลข 1-9 จะถูกเพิ่มอัตโนมัติ" :
+          !selectedDigit ? "เลือกจำนวนหลักก่อน" :
+          (selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) ? `กรอกหมายเลข 1 หลัก สำหรับรูด (เช่น 1 2 3)` :
+          `กรอกหมายเลข ${selectedDigit} หลัก (เช่น ${"1".repeat(selectedDigit)} ${"2".repeat(selectedDigit)})`
+        }
+      />
       <style jsx global>{`
         @keyframes shake { 0% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } 100% { transform: translateX(0); } }
         .animate-shake { animation: shake 0.5s; }

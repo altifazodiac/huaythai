@@ -99,7 +99,7 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
       <DrawerContent className="max-w-lg w-full mx-auto rounded-t-2xl md:rounded-l-2xl md:rounded-t-none md:right-0 md:fixed md:top-0 md:bottom-0 md:w-[420px] p-0 overflow-y-auto">
         <DrawerHeader>
           <DrawerTitle>
-            <TicketIcon className="inline w-6 h-6 mr-2 text-green-600" />
+            <TicketIcon className="inline w-6 h-6 mr-2 text-red-600" />
             รายละเอียดบิล {purchase?.ticket_set_number || billNumber}
           </DrawerTitle>
           <DrawerDescription>
@@ -111,7 +111,7 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
         </DrawerHeader>
         <div className="px-4 pb-4" style={{paddingBottom: 0}}>
           {loading ? (
-            <div className="text-center py-8 text-green-600">กำลังโหลด...</div>
+            <div className="text-center py-8 text-red-600">กำลังโหลด...</div>
           ) : error ? (
             <div className="text-center text-red-500 py-8">{error}</div>
           ) : purchase ? (
@@ -130,12 +130,12 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
                   {purchase.items.map((item: any) => {
                     const win = isWinningItem(item);
                     return (
-                      <TableRow key={item.id} className={win ? "bg-green-50 dark:bg-green-900/20" : ""}>
+                      <TableRow key={item.id} className={win ? "bg-red-50 dark:bg-red-900/20" : ""}>
                         <TableCell>{item.lottery_sub_types?.sub_type_name || "-"}</TableCell>
                         <TableCell>{item.lottery_sub_number?.type_number || "-"}</TableCell>
                         <TableCell>
                           {item.numbers.map((num: string) => (
-                            <span key={num} className={win ? "text-green-700 font-bold" : "text-slate-700 dark:text-slate-200"}>
+                            <span key={num} className={win ? "text-red-700 font-bold" : "text-slate-700 dark:text-slate-200"}>
                               {num}
                             </span>
                           )).reduce((prev: any, curr: any) => [prev, ", ", curr])}
@@ -143,7 +143,7 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
                         <TableCell className="text-right">{item.amount.toLocaleString()}</TableCell>
                         <TableCell className="text-center">
                           {win ? (
-                            <Badge variant="secondary" className="bg-green-600 text-white">ถูกรางวัล</Badge>
+                            <Badge variant="secondary" className="bg-red-600 text-white">ถูกรางวัล</Badge>
                           ) : (
                             <Badge variant="secondary">ไม่ถูกรางวัล</Badge>
                           )}
@@ -160,10 +160,10 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
         </div>
         {/* สรุปยอดรวม: sticky bottom */}
         <div className="sticky bottom-0 left-0 w-full z-10 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-2 justify-between items-center text-sm" style={{boxShadow: '0 -2px 8px 0 rgba(0,0,0,0.03)'}}>
-          <span className="flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold">
+          <span className="flex items-center gap-1 text-red-700 dark:text-red-400 font-semibold">
             <DollarSign className="w-4 h-4" /> ยอดซื้อ: {summary.total.toLocaleString()} บาท
           </span>
-          <span className="flex items-center gap-1 text-green-700 dark:text-green-400 font-semibold">
+          <span className="flex items-center gap-1 text-red-700 dark:text-red-400 font-semibold">
             <TicketIcon className="w-4 h-4" /> ถูกรางวัล: {summary.win.toLocaleString()} บาท
           </span>
           <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold">

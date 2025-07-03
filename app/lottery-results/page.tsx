@@ -27,7 +27,7 @@ import { supabase } from "@/lib/supabase/supabaseClient";
 const LOTTERY_TYPE_COLORS: Record<string, string> = {
   "หวยลาว": "border-blue-500 bg-blue-50 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200",
   "หวยเวียดนาม": "border-red-500 bg-red-50 dark:bg-red-900/40 text-red-800 dark:text-red-200",
-  "หวยหุ้น": "border-green-500 bg-green-50 dark:bg-green-900/40 text-green-800 dark:text-green-200",
+  "หวยหุ้น": "border-red-500 bg-red-50 dark:bg-red-900/40 text-red-800 dark:text-red-200",
   "หวยไทย": "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200",
 };
 
@@ -61,7 +61,7 @@ function getCountryGroup(country: string) {
 function renderFlag(country: string, lotteryName: string) {
   const countryName = getCountryName(country, lotteryName);
   if (countryName === "หวยหุ้น") {
-    return <BarChart3 className="w-5 h-5 text-green-600 dark:text-green-400" />;
+    return <BarChart3 className="w-5 h-5 text-red-600 dark:text-red-400" />;
   }
   if (countryName === "อื่นๆ") {
     return <span className="text-2xl" role="img" aria-label="other">🌍</span>;
@@ -164,32 +164,32 @@ export default function LotteryResultsPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <div className="flex flex-col min-h-screen bg-green-50/50 dark:bg-green-900/10 text-gray-800 dark:text-gray-200 w-full">
+        <div className="flex flex-col min-h-screen bg-red-50/50 dark:bg-red-900/10 text-gray-800 dark:text-gray-200 w-full">
             {/* --- Sticky Header --- */}
-            <header className="sticky top-0 z-20 flex flex-col gap-2 bg-green-100/80 dark:bg-green-950/80 backdrop-blur-sm border-b border-green-200 dark:border-green-800/50 shadow-sm transition-all duration-300">
+            <header className="sticky top-0 z-20 flex flex-col gap-2 bg-red-100/80 dark:bg-red-950/80 backdrop-blur-sm border-b border-red-200 dark:border-red-800/50 shadow-sm transition-all duration-300">
                 <div className="flex h-12 items-center px-3 md:px-4">
                      <div className="flex items-center gap-2">
                         <SidebarTrigger className="-ml-1 scale-90" />
-                        <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4 bg-green-300 dark:bg-green-700" />
+                        <Separator orientation="vertical" className="mr-1 data-[orientation=vertical]:h-4 bg-red-300 dark:bg-red-700" />
                         <Breadcrumb>
                         <BreadcrumbList>
                             <BreadcrumbItem className="hidden md:block">
-                            <BreadcrumbLink href="/" className="text-xs font-light text-green-800 dark:text-green-300">แดชบอร์ด</BreadcrumbLink>
+                            <BreadcrumbLink href="/" className="text-xs font-light text-red-800 dark:text-red-300">แดชบอร์ด</BreadcrumbLink>
                             </BreadcrumbItem>
                             <BreadcrumbSeparator className="hidden md:block" />
                             <BreadcrumbItem>
-                            <BreadcrumbPage className="text-xs font-light text-green-900 dark:text-green-200">รายการผลหวย</BreadcrumbPage>
+                            <BreadcrumbPage className="text-xs font-light text-red-900 dark:text-red-200">รายการผลหวย</BreadcrumbPage>
                             </BreadcrumbItem>
                         </BreadcrumbList>
                         </Breadcrumb>
                     </div>
                     <div className="ml-auto flex items-center gap-2">
                       <div className="relative">
-                          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-green-700 dark:text-green-400" />
+                          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-red-700 dark:text-red-400" />
                           <Input
                             type="search"
                             placeholder="ค้นหาชื่อหวย..."
-                            className="w-full pl-9 text-xs font-light rounded-full bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800 focus:border-green-400 dark:focus:border-green-600 h-9 max-w-xs"
+                            className="w-full pl-9 text-xs font-light rounded-full bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-800 focus:border-red-400 dark:focus:border-red-600 h-9 max-w-xs"
                             value={filter}
                             onChange={(e) => setFilter(e.target.value)}
                           />
@@ -202,13 +202,13 @@ export default function LotteryResultsPage() {
             <main className="flex-1 w-full p-2 sm:p-4 transition-all duration-300">
                 {/* วันที่แสดงบนสุด */}
                 <div className="w-full flex justify-center mb-4">
-                  <div className="bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100 rounded-lg px-6 py-2 text-lg font-bold shadow animate-fade-in">
+                  <div className="bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100 rounded-lg px-6 py-2 text-lg font-bold shadow animate-fade-in">
                     {`ผลหวยประจำวันที่ ${format(new Date(today), 'dd MMMM yyyy', { locale: undefined })}`}
                   </div>
                 </div>
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
-                        <Loader2 className="animate-spin w-10 h-10 text-green-600 dark:text-green-400" />
+                        <Loader2 className="animate-spin w-10 h-10 text-red-600 dark:text-red-400" />
                     </div>
                 ) : (
                     <>
@@ -223,11 +223,11 @@ export default function LotteryResultsPage() {
                                 <Table>
                                     <TableHeader className="[&_tr]:border-b-0">
                                         <TableRow className="hover:bg-transparent">
-                                            <TableHead className="w-[10%] sm:w-[8%] font-normal text-xs text-green-800 dark:text-green-300 p-1 sm:p-2">เวลา</TableHead>
-                                            <TableHead className="w-[45%] sm:w-[40%] font-normal text-xs text-green-800 dark:text-green-300 p-1 sm:p-2">ชื่อหวย</TableHead>
-                                            <TableHead className="text-center font-normal text-xs text-green-800 dark:text-green-300 p-1 sm:p-2">3 ตัวบน</TableHead>
-                                            <TableHead className="text-center font-normal text-xs text-green-800 dark:text-green-300 p-1 sm:p-2 hidden sm:table-cell">2 ตัวบน</TableHead>
-                                            <TableHead className="text-center font-normal text-xs text-green-800 dark:text-green-300 p-1 sm:p-2">2 ตัวล่าง</TableHead>
+                                            <TableHead className="w-[10%] sm:w-[8%] font-normal text-xs text-red-800 dark:text-red-300 p-1 sm:p-2">เวลา</TableHead>
+                                            <TableHead className="w-[45%] sm:w-[40%] font-normal text-xs text-red-800 dark:text-red-300 p-1 sm:p-2">ชื่อหวย</TableHead>
+                                            <TableHead className="text-center font-normal text-xs text-red-800 dark:text-red-300 p-1 sm:p-2">3 ตัวบน</TableHead>
+                                            <TableHead className="text-center font-normal text-xs text-red-800 dark:text-red-300 p-1 sm:p-2 hidden sm:table-cell">2 ตัวบน</TableHead>
+                                            <TableHead className="text-center font-normal text-xs text-red-800 dark:text-red-300 p-1 sm:p-2">2 ตัวล่าง</TableHead>
                                             <TableHead className="w-[5%] p-1 sm:p-2"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -242,8 +242,8 @@ export default function LotteryResultsPage() {
                                             });
                                             return (
                                                 <Fragment key={group}>
-                                                    <TableRow key={group} className="border-b-2 border-green-200 dark:border-green-800/60 bg-green-100/80 dark:bg-green-950/50 sticky top-[48px] z-10">
-                                                        <TableCell colSpan={6} className="p-2 text-sm font-semibold text-green-900 dark:text-green-200">
+                                                    <TableRow key={group} className="border-b-2 border-red-200 dark:border-red-800/60 bg-red-100/80 dark:bg-red-950/50 sticky top-[48px] z-10">
+                                                        <TableCell colSpan={6} className="p-2 text-sm font-semibold text-red-900 dark:text-red-200">
                                                             {group}
                                                         </TableCell>
                                                     </TableRow>
@@ -265,19 +265,19 @@ export default function LotteryResultsPage() {
                                                         return (
                                                             <TableRow
                                                                 key={r.id}
-                                                                className="border-b border-green-100/80 dark:border-green-900/50 hover:bg-green-200/50 dark:hover:bg-green-800/40 transition-colors duration-200 cursor-pointer"
+                                                                className="border-b border-red-100/80 dark:border-red-900/50 hover:bg-red-200/50 dark:hover:bg-red-800/40 transition-colors duration-200 cursor-pointer"
                                                                 onClick={() => { setSelected(r); setDrawerOpen(true); }}
                                                             >
-                                                                <TableCell className="p-2 text-xs font-mono text-green-800 dark:text-green-300">{time}</TableCell>
+                                                                <TableCell className="p-2 text-xs font-mono text-red-800 dark:text-red-300">{time}</TableCell>
                                                                 <TableCell className="p-2 flex items-center gap-3">
                                                                     {renderFlag(r.country, r.lottery_name)}
-                                                                    <span className="text-xs sm:text-sm font-light text-green-900 dark:text-green-200 truncate">{r.lottery_name || group}</span>
+                                                                    <span className="text-xs sm:text-sm font-light text-red-900 dark:text-red-200 truncate">{r.lottery_name || group}</span>
                                                                 </TableCell>
-                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{top3}</TableCell>
-                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors hidden sm:table-cell ${isPending || top2.length < 2 ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{isPending ? 'xx' : top2}</TableCell>
-                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-green-700 dark:text-green-300 font-semibold'}`}>{bottom2}</TableCell>
+                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-red-700 dark:text-red-300 font-semibold'}`}>{top3}</TableCell>
+                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors hidden sm:table-cell ${isPending || top2.length < 2 ? 'text-gray-400 dark:text-gray-500' : 'text-red-700 dark:text-red-300 font-semibold'}`}>{isPending ? 'xx' : top2}</TableCell>
+                                                                <TableCell className={`p-2 text-center text-sm font-mono transition-colors ${isPending ? 'text-gray-400 dark:text-gray-500' : 'text-red-700 dark:text-red-300 font-semibold'}`}>{bottom2}</TableCell>
                                                                 <TableCell className="p-2">
-                                                                    <ChevronRight className="w-4 h-4 text-green-400 dark:text-green-600" />
+                                                                    <ChevronRight className="w-4 h-4 text-red-400 dark:text-red-600" />
                                                                 </TableCell>
                                                             </TableRow>
                                                         );

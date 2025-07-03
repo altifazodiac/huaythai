@@ -118,7 +118,7 @@ export default async function LotteryResultsPage() {
       <main className="container mx-auto px-2 sm:px-4 py-8">
         <header className="mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">ผลการออกรางวัลล่าสุด</h1>
-          <div className="mt-2 text-lg text-green-800 dark:text-green-200 font-semibold">
+          <div className="mt-2 text-lg text-red-800 dark:text-red-200 font-semibold">
             {`ผลหวยประจำวันที่ ${format(new Date(todayStr), 'dd MMMM yyyy')}`}
           </div>
         </header>

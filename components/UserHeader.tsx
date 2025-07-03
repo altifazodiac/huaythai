@@ -59,7 +59,7 @@ export default function UserHeader() {
           className="text-white text-base font-medium" // ลด text size
           style={{ fontFamily: "Kanit, sans-serif" }}
         >
-          🎟️ หวยเศรษฐี 789
+          🎟️ สิงโตทองคำ 77
         </motion.div>
       </Link>
       <div className="flex items-center gap-3"> {/* ลด gap */}
@@ -86,7 +86,7 @@ export default function UserHeader() {
               // ปรับ bg opacity, padding, text size, shadow และสีตัวเลขเครดิต
               className="bg-white/15 px-3 py-0.5 rounded-full text-white text-xs sm:text-sm shadow-sm"
             >
-              💰 เครดิต: <span className="font-semibold text-green-200">{credit?.toLocaleString() ?? "0"}</span>
+              💰 เครดิต: <span className="font-semibold text-red-200">{credit?.toLocaleString() ?? "0"}</span>
             </motion.div>
           </>
         )}
