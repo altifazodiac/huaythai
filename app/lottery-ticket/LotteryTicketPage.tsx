@@ -244,8 +244,11 @@ export default function LotteryTicketPage() {
       e.preventDefault();
       const newValue = processAutoSpacing(numberInput, e.key, selectedDigit);
       setNumberInput(newValue);
+    } else if (e.key === 'Backspace') {
+      e.preventDefault(); // ป้องกันการทำงานของ Backspace ปกติ (ที่อาจจะช้า)
+      handleNumberPadBackspace(); // เรียกใช้ฟังก์ชันลบตัวอักษรทันที
     }
-    // ปล่อยให้ตัวอักษรอื่นๆ ทำงานตามปกติ (เว้นวรรค, คอมม่า, Enter, Backspace, etc.)
+    // ปล่อยให้ตัวอักษรอื่นๆ (เช่น arrows, delete, tab, space, comma) ทำงานตามปกติ
   };
 
   useEffect(() => {
@@ -1262,7 +1265,7 @@ export default function LotteryTicketPage() {
                       <div className="flex justify-between items-center mb-1">
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
                             <Hash className="w-4 h-4 text-red-800" />
-                            หมายเลขหวย <span className="text-xs text-slate-500 dark:text-slate-400">(คั่นด้วยเว้นวรรค, คอมม่า หรือขึ้นบรรทัดใหม่)</span>
+                            หมายเลขหวย <span className="text-xs text-slate-500 dark:text-slate-400">(พิมพ์เลขต่อเนื่องได้เลย ระบบจะเว้นวรรคให้)</span>
                           </label>
                         {selectedDigit && (selectedDigit === 1 || selectedDigit === 2 || selectedDigit === 3) && 
                          !(selectedDigit === 2 && (twoDigitOperation === 'swipeFront' || twoDigitOperation === 'swipeBack' || twoDigitOperation === 'swipe19')) && 
@@ -1538,7 +1541,6 @@ export default function LotteryTicketPage() {
         onClear={handleNumberPadClear}
         title={`กรอกหมายเลข ${selectedDigit || ''} หลัก`}
         currentValue={numberInput}
-        selectedDigit={selectedDigit || 1}
         placeholder={
           swipeNineSingleDigit && selectedDigit === 1 ? "เลข 1-9 จะถูกเพิ่มอัตโนมัติ" :
           !selectedDigit ? "เลือกจำนวนหลักก่อน" :

@@ -15,7 +15,6 @@ interface NumberPadDrawerProps {
   title?: string;
   currentValue?: string;
   placeholder?: string;
-  selectedDigit?: number; // จำนวนหลักที่เลือก
 }
 
 const NumberPadDrawer: React.FC<NumberPadDrawerProps> = ({
@@ -26,50 +25,27 @@ const NumberPadDrawer: React.FC<NumberPadDrawerProps> = ({
   onClear,
   title = "กรอกข้อมูล",
   currentValue = "",
-  placeholder = "กรอกหมายเลขที่นี่...",
-  selectedDigit = 1
+  placeholder = "กรอกหมายเลขที่นี่..."
 }) => {
   // จัดการ Layout ของปุ่มใหม่ทั้งหมดในที่เดียวเพื่อง่ายต่อการแก้ไข
   const keypadLayout = [
     { label: '1', value: '1', type: 'number' },
     { label: '2', value: '2', type: 'number' },
     { label: '3', value: '3', type: 'number' },
-    { label: <Delete size={24} />, value: 'backspace', type: 'action', onClick: onBackspace, className: "row-span-2" },
     { label: '4', value: '4', type: 'number' },
     { label: '5', value: '5', type: 'number' },
     { label: '6', value: '6', type: 'number' },
     { label: '7', value: '7', type: 'number' },
     { label: '8', value: '8', type: 'number' },
     { label: '9', value: '9', type: 'number' },
-    { label: <RotateCcw size={20} />, value: 'clear', type: 'action', onClick: onClear },
-    { label: ',', value: ',', type: 'number' },
+    { label: <RotateCcw size={22} />, value: 'clear', type: 'action', onClick: onClear },
     { label: '0', value: '0', type: 'number' },
-    { label: '␣', value: ' ', type: 'number' }, // Spacebar
-    { label: '↵', value: '\n', type: 'action', onClick: () => onNumberClick('\n') }, // Newline
+    { label: <Delete size={24} />, value: 'backspace', type: 'action', onClick: onBackspace },
   ];
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
-    }
-  };
-
-  // ฟังก์ชันจัดการการคีย์ตัวเลขพร้อมเว้นวรรคอัตโนมัติ
-  const handleNumberClick = (value: string) => {
-    if (value.match(/^\d$/)) { // ถ้าเป็นตัวเลข 0-9
-      // หาตำแหน่งสุดท้ายที่ไม่ใช่เว้นวรรค, คอมม่า, หรือขึ้นบรรทัดใหม่
-      const trimmedValue = currentValue.replace(/[\s,\n]+$/, ''); // ลบ separator ท้าย
-      const lastGroup = trimmedValue.split(/[\s,\n]+/).pop() || ''; // กลุ่มตัวเลขสุดท้าย
-      
-      // ถ้ากลุ่มสุดท้ายมีความยาวครบตามจำนวนหลักที่เลือก ให้เพิ่มเว้นวรรคก่อน
-      if (lastGroup.length >= selectedDigit) {
-        onNumberClick(` ${value}`);
-      } else {
-        onNumberClick(value);
-      }
-    } else {
-      // ถ้าไม่ใช่ตัวเลข (เช่น คอมม่า, เว้นวรรค, ขึ้นบรรทัดใหม่) ให้ใช้ตามปกติ
-      onNumberClick(value);
     }
   };
 
@@ -92,7 +68,7 @@ const NumberPadDrawer: React.FC<NumberPadDrawerProps> = ({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-80 left-4 right-4 z-50 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-4"
+            className="fixed bottom-96 left-4 right-4 z-50 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-4"
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
@@ -135,7 +111,7 @@ const NumberPadDrawer: React.FC<NumberPadDrawerProps> = ({
             </div>
 
             {/* Keypad */}
-            <div className="grid grid-cols-4 grid-rows-4 gap-2.5 p-4 pb-safe">
+            <div className="grid grid-cols-3 grid-rows-4 gap-3 p-4 pb-safe">
               {keypadLayout.map((key) => {
                 const isAction = key.type === 'action';
                 const buttonBaseClasses = "h-full w-full rounded-xl text-3xl font-medium transition-colors duration-150 flex items-center justify-center";
@@ -150,10 +126,10 @@ const NumberPadDrawer: React.FC<NumberPadDrawerProps> = ({
                             if (key.onClick) {
                                 key.onClick();
                             } else if (key.type === 'number') {
-                                handleNumberClick(key.value);
+                                onNumberClick(key.value);
                             }
                         }}
-                        className={`${buttonBaseClasses} ${isAction ? actionClasses : numberClasses} ${key.className || ''}`}
+                        className={`${buttonBaseClasses} ${isAction ? actionClasses : numberClasses}`}
                     >
                         {key.label}
                     </motion.button>
