@@ -68,7 +68,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
     },
     {
       title: "รายการที่ลบ",
-      href: "/admin/lottery-ticket",
+      href: "/admin/lottery-ticketAd",
       icon: Trash,
     },
     {

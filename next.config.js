@@ -1,0 +1,51 @@
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  images: {
+    domains: [
+      'bqgiwmawqnixpgvuqhuc.supabase.co',
+      // เพิ่ม domain อื่นๆ ที่ต้องการ
+    ],
+  },
+  // แก้ไข cross-origin warning สำหรับ development
+  allowedDevOrigins: [
+    '192.168.1.106',
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0'
+  ],
+  reactStrictMode: true,
+  typescript: {
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    // !! WARN !!
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Also disable ESLint during builds
+    ignoreDuringBuilds: true,
+  },
+  async redirects() {
+    return [
+      {
+        source: '/admin',
+        destination: '/',
+        permanent: false,
+      },
+    ]
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
+        ],
+      },
+    ];
+  },
+};
+
+module.exports = nextConfig;

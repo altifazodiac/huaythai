@@ -1,6 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+// นำเข้า supabase client จาก lib/supabase/supabaseClient.ts แทนการสร้างใหม่
+import { supabase as supabaseInstance } from '@/lib/supabase/supabaseClient';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey); 
+// ส่งออก supabase client เดิมเพื่อให้โค้ดเดิมทำงานได้
+export const supabase = supabaseInstance;

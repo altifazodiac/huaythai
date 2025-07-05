@@ -1,17 +1,20 @@
- import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+// นำเข้า supabase client จาก supabaseClient.ts แทนการสร้างใหม่
+import { createBrowserClient } from "@supabase/ssr"
 
-let supabaseClient: ReturnType<typeof createSupabaseClient> | null = null
+// ส่งออก supabase client เดิมเพื่อให้โค้ดเดิมทำงานได้
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
-export const createClient = () => {
-  if (supabaseClient) return supabaseClient
+// สำหรับการใช้งานที่ต้องการ singleton instance
+let clientInstance: ReturnType<typeof createBrowserClient> | null = null
 
-  const supabaseUrl = 'https://bqgiwmawqnixpgvuqhuc.supabase.co';
-  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxZ2l3bWF3cW5peHBndnVxaHVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ1NTMzNjksImV4cCI6MjA2MDEyOTM2OX0.OYDTDXPASeTRCuYE0dL69hq_lY9-8UMVip7TK0RD8V8';
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase environment variables")
+export function getSupabaseClient() {
+  if (!clientInstance) {
+    clientInstance = createClient()
   }
-
-  supabaseClient = createSupabaseClient(supabaseUrl, supabaseKey)
-  return supabaseClient
+  return clientInstance
 }

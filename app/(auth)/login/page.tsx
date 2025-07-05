@@ -42,35 +42,90 @@ const LoginPage = () => {
   };
 
   const validateInputs = () => {
-    if (!email) { setError('กรุณากรอกชื่อผู้ใช้หรืออีเมล'); return false; }
-    if (password.length < 6) { setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); return false; }
-    setError(null); return true;
+    if (!email) { 
+      setError('กรุณากรอกชื่อผู้ใช้หรืออีเมล'); 
+      return false; 
+    }
+    if (password.length < 6) { 
+      setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); 
+      return false; 
+    }
+    setError(null); 
+    return true;
   };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    console.log('🚀 เริ่มล็อกอิน:', email);
+    
     if (!validateInputs()) return;
-    setLoading(true); setError(null);
+    
+    setLoading(true);
+    setError(null);
+
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) throw signInError;
-      if (data.user) {
+
+      if (signInError) {
+        console.error('🚨 Login error:', signInError.message);
+        throw signInError;
+      }
+
+      console.log('✅ Login successful:', data.user?.email);
+
+      if (data.user && data.session) {
         // บันทึก login history
-        const ip = await fetch("https://api.ipify.org?format=json").then(res => res.json()).then(d => d.ip).catch(() => null);
-        await supabase.from("login_history").insert([{
-          user_id: data.user.id,
-          email: data.user.email,
-          ip_address: ip,
-          user_agent: typeof window !== "undefined" ? window.navigator.userAgent : null,
-        }]);
-        await new Promise(resolve => setTimeout(resolve, 500));
-        router.push('/');
+        try {
+          const ip = await fetch("https://api.ipify.org?format=json").then(res => res.json()).then(d => d.ip).catch(() => null);
+          const { error: historyError } = await supabase.from("login_history").insert([{
+            user_id: data.user.id,
+            email: data.user.email,
+            ip_address: ip,
+            user_agent: typeof window !== "undefined" ? window.navigator.userAgent : null,
+          }]);
+          if (historyError) {
+            console.error('⚠️ History error:', historyError.message);
+          }
+        } catch (historyCatchError) {
+            console.error('🚨 History error:', historyCatchError);
+        }
+        
+        console.log('🔄 Redirecting to lottery-main...');
+        
+        // รอให้ session อัปเดต
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // ตรวจสอบ session อีกครั้งก่อน redirect
+        const { data: sessionCheck } = await supabase.auth.getSession();
+        
+        if (sessionCheck.session) {
+          console.log('✅ Session confirmed');
+          
+          // ใช้ window.location.href เพื่อให้ full page reload และให้ middleware ทำงาน
+          window.location.href = '/lottery-main';
+          
+        } else {
+          console.error('❌ Session validation failed');
+          setError('เกิดข้อผิดพลาดในการยืนยันตัวตน กรุณาลองใหม่อีกครั้ง');
+        }
+      } else {
+        console.error('❌ No user or session data');
+        setError('ไม่ได้รับข้อมูลผู้ใช้หลังการล็อกอิน');
       }
     } catch (err: any) {
-      if (err.message.includes('Invalid login credentials')) setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      else if (err.message.includes('Email not confirmed')) setError('กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ');
-      else setError(err.message || 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
-    } finally { setLoading(false); }
+      console.error('🚨 Login error:', err.message);
+      
+      if (err.message.includes('Invalid login credentials')) {
+        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      } else if (err.message.includes('Email not confirmed')) {
+        setError('กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ');
+      } else {
+        setError(err.message || 'เกิดข้อผิดพลาดที่ไม่รู้จัก');
+      }
+    } finally {
+      setLoading(false);
+      console.log('🏁 Login process completed');
+    }
   };
 
   // Animation variants

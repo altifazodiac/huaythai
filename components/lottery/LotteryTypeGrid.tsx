@@ -250,7 +250,7 @@ export default function LotteryTypeGrid({
                                 date: new Date(drawDateString).toISOString(),
                                 schedule: scheduleWithDays,
                               };
-                              router.push(`/lottery-ticket?subType=${sub.lottery_sub_type_id}&draw=${encodeURIComponent(JSON.stringify(availableDraw))}`);
+                              router.push(`/lottery-orders?subType=${sub.lottery_sub_type_id}&draw=${encodeURIComponent(JSON.stringify(availableDraw))}`);
                             }}
                           >
                             <motion.div
