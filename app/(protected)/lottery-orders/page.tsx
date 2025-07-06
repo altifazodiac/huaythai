@@ -12,6 +12,8 @@ import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { countryFlagImg } from "@/lib/utils/flags";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { time } from 'console';
+import { toast } from 'sonner';
 
 // Define types for orders
 type OrderCategory = 'three' | 'two' | 'run';
@@ -66,7 +68,22 @@ function normalizeDraw(draw: any): AvailableDraw {
     date: draw?.date ? new Date(draw.date) : new Date(),
   };
 }
- 
+function CurrentTime() {
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000); // อัปเดตทุก 1 วินาที
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="text-xs opacity-90">
+      {now.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}
+    </div>
+  );
+}
 
 const LotteryOrderPage = () => {
     const searchParams = useSearchParams();
@@ -641,32 +658,30 @@ const LotteryOrderPage = () => {
     };
 
     const handleAddOrder = (inputNumber: string) => {
-        if (selectedPrizeIds.length > 0) {
-            const newOrders: Order[] = [];
-            selectedPrizeIds.forEach(prizeId => {
-                const prize = prizeInfo.find(p => p.id === prizeId);
-                if (!prize) return;
-                newOrders.push({
-                    id: Date.now() + Math.random(),
-                    numbers: inputNumber,
-                    category: prize.category as OrderCategory,
-                    pattern: mapPrizeDisplayNameToPattern(prize.display_name),
-                    isSpecialPattern: false,
-                });
-            });
-            setOrders(prev => [...prev, ...newOrders]);
-        } else {
-            setOrders(prev => [
-                ...prev,
-                {
-                    id: Date.now(),
-                    numbers: inputNumber,
-                    category: activeDigitTab,
-                    pattern: activeDigitTab === 'three' ? identifyThreeDigitPattern(inputNumber) : '',
-                    isSpecialPattern: false,
-                },
-            ]);
+        // ตรวจสอบว่ามีการเลือกประเภทหวยหรือไม่
+        if (selectedPrizeIds.length === 0) {
+            toast.error('กรุณาเลือกประเภทหวยก่อนเพิ่มรายการ');
+            return; // หยุดการทำงานถ้าไม่เลือก
         }
+
+        const newOrders: Order[] = [];
+        selectedPrizeIds.forEach(prizeId => {
+            const prize = prizeInfo.find(p => p.id === prizeId);
+            if (!prize) return;
+            newOrders.push({
+                id: Date.now() + Math.random(),
+                numbers: inputNumber,
+                category: prize.category as OrderCategory,
+                pattern: mapPrizeDisplayNameToPattern(prize.display_name),
+                isSpecialPattern: false,
+            });
+        });
+
+        setOrders(prev => [...prev, ...newOrders]);
+        
+        // รีเซ็ตการเลือกประเภทหวยหลังเพิ่มเสร็จ
+        setSelectedPrizeIds([]);
+        toast.success('เพิ่มรายการสำเร็จ');
     };
 
     const handleNumberPress = (num: string) => {
@@ -675,10 +690,10 @@ const LotteryOrderPage = () => {
             setCurrentInput(newInput);
             if (newInput.length === maxDigits) {
                 setTimeout(() => {
-                    // เฉพาะรูดหน้า/รูดหลัง/19 ประตู
                     if (activeDigitTab === 'two' && (selectedTwoDigitPattern === 'รูดหน้า' || selectedTwoDigitPattern === 'รูดหลัง' || selectedTwoDigitPattern === '19 ประตู')) {
                         const newOrders = generateTwoDigitNumbersByPattern(selectedTwoDigitPattern, newInput);
                         setOrders(prev => [...prev, ...newOrders]);
+                        setSelectedPrizeIds([]); // รีเซ็ตการเลือกประเภท
                     } else {
                         handleAddOrder(newInput);
                     }
@@ -698,7 +713,13 @@ const LotteryOrderPage = () => {
         setSelectedTwoDigitPattern('');
     };
 
-
+    // เพิ่ม useEffect สำหรับรีเซ็ตค่าเมื่อเปลี่ยนประเภทหวย
+    useEffect(() => {
+        setCurrentInput('');
+        setSelectedPattern('');
+        setSelectedTwoDigitPattern('');
+        setSelectedDigitForTwoPattern('');
+    }, [selectedPrizeIds]);
 
     const deleteOrder = (id: number) => {
         setOrders(orders.filter(order => order.id !== id));
@@ -743,7 +764,10 @@ const LotteryOrderPage = () => {
                            <TicketIcon className="w-12 h-12 text-red-100" />
                             <h1 className="text-sm md:text-lg font-bold text-white">สร้างรายการหวย</h1>
                         </div>
-                        {subTypeObj && (
+                       
+                    </div>
+                    <div className="flex items-center gap-4">
+                    {subTypeObj && (
                             <div className="flex items-center gap-2 ml-4">
                                  {subTypeObj.country_origin && (
                             <img src={countryFlagImg(subTypeObj.country_origin)} alt={subTypeObj.country_origin} className="h-10 w-10 rounded-full object-cover border border-gray-300" />
@@ -754,7 +778,15 @@ const LotteryOrderPage = () => {
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-4">
+                </div>
+                {subTypeObj && selectedDraw && (
+                    <div className="border-t flex flex-row justify-between border-red-500 py-2">
+                        <div className="text-sm opacity-90 text-white">
+                            กรอกเลขเพื่อเพิ่มรายการ
+                            <div className="text-xs opacity-90">
+                                   <CurrentTime />
+                                </div>
+                        </div>
                         {selectedDraw && (
                             <div className="text-sm text-white">
                                 <div className="flex items-center gap-1">
@@ -762,18 +794,11 @@ const LotteryOrderPage = () => {
                                     <span>งวด: {format(selectedDraw.date, 'd MMM yy', { locale: th })}</span>
                                 </div>
                                 <div className="text-xs opacity-90">
-                                    เวลา: {selectedDraw.schedule.drawing_time}
+                                    เวลาปิดรับ: {selectedDraw.schedule.drawing_time}
                                 </div>
                             </div>
                         )}
                          
-                    </div>
-                </div>
-                {subTypeObj && selectedDraw && (
-                    <div className="border-t border-red-500 py-2">
-                        <div className="text-sm opacity-90 text-white">
-                            กรอกรายการเลขเพื่อเพิ่มรายการสำหรับหวย 
-                        </div>
                     </div>
                 )}
             </div>
@@ -1030,7 +1055,7 @@ const LotteryOrderPage = () => {
                               {/* Digit Selection for Two Digit Patterns */}
                               <div className="mb-2">
                                 <div className="text-xs text-gray-600 mb-1">เลือกตัวเลขสำหรับรูด (หรือไม่เลือกเพื่อใช้ทุกตัว):</div>
-                                <div className="flex gap-1 mb-2">
+                                <div className="flex flex-wrap gap-1 mb-2">
                                   <Button 
                                     variant={selectedDigitForTwoPattern === '' ? "secondary" : "outline"}
                                     className="h-6 w-10 text-xs"
