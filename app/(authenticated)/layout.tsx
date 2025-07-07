@@ -1,18 +1,22 @@
+import { AuthProvider } from "@/lib/contexts/AuthContext";
+import AppLayoutClient from "@/components/AppLayoutClient";
 import { AppBottomNav } from "@/components/app-bottom-nav";
 import UserHeader from "@/components/UserHeader";
 
-export default function AuthenticatedLayout({
+export default function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <>
-      <UserHeader />
-      <main className="flex-1">
-        {children}
-      </main>
-      <AppBottomNav />
-    </>
+    <AuthProvider>
+      <AppLayoutClient>
+        <UserHeader />
+        <main className="flex-1">
+          {children}
+        </main>
+        <AppBottomNav />
+      </AppLayoutClient>
+    </AuthProvider>
   );
 }

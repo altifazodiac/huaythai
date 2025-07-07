@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { ThemeProvider } from "@/components/theme-provider"
 import { LoadingProvider } from "@/components/LoadingProvider";
 import AppLayoutClient from "@/components/AppLayoutClient";
+import { AuthProvider } from "@/lib/contexts/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,19 +38,21 @@ export default function RootLayout({
       <body
         className={`${kanit.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LoadingProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <Toaster position="top-right" />
-            <AppLayoutClient>
-              {children}
-            </AppLayoutClient>
-          </ThemeProvider>
-        </LoadingProvider>
+        <AuthProvider>
+          <LoadingProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <Toaster position="top-right" />
+              <AppLayoutClient>
+                {children}
+              </AppLayoutClient>
+            </ThemeProvider>
+          </LoadingProvider>
+        </AuthProvider>
       </body>
     </html>
   );
