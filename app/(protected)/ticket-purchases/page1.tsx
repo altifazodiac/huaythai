@@ -1,12 +1,12 @@
 "use client";
 import React, { useEffect, useState, useMemo } from "react";
-import { useAuth } from "@/lib/contexts/AuthContext";
+
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { Separator } from "@/components/ui/separator";
-import { AppSidebar } from "@/components/app-sidebar";
+// import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -89,7 +90,7 @@ type Grouped = {
 export default function LotteryPurchasePage() {
   useRequireAuth();
   const router = useRouter();
-  const { supabase } = useAuth();
+  const { supabase } = useAuth(); // ใช้ authenticated client จาก AuthContext
   
   const [tickets, setTickets] = useState<LotteryTicket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -386,7 +387,7 @@ export default function LotteryPurchasePage() {
     return (
       <DirectionProvider dir="ltr">
         <SidebarProvider>
-          <AppSidebar />
+          {/* <AppSidebar /> */}
           <SidebarInset>
             <div className="flex items-center justify-center h-screen">
               <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
@@ -400,7 +401,7 @@ export default function LotteryPurchasePage() {
   return (
     <DirectionProvider dir="ltr">
       <SidebarProvider>
-        <AppSidebar />
+        {/* <AppSidebar /> */}
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2 px-4">

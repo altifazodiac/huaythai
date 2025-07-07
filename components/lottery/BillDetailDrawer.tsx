@@ -15,7 +15,6 @@ import { Table, TableHeader, TableBody, TableRow, TableCell } from "@/components
 import { DollarSign, TicketIcon, Hash, Tag } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-import { supabase } from "@/lib/supabase/supabaseClient";
 import { fetchTicketPurchase } from "@/lib/lottery-print";
 
 interface BillDetailDrawerProps {
@@ -23,6 +22,7 @@ interface BillDetailDrawerProps {
   onOpenChange: (open: boolean) => void;
   billNumber?: string;
   ticketId?: string;
+  supabase: any; // เพิ่ม supabase client เป็น prop
 }
 
 interface LotteryResult {
@@ -33,7 +33,7 @@ interface LotteryResult {
   // ... other fields
 }
 
-const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChange, billNumber, ticketId }) => {
+export default function BillDetailDrawer({ isOpen, onOpenChange, billNumber, ticketId, supabase }: BillDetailDrawerProps) {
   const [loading, setLoading] = useState(false);
   const [purchase, setPurchase] = useState<any>(null);
   const [results, setResults] = useState<LotteryResult[]>([]);
@@ -47,7 +47,7 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
     setError(null);
     (async () => {
       try {
-        const purchaseData = await fetchTicketPurchase({ bill_number: billNumber, id: ticketId });
+        const purchaseData = await fetchTicketPurchase({ bill_number: billNumber, id: ticketId, supabase });
         setPurchase(purchaseData);
         if (purchaseData) {
           // ดึงผลรางวัลตามงวดและชนิดหวย
@@ -180,4 +180,4 @@ const BillDetailDrawer: React.FC<BillDetailDrawerProps> = ({ isOpen, onOpenChang
   );
 };
 
-export default BillDetailDrawer; 
+ 

@@ -9,6 +9,7 @@ interface AuthContextType {
   credit: number | null;
   loading: boolean;
   fetchCredit: () => Promise<void>;
+  supabase: typeof supabase;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchCredit]);
 
   return (
-    <AuthContext.Provider value={{ user, credit, loading, fetchCredit }}>
+    <AuthContext.Provider value={{ user, credit, loading, fetchCredit, supabase }}>
       {children}
     </AuthContext.Provider>
   );

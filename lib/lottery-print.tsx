@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 import { th } from "date-fns/locale";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase/supabaseClient";
+
 import { getThailandTime, getNextDrawDate } from "@/lib/utils/date-utils";
 import { toZonedTime } from "date-fns-tz";
 
@@ -472,7 +472,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
   }
 };
 
-export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bill_number?: string }): Promise<ConsolidatedTicketPurchase | null> {
+export async function fetchTicketPurchase({ id, bill_number, supabase }: { id?: string; bill_number?: string; supabase: any }): Promise<ConsolidatedTicketPurchase | null> {
   let query = supabase
     .from("lottery_tickets")
     .select(`
@@ -557,7 +557,7 @@ export async function fetchTicketPurchase({ id, bill_number }: { id?: string; bi
 }
 
 // ดึง preferred order ของแต่ละ digit จาก lottery_sub_types ใน Supabase
-export async function getPreferredOrderMapFromDB(): Promise<Record<number, string[]>> {
+export async function getPreferredOrderMapFromDB(supabase: any): Promise<Record<number, string[]>> {
   // ดึงข้อมูลจาก lottery_sub_types (สมมุติว่ามี field digit_number, type_order หรือ type_labels)
   // ถ้าไม่มี type_order ใน DB ให้ดึงจาก lottery_sub_number แทน
   const { data, error } = await supabase

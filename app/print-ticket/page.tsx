@@ -4,10 +4,12 @@ import { useSearchParams } from "next/navigation";
 import { fetchTicketPurchase, handlePrint } from "@/lib/lottery-print";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useAuth } from "@/lib/contexts/AuthContext";
 
 // This component contains the actual client-side logic using searchParams
 function PrintTicketClientLogic() {
   const searchParams = useSearchParams();
+  const { supabase } = useAuth();
   const bill_number = searchParams.get("bill_number");
 
   useEffect(() => {
@@ -16,7 +18,7 @@ function PrintTicketClientLogic() {
         toast.error("ไม่พบเลขบิล");
         return;
       }
-      const purchase = await fetchTicketPurchase({ bill_number });
+      const purchase = await fetchTicketPurchase({ bill_number, supabase });
       if (!purchase) {
         toast.error("ไม่พบข้อมูลบิล");
         return;

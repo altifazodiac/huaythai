@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { title: "หวย", url: "/", icon: GalleryVerticalEnd },
-  { title: "ซื้อ", url: "/ticketpurchases", icon: BookOpen },
+  { title: "ซื้อ", url: "/ticket-purchases", icon: BookOpen },
   { title: "ตรวจผล", url: "/lottery-ticketresults", icon: PieChart }, // ปุ่มกลาง
   { title: "ผลล่าสุด", url: "/lottery-results", icon: Calendar },
   { title: "สรุป", url: "/lottery-summary", icon: Frame },
