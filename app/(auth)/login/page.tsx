@@ -3,13 +3,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, easeOut } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
 import { User, Lock, Eye, EyeOff, Loader2, Sparkles, Zap, Ticket } from 'lucide-react';
 import Particles from "react-tsparticles";
 import { loadFull } from "tsparticles";
 import type { Engine, ISourceOptions } from "tsparticles-engine";
+import Image from "next/image"
 
 const LoginPage = () => {
   const router = useRouter();
@@ -131,11 +132,11 @@ const LoginPage = () => {
   // Animation variants
   const cardVariants = {
     hidden: { opacity: 0, scale: 0.95, y: 40 },
-    visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.7, ease: "easeOut" } },
+    visible: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.7, ease: easeOut } },
   };
   const itemVariants = {
     hidden: { opacity: 0, x: -30 },
-    visible: { opacity: 1, x: 0, transition: { type: 'spring', stiffness: 120 } },
+    visible: { opacity: 1, x: 0, transition: { type: "spring" as const, stiffness: 120 } },
   };
 
   if (!isMounted) return null;
@@ -180,8 +181,21 @@ const LoginPage = () => {
             variants={{ visible: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } } }}
             className="w-full"
           >
-            <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-red-900 drop-shadow-neon">
-              <span className="text-red-400 animate-glow-text">เข้าสู่ระบบ</span>
+          <Image
+              src="https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//Logo2.png"
+              alt="logo"
+              width={180}
+              height={180}
+              className={`
+                rounded-full  
+               animate-fade-in-up 
+                ml-24
+                shadow-md
+              `}
+              style={{ animationDelay: '0.2s' }}
+            />
+            <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-red-900 ">
+              <span className="text-red-600  ">เข้าสู่ระบบ</span>
             </motion.h1>
             <motion.p variants={itemVariants} className="mt-2 text-lg text-red-700 mb-8 font-semibold animate-glow-text2">
               ยินดีต้อนรับสู่ <span className="text-red-400 font-bold">สิงโตทองคำ 77</span>
