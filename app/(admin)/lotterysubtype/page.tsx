@@ -1,7 +1,8 @@
 "use client";
 import React from "react";
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,8 @@ const COLUMN_CONFIG = [
 ];
 
 export default function LotterySubTypePage() {
+  // ลบโค้ดส่วนที่สร้าง client ใหม่ทิ้งไป
+  /*
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     if (typeof window === "undefined") {
       // On server, don't create client
@@ -124,6 +127,7 @@ export default function LotterySubTypePage() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     ), []
   );
+  */
 
   const [lotteryTypes, setLotteryTypes] = useState<LotteryType[]>([]);
   const [subTypes, setSubTypes] = useState<LotterySubType[]>([]);
@@ -293,21 +297,26 @@ export default function LotterySubTypePage() {
 
   // handle toggle active
   async function handleToggleActive(id: number, currentStatus: boolean) {
+    console.log(`Toggling active for sub_type_id: ${id} from ${currentStatus} to ${!currentStatus}`);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("lottery_sub_types")
         .update({ is_active: !currentStatus })
-        .eq("lottery_sub_type_id", id);
+        .eq("lottery_sub_type_id", id)
+        .select(); // ใช้ .select() เพื่อให้ได้ข้อมูลกลับมา
       
       if (error) {
+        console.error("Toggle Active Error:", error);
         toast.error("เกิดข้อผิดพลาด: " + error.message);
         return;
       }
       
+      console.log("Toggle successful:", data);
       toast.success(currentStatus ? "ปิดใช้งานสำเร็จ" : "เปิดใช้งานสำเร็จ");
       await fetchSubTypes();
     } catch (error) {
-      toast.error("เกิดข้อผิดพลาดในการอัปเดต");
+      console.error("Unexpected Toggle Error:", error);
+      toast.error("เกิดข้อผิดพลาดที่ไม่คาดคิดในการอัปเดต");
     }
   }
 
@@ -350,41 +359,47 @@ export default function LotterySubTypePage() {
     const formData = {
       ...scheduleForm,
       lottery_sub_type_id: currentSubTypeId,
-      frequency_value: Number(scheduleForm.frequency_value), // แปลงเป็นตัวเลข
-      is_active: scheduleForm.is_active ?? true // ตั้งค่า default เป็น true หากไม่มีค่า
+      frequency_value: Number(scheduleForm.frequency_value),
+      is_active: scheduleForm.is_active ?? true
     };
     
+    console.log("Submitting schedule form:", { editScheduleId, formData });
+
     try {
-    if (editScheduleId) {
-        const { error } = await supabase
+      if (editScheduleId) {
+        const { data, error } = await supabase
           .from("drawing_schedules")
           .update(formData)
-          .eq("schedule_id", editScheduleId);
+          .eq("schedule_id", editScheduleId)
+          .select();
         
         if (error) {
-          console.error("Update error:", error);
+          console.error("Update Schedule Error:", error);
           toast.error("เกิดข้อผิดพลาดในการแก้ไข: " + error.message);
           return;
         }
-      toast.success("แก้ไขตารางเวลาสำเร็จ");
-    } else {
-        const { error } = await supabase
+        console.log("Update Schedule Success:", data);
+        toast.success("แก้ไขตารางเวลาสำเร็จ");
+      } else {
+        const { data, error } = await supabase
           .from("drawing_schedules")
-          .insert([formData]);
+          .insert([formData])
+          .select();
         
         if (error) {
-          console.error("Insert error:", error);
+          console.error("Insert Schedule Error:", error);
           toast.error("เกิดข้อผิดพลาดในการบันทึก: " + error.message);
           return;
         }
-      toast.success("บันทึกตารางเวลาสำเร็จ");
-    }
+        console.log("Insert Schedule Success:", data);
+        toast.success("บันทึกตารางเวลาสำเร็จ");
+      }
       
-    await fetchSchedules(currentSubTypeId);
-    setScheduleForm({});
-    setEditScheduleId(null);
+      await fetchSchedules(currentSubTypeId);
+      setScheduleForm({ is_active: true });
+      setEditScheduleId(null);
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("Unexpected Schedule Submit Error:", error);
       toast.error("เกิดข้อผิดพลาดที่ไม่คาดคิด");
     }
   };
@@ -397,9 +412,24 @@ export default function LotterySubTypePage() {
   const handleDeleteSchedule = async (schedule_id: number) => {
     if (!currentSubTypeId) return;
     if (!confirm("ยืนยันการลบตารางเวลานี้?")) return;
-    await supabase.from("drawing_schedules").delete().eq("schedule_id", schedule_id);
-    toast.success("ลบตารางเวลาสำเร็จ");
-    await fetchSchedules(currentSubTypeId);
+
+    console.log(`Deleting schedule_id: ${schedule_id}`);
+    try {
+      const { error } = await supabase.from("drawing_schedules").delete().eq("schedule_id", schedule_id);
+
+      if (error) {
+        console.error("Delete Schedule Error:", error);
+        toast.error("เกิดข้อผิดพลาดในการลบ: " + error.message);
+        return;
+      }
+
+      console.log("Delete Schedule Success");
+      toast.success("ลบตารางเวลาสำเร็จ");
+      await fetchSchedules(currentSubTypeId);
+    } catch (error) {
+      console.error("Unexpected Delete Schedule Error:", error);
+      toast.error("เกิดข้อผิดพลาดที่ไม่คาดคิดในการลบ");
+    }
   };
 
   // Animal Numbers Dialog
@@ -829,21 +859,21 @@ export default function LotterySubTypePage() {
                       >
                         {showColumns.index && (
                           <TableCell style={{ width: colWidths[0], minWidth: 60 }}>
-                            <button
-                              className="mr-2 text-lg focus:outline-none"
-                              onClick={() => setExpandedRow(expandedRow === item.lottery_sub_type_id ? null : item.lottery_sub_type_id)}
-                              title="แสดง/ซ่อนตารางเวลา"
-                              type="button"
-                            >
-                              {expandedRow === item.lottery_sub_type_id ? "▼" : "▶"}
-                            </button>
+                          <button
+                            className="mr-2 text-lg focus:outline-none"
+                            onClick={() => setExpandedRow(expandedRow === item.lottery_sub_type_id ? null : item.lottery_sub_type_id)}
+                            title="แสดง/ซ่อนตารางเวลา"
+                            type="button"
+                          >
+                            {expandedRow === item.lottery_sub_type_id ? "▼" : "▶"}
+                          </button>
                             {index + 1}
-                          </TableCell>
+                        </TableCell>
                         )}
                         {showColumns.lottery_type_id && (
                           <TableCell style={{ width: colWidths[1], minWidth: 60 }}>
-                            {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name || "-"}
-                          </TableCell>
+                          {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name || "-"}
+                        </TableCell>
                         )}
                         {showColumns.sub_type_name && (
                           <TableCell style={{ width: colWidths[2], minWidth: 60 }}>{item.sub_type_name}</TableCell>
@@ -875,11 +905,11 @@ export default function LotterySubTypePage() {
                           <TableCell style={{ width: colWidths[7], minWidth: 60 }}>
                             <div className="flex gap-1">
                               <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-                                แก้ไข
-                              </Button>
+                              แก้ไข
+                            </Button>
                               <Button size="sm" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
-                                ลบ
-                              </Button>
+                              ลบ
+                            </Button>
                               <Button size="sm" variant="outline" onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>
                                 ตารางเวลา
                               </Button>
@@ -889,8 +919,8 @@ export default function LotterySubTypePage() {
                               <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
                                 อัตรา
                               </Button>
-                            </div>
-                          </TableCell>
+                          </div>
+                        </TableCell>
                         )}
                       </motion.tr>
                       {expandedRow === item.lottery_sub_type_id && showColumns.index && (
