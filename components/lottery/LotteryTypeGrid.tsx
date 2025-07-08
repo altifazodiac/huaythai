@@ -153,10 +153,24 @@ export default function LotteryTypeGrid({
     return () => clearInterval(interval);
   }, []);
 
+  // ฟังก์ชันสำหรับเรียงลำดับหวยยี่กี
+  const sortYikiRounds = (subTypes: any[]) => {
+    return subTypes.sort((a, b) => {
+      // ตรวจสอบว่าเป็นหวยยี่กีหรือไม่
+      if (a.country_origin === "ยี่กี 88" && b.country_origin === "ยี่กี 88") {
+        // แยกเลขรอบจาก "รอบที่ X"
+        const roundA = parseInt(a.sub_type_name.replace(/[^0-9]/g, '')) || 0;
+        const roundB = parseInt(b.sub_type_name.replace(/[^0-9]/g, '')) || 0;
+        return roundA - roundB;
+      }
+      // สำหรับหวยอื่น ๆ ใช้การเรียงลำดับเดิม
+      return 0;
+    });
+  };
+
   const filteredGrouped = useMemo(() => {
-    return grouped.map(group => ({
-      ...group,
-      subTypes: group.subTypes.filter((sub: any) => {
+    return grouped.map(group => {
+      const filteredSubTypes = group.subTypes.filter((sub: any) => {
         if (sub.is_active === false) return false; // แสดงเฉพาะที่เปิดใช้งาน
         if (filterCountry !== "all" && sub.country_origin !== filterCountry) return false;
         const schedule = schedules.find(s => s.lottery_sub_type_id === sub.lottery_sub_type_id);
@@ -166,8 +180,18 @@ export default function LotteryTypeGrid({
         if (filterOpen === true && !isOpenNow(scheduleEn)) return false;
         if (filterOpen === false && isOpenNow(scheduleEn)) return false;
         return true;
-      }),
-    }));
+      });
+      
+      // เรียงลำดับ subTypes โดยเฉพาะสำหรับหวยยี่กี
+      const sortedSubTypes = group.type_name === "ยี่กี" 
+        ? sortYikiRounds(filteredSubTypes)
+        : filteredSubTypes;
+      
+      return {
+        ...group,
+        subTypes: sortedSubTypes,
+      };
+    });
   }, [grouped, schedules, filterOpen, filterCountry]);
 
   function isMonthlyDraw(schedule: any) {

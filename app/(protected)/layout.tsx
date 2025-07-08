@@ -17,9 +17,9 @@ export default async function ProtectedLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-background">
       
-      <main className="flex-1 p-4">
+      <main className="flex-1 p-4 pb-20 overflow-y-auto">
         {children}
       </main>
       <AppBottomNav />

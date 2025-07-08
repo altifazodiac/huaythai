@@ -387,3 +387,82 @@
   border-radius: 70px 70px 70px 70px;
   z-index: 2;
 }
+
+/* Floating Center Button Styles */
+.floating-center-btn {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(to bottom, #ef4444, #dc2626);
+  border-radius: 50%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(220, 38, 38, 0.4);
+  border: 4px solid white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100000;
+  cursor: pointer;
+}
+
+.floating-center-btn:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(220, 38, 38, 0.6);
+}
+
+.floating-center-btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.floating-center-btn::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #ef4444, #dc2626, #b91c1c);
+  border-radius: 50%;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.floating-center-btn:hover::before {
+  opacity: 1;
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+.navbarShape {
+  /* ใช้ polygon เพื่อสร้างรอยเว้าแบบเหลี่ยม */
+  /* clip-path: polygon(
+    0% 0%, 40% 0%, 45% 50%, 50% 60%, 55% 50%, 60% 0%, 100% 0%,
+    100% 100%, 0% 100%
+  ); */
+
+  /* หรือใช้ path() เพื่อให้ได้ความโค้งที่สวยงาม (แนะนำ) */
+  clip-path: path('M 0 0 L 100% 0 L 100% 100% L 0 100% L 0 0 M 40% 0 C 40% 60%, 60% 60%, 60% 0 Z');
+}
+
+.floating-center-btn {
+  @apply fixed bottom-12 left-1/2 transform -translate-x-1/2 z-[1000];
+  @apply w-16 h-16 rounded-full;
+  @apply bg-gradient-to-b from-red-500 to-red-700;
+  @apply flex flex-col items-center justify-center;
+  @apply shadow-lg hover:shadow-xl transition-all duration-200;
+  @apply hover:scale-105 active:scale-95;
+}

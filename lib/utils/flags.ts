@@ -35,6 +35,8 @@ export const countryFlagImg = (country: string) => {
     "จีน": "China.jpg",
     "อียิปต์": "Egypt.jpg",
     "ธกส": "THS.jpg",
+    "ยี่กี 88": "Yiki88.png",
+     
   };
   const filename = map[country] || "Unknown.jpg";
   return getFlagUrl(filename);
