@@ -1,16 +1,16 @@
 "use client"
 import { useRouter, usePathname } from "next/navigation";
-import { GalleryVerticalEnd, BookOpen, PieChart, Calendar, Frame, Sun, Moon, Ticket, Settings, ShieldUser } from "lucide-react";
+import { GalleryVerticalEnd, BookOpen, PieChart, Calendar, Frame, Sun, Moon, Ticket, Settings, ShieldUser, TicketIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { title: "ผลหวย", url: "/api-results", icon: Calendar },
+  { title: "รายการซื้อ", url: "/ticket-purchases", icon: TicketIcon },
   { title: "ตรวจผล", url: "/results", icon: BookOpen }, 
   { title: "ซื้อหวย", url: "/", icon: Ticket },
   { title: "สรุปรายงาน", url: "/summary", icon: PieChart },
-  { title: "ช่วยเหลือ", url: "/", icon: ShieldUser },
+  { title: "ผลหวย", url: "/api-results", icon: Calendar },
 
   
 ];

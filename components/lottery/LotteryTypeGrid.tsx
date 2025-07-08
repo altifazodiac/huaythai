@@ -16,11 +16,53 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // [Existing isOpenNow and dayOfWeekTH functions remain unchanged]
 function isOpenNow(schedule: any): boolean {
-  if (!schedule || !schedule.open_time || !schedule.close_time) {
+  if (!schedule || !schedule.open_time || !schedule.close_time || !schedule.day_of_week) {
     return false;
   }
 
   const now = new Date();
+  const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
+  const currentDate = now.getDate();
+
+  // Check for specific month dates (e.g. "1 ของเดือน")
+  if (schedule.day_of_week.includes('ของเดือน')) {
+    const dayMatch = schedule.day_of_week.match(/(\d+)\s*ของเดือน/);
+    if (dayMatch && dayMatch[1]) {
+      const targetDate = parseInt(dayMatch[1]);
+      if (currentDate !== targetDate) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+  } 
+  // Check for day ranges (e.g. "จันทร์–ศุกร์")
+  else if (schedule.day_of_week.includes('–') || schedule.day_of_week.includes(',')) {
+    const dayRanges = schedule.day_of_week.split(/[–,]/).map((d: string) => d.trim());
+    const dayMap: Record<string, string> = {
+      'จันทร์': 'Monday', 'อังคาร': 'Tuesday', 'พุธ': 'Wednesday',
+      'พฤหัส': 'Thursday', 'ศุกร์': 'Friday', 'เสาร์': 'Saturday', 'อาทิตย์': 'Sunday'
+    };
+    
+    const allowedDays = dayRanges.flatMap((day: string) => dayMap[day] || day);
+    
+    if (!allowedDays.includes(currentDay)) {
+      return false;
+    }
+  }
+  // Check for single day
+  else {
+    const dayMap: Record<string, string> = {
+      'จันทร์': 'Monday', 'อังคาร': 'Tuesday', 'พุธ': 'Wednesday',
+      'พฤหัส': 'Thursday', 'ศุกร์': 'Friday', 'เสาร์': 'Saturday', 'อาทิตย์': 'Sunday'
+    };
+    const thaiDay = schedule.day_of_week.trim();
+    if (dayMap[thaiDay] !== currentDay) {
+      return false;
+    }
+  }
+
+  // Existing time check logic
   const [openH, openM] = schedule.open_time.split(":").map(Number);
   const [closeH, closeM] = schedule.close_time.split(":").map(Number);
 
@@ -167,6 +209,46 @@ export default function LotteryTypeGrid({
       return 0;
     });
   };
+
+  // ฟังก์ชันนับถอยหลังแบบพิเศษ (นับวันจนถึงวันที่ 1 หรือ 16 แล้วค่อยนับเวลา)
+  function getSpecialCountdown(schedule: any, currentDate: Date = new Date()) {
+    // ตรวจสอบว่าวันปัจจุบันเป็นวันที่ 1 หรือ 16 หรือไม่
+    const today = currentDate.getDate();
+    const isTargetDate = today === 1 || today === 16;
+    
+    if (isTargetDate) {
+      // ถ้าวันนี้เป็นวันที่ 1 หรือ 16 ให้นับเวลาแบบปกติ
+      const targetDate = new Date(currentDate);
+      // ตั้งค่าเวลาเปิดปิดตาม schedule
+      const [hours, minutes] = schedule.open_time.split(':').map(Number);
+      targetDate.setHours(hours, minutes, 0, 0);
+      
+      const diff = targetDate.getTime() - currentDate.getTime();
+      if (diff > 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff / (1000 * 60)) % 60);
+        const seconds = Math.floor((diff / 1000) % 60);
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }
+    
+    // ถ้าไม่ใช่วันที่ 1 หรือ 16 หรือเวลาผ่านไปแล้ว ให้คำนวณจำนวนวันจนถึงวันที่ 1 หรือ 16 ถัดไป
+    const nextTargetDate = new Date(currentDate);
+    
+    // หาวันที่ 1 หรือ 16 ถัดไป
+    if (today < 1) {
+      nextTargetDate.setDate(1);
+    } else if (today < 16) {
+      nextTargetDate.setDate(16);
+    } else {
+      nextTargetDate.setMonth(nextTargetDate.getMonth() + 1);
+      nextTargetDate.setDate(1);
+    }
+    
+    const diffDays = Math.ceil((nextTargetDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+    return `${diffDays} วัน`;
+  }
 
   const filteredGrouped = useMemo(() => {
     return grouped.map(group => {
@@ -365,8 +447,12 @@ export default function LotteryTypeGrid({
                                     ? <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />
                                     : (
                                       (() => {
-                                        const today = new Date().getDate();
-                                        if (today === 1 || today === 16) {
+                                        const today = new Date();
+                                        const isSpecialLottery = schedule.day_of_week.includes('1') || schedule.day_of_week.includes('16');
+                                        
+                                        if (isSpecialLottery) {
+                                          return <div className="text-xs text-red-500">เหลืออีก {getSpecialCountdown(schedule, today)}</div>;
+                                        } else if (today.getDate() === 1 || today.getDate() === 16) {
                                           return <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />;
                                         }
                                         return null;

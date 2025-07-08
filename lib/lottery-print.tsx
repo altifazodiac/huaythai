@@ -248,15 +248,15 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
       }, 0);
 
       return `
-        <div class="ticket-group-item" style="display: flex; border-bottom: 1px solid #e5e7eb; padding: 8px 4px; font-size: 12px; background:rgba(20,83,45,0.04); border-radius: 8px; margin-bottom: 4px; box-shadow:0 1px 2px rgba(20,83,45,0.04);">
-          <div class="group-info" style="width: 90px; text-align: center; padding-right: 8px; border-right: 2px dashed #22c55e; flex-shrink: 0;">
-            <div style="font-weight: bold; color: #14532d; font-size: 15px;"><i class='fa fa-th-large' style='color:#22c55e; margin-right:2px;'></i>${group.digit_number} ตัว</div>
-            <div style="color: #166534; font-size: 11px; font-weight:500;">${group.typeOrder.map(label => `<i class='fa fa-certificate' style='color:#facc15;'></i> ${label}`).join(" ")}</div>
-            <div style="font-size: 11px; color:#14532d;">${group.typeOrder.map(label => (group.amounts[label] !== undefined ? group.amounts[label] : 0).toFixed(0)).join(" x ")}</div>
-            <div style="font-size: 11px; color: #22c55e; font-weight:600;"><i class='fa fa-coins' style='color:#facc15;'></i> รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] !== undefined ? group.amounts[label] : 0), 0) * group.numbers.length).toFixed(0)}฿</div>
+        <div class="ticket-group-item" style="display: flex; border-bottom: 1px solid #e5e7eb; padding: 8px 4px; font-size: 12px; background:rgba(220,38,38,0.04); border-radius: 8px; margin-bottom: 4px; box-shadow:0 1px 2px rgba(220,38,38,0.04);">
+          <div class="group-info" style="width: 90px; text-align: center; padding-right: 8px; border-right: 2px dashed #ef4444; flex-shrink: 0;">
+            <div style="font-weight: bold; color: #991b1b; font-size: 15px;"><i class='fa fa-th-large' style='color:#ef4444; margin-right:2px;'></i>${group.digit_number} ตัว</div>
+            <div style="color: #991b1b; font-size: 11px; font-weight:500;">${group.typeOrder.map(label => `<i class='fa fa-certificate' style='color:#facc15;'></i> ${label}`).join(" ")}</div>
+            <div style="font-size: 11px; color:#991b1b;">${group.typeOrder.map(label => (group.amounts[label] !== undefined ? group.amounts[label] : 0).toFixed(0)).join(" x ")}</div>
+            <div style="font-size: 11px; color: #ef4444; font-weight:600;"><i class='fa fa-coins' style='color:#facc15;'></i> รวม: ${(group.typeOrder.reduce((sum, label) => sum + (group.amounts[label] !== undefined ? group.amounts[label] : 0), 0) * group.numbers.length).toFixed(0)}฿</div>
           </div>
           <div class="group-numbers" style="flex-grow: 1; padding-left: 12px; line-height: 1.7; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
-            ${group.numbers.map(num => `<span style="background: linear-gradient(90deg,#22c55e 0%,#14532d 100%); color: #fff; padding: 2px 8px; border-radius: 6px; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(20,83,45,0.10); display:inline-flex; align-items:center;"><i class='fa fa-ticket' style='margin-right:3px;'></i>${num}</span>`).join("")}
+            ${group.numbers.map(num => `<span style="background: linear-gradient(90deg,#ef4444 0%,#991b1b 100%); color: #fff; padding: 2px 8px; border-radius: 6px; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(220,38,38,0.10); display:inline-flex; align-items:center;"><i class='fa fa-ticket' style='margin-right:3px;'></i>${num}</span>`).join("")}
           </div>
         </div>
       `;
@@ -283,10 +283,10 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
             .container {
               width: 150mm;
               margin: 10mm auto;
-              border: 1px solid #22c55e;
+              border: 1px solid #ef4444;
               position: relative;
               background: #fff;
-              box-shadow: 0 4px 16px rgba(20,83,45,0.10);
+              box-shadow: 0 4px 16px rgba(220,38,38,0.10);
               border-radius: 16px;
               overflow: hidden;
             }
@@ -296,7 +296,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               left: 50%;
               transform: translate(-50%, -50%) rotate(-30deg);
               font-size:42px;
-              color: rgba(34,197,94,0.10);
+              color: rgba(220,38,38,0.10);
               font-weight: 900;
               z-index: 0;
               pointer-events: none;
@@ -307,7 +307,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               width: 100%;
               min-height: 32px;
               text-align: center;
-              background: linear-gradient(90deg,#14532d 0%,#22c55e 100%);
+              background: linear-gradient(90deg,#991b1b 0%,#ef4444 100%);
               border-bottom: 4px solid #fff;
               padding-top: 8px;
               padding-bottom: 8px;
@@ -315,7 +315,7 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               position: relative;
               z-index: 1;
               color: #fff;
-              box-shadow: 0 2px 8px rgba(20,83,45,0.08);
+              box-shadow: 0 2px 8px rgba(220,38,38,0.08);
             }
             .header h1 {
               font-size: 18px;
@@ -342,10 +342,10 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               font-size: 13px;
             }
             .ticket-info-row {
-              display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #22c55e; padding-bottom: 4px;
+              display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #ef4444; padding-bottom: 4px;
             }
             .ticket-info .icon {
-              color: #22c55e; margin-right: 4px;
+              color: #ef4444; margin-right: 4px;
             }
             .ticket-number-barcode {
               height: 22px;
@@ -355,14 +355,14 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               font-size: 14px;
               font-weight:600;
               letter-spacing: 2px;
-              background: linear-gradient(90deg,#22c55e 0%,#14532d 100%);
+              background: linear-gradient(90deg,#ef4444 0%,#991b1b 100%);
               color: #fff;
               border-radius: 6px;
               margin-bottom: 8px;
               margin-top: 2px;
               position: relative;
               z-index: 1;
-              box-shadow: 0 1px 4px rgba(20,83,45,0.10);
+              box-shadow: 0 1px 4px rgba(220,38,38,0.10);
               display: flex; align-items: center; justify-content: center;
             }
             .total {
@@ -377,9 +377,9 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               margin: 0 auto;
               position: relative;
               z-index: 1;
-              background: linear-gradient(90deg,#14532d 0%,#22c55e 100%);
+              background: linear-gradient(90deg,#991b1b 0%,#ef4444 100%);
               color: #fff;
-              box-shadow: 0 2px 8px rgba(20,83,45,0.10);
+              box-shadow: 0 2px 8px rgba(220,38,38,0.10);
               display: flex; align-items: center; justify-content: center; gap: 8px;
             }
             .total .fa-coins { color: #facc15; margin-right: 4px; }
@@ -387,12 +387,12 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
               text-align: center;
               margin-top: 12px;
               font-size: 11px;
-              color: #166534;
+              color: #991b1b;
               padding-top: 8px;
               position: relative;
               z-index: 1;
               background: linear-gradient(90deg,#f6fef8 0%,#d1fae5 100%);
-              border-top: 1px solid #22c55e;
+              border-top: 1px solid #ef4444;
             }
             .footer p {
               margin: 2px 0;
@@ -427,23 +427,23 @@ export const handlePrint = async ({ purchase, ticketSubTypes, user }: TicketPrin
             <div class="header">
               <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                 <h1 style="font-size: 20px; margin: 0;font-weight: 700;color: #fff; letter-spacing:1px;"><i class='fa fa-receipt' style='margin-right:6px;'></i>บันทึกช่วยจำ</h1>
-                <div style="border: 1px solid #fff; width: 120px; height: 28px; background-color: #22c55e; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-left:10px;"><h1 style="font-size: 15px; margin: 0;font-weight: 500;color: #fff; display:flex; align-items:center;"><i class='fa fa-user-circle' style='margin-right:4px;'></i>${user?.user_metadata?.name || "Guest"}</h1></div>
+                <div style="border: 1px solid #fff; width: 120px; height: 28px; background-color: #ef4444; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-left:10px;"><h1 style="font-size: 15px; margin: 0;font-weight: 500;color: #fff; display:flex; align-items:center;"><i class='fa fa-user-circle' style='margin-right:4px;'></i>${user?.user_metadata?.name || "Guest"}</h1></div>
               </div>
             </div>
             <div class="ticket-info">
               <div class="ticket-info-row">
-                <span style="font-weight: bold; font-size: 15px; color: #14532d;"><i class='fa fa-star icon'></i>${lotteryTypeName}</span>
-                <span style="font-size: 13px; color: #166534;"><i class='fa fa-barcode icon'></i>บิล: ${purchase.ticket_set_number}</span>
+                <span style="font-weight: bold; font-size: 15px; color: #991b1b;"><i class='fa fa-star icon'></i>${lotteryTypeName}</span>
+                <span style="font-size: 13px; color: #991b1b;"><i class='fa fa-barcode icon'></i>บิล: ${purchase.ticket_set_number}</span>
               </div>
               <div class="ticket-info-row" style="border-bottom:none;">
-                <span style="color: #166534;"><i class='fa fa-calendar icon'></i>งวด: ${formattedActualDrawDate} (เวลา ${purchase.draw_time || 'N/A'})</span>
-                <span style="color: #166534;"><i class='fa fa-user icon'></i>ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
+                <span style="color: #991b1b;"><i class='fa fa-calendar icon'></i>งวด: ${formattedActualDrawDate} (เวลา ${purchase.draw_time || 'N/A'})</span>
+                <span style="color: #991b1b;"><i class='fa fa-user icon'></i>ผู้ซื้อ: ${purchase.ticket_set_name || "ไม่มีชื่อ"}</span>
               </div>
               <div class="ticket-info-row">
-                <span style="color: #22c55e; font-weight: bold; font-size: 13px;"><i class="fa fa-clock-o icon" aria-hidden="true"></i>ปิดรับใน:</span>
-                <span style="color: #22c55e; font-weight: bold; font-size: 13px;">${countdownText}</span>
+                <span style="color: #ef4444; font-weight: bold; font-size: 13px;"><i class="fa fa-clock-o icon" aria-hidden="true"></i>ปิดรับใน:</span>
+                <span style="color: #ef4444; font-weight: bold; font-size: 13px;">${countdownText}</span>
               </div>
-              <div style="font-size: 12px; text-align: right; background-color: #e7fbe9; padding: 4px 8px; border-radius: 6px; color: #14532d; margin-top: 2px;">
+              <div style="font-size: 12px; text-align: right; background-color: #e7fbe9; padding: 4px 8px; border-radius: 6px; color: #991b1b; margin-top: 2px;">
                 <i class='fa fa-calendar-check-o icon'></i>วันที่ซื้อ: ${formattedPurchaseDateTime}
               </div>
             </div>
@@ -579,4 +579,3 @@ export async function getPreferredOrderMapFromDB(supabase: any): Promise<Record<
   });
   return map;
 }
-
