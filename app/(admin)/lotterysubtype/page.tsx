@@ -99,6 +99,17 @@ interface LotterySubNumber {
   updated_at?: string;
 }
 
+const COLUMN_CONFIG = [
+  { key: "index", label: "ลำดับ" },
+  { key: "lottery_type_id", label: "ประเภทหวย" },
+  { key: "sub_type_name", label: "ชื่อชนิดย่อย" },
+  { key: "country_origin", label: "ประเทศ" },
+  { key: "reference_source", label: "อ้างอิง" },
+  { key: "notes", label: "หมายเหตุ" },
+  { key: "is_active", label: "สถานะ" },
+  { key: "actions", label: "จัดการ" },
+];
+
 export default function LotterySubTypePage() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     if (typeof window === "undefined") {
@@ -143,9 +154,19 @@ export default function LotterySubTypePage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [colWidths, setColWidths] = useState<number[]>([60, 120, 160, 120, 120, 120, 100, 180]);
   const tableRef = useRef<HTMLTableElement>(null);
-
   // Debounced search
   const [searchTerm, setSearchTerm] = useState("");
+  // เพิ่มตรงนี้
+  const [showColumns, setShowColumns] = useState<Record<string, boolean>>({
+    index: true,
+    lottery_type_id: true,
+    sub_type_name: true,
+    country_origin: true,
+    reference_source: true,
+    notes: true,
+    is_active: true,
+    actions: true,
+  });
 
   // Debounce search input
   useEffect(() => {
@@ -597,9 +618,6 @@ export default function LotterySubTypePage() {
 
   TableRowComponent.displayName = 'TableRowComponent';
 
-  const columnLabels = ["ลำดับ", "ประเภทหวย", "ชื่อชนิดย่อย", "ประเทศ", "อ้างอิง", "หมายเหตุ", "สถานะ", "จัดการ"];
-  const [showColumns, setShowColumns] = useState<boolean[]>(Array(columnLabels.length).fill(true));
-
   return (
     <>
       <motion.div
@@ -731,23 +749,20 @@ export default function LotterySubTypePage() {
           </Select>
         </div>
 
-        {/* ปุ่มเลือกคอลัมน์ */}
-        <div className="mb-2">
-          <label className="font-medium mr-2">แสดงคอลัมน์:</label>
-          {columnLabels.map((label, idx) => (
-            <label key={label} className="mr-2">
+        {/* UI สำหรับเลือกซ่อน/แสดง column */}
+        <div className="mb-2 flex gap-2 items-center">
+          <span className="text-sm font-medium">แสดงคอลัมน์:</span>
+          {COLUMN_CONFIG.filter(col => col.key !== "is_active" && col.key !== "actions").map(col => (
+            <label key={col.key} className="flex items-center gap-1 text-xs">
               <input
                 type="checkbox"
-                checked={showColumns[idx]}
-                onChange={() => {
-                  const updated = [...showColumns];
-                  updated[idx] = !updated[idx];
-                  setShowColumns(updated);
-                }}
+                checked={showColumns[col.key]}
+                onChange={() => setShowColumns((sc: Record<string, boolean>) => ({ ...sc, [col.key]: !sc[col.key] }))}
               />
-              <span className="ml-1">{label}</span>
+              {col.label}
             </label>
           ))}
+          <span className="text-xs text-gray-400">(สถานะ, จัดการ แสดงเสมอ)</span>
         </div>
 
         <Card>
@@ -758,23 +773,23 @@ export default function LotterySubTypePage() {
             <Table ref={tableRef}>
               <TableHeader>
                 <TableRow>
-                  {columnLabels.map((label, idx) =>
-                    showColumns[idx] && (
+                  {COLUMN_CONFIG.map((col, idx) =>
+                    showColumns[col.key] && (
                       <TableHead
-                        key={label}
+                        key={col.key}
                         style={{ width: colWidths[idx], minWidth: 60, position: "relative" }}
                         onClick={
-                          idx === 0 ? () => { setSortKey("lottery_sub_type_id"); setSortAsc(sortKey !== "lottery_sub_type_id" ? true : !sortAsc); } :
-                          idx === 1 ? () => { setSortKey("lottery_type_id"); setSortAsc(sortKey !== "lottery_type_id" ? true : !sortAsc); } :
-                          idx === 2 ? () => { setSortKey("sub_type_name"); setSortAsc(sortKey !== "sub_type_name" ? true : !sortAsc); } :
-                          idx === 3 ? () => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); } :
-                          idx === 4 ? () => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); } :
-                          idx === 5 ? () => { setSortKey("notes"); setSortAsc(sortKey !== "notes" ? true : !sortAsc); } :
-                          idx === 6 ? () => { setSortKey("is_active"); setSortAsc(sortKey !== "is_active" ? true : !sortAsc); } : undefined
+                          col.key === "index" ? () => { setSortKey("lottery_sub_type_id"); setSortAsc(sortKey !== "lottery_sub_type_id" ? true : !sortAsc); } :
+                          col.key === "lottery_type_id" ? () => { setSortKey("lottery_type_id"); setSortAsc(sortKey !== "lottery_type_id" ? true : !sortAsc); } :
+                          col.key === "sub_type_name" ? () => { setSortKey("sub_type_name"); setSortAsc(sortKey !== "sub_type_name" ? true : !sortAsc); } :
+                          col.key === "country_origin" ? () => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); } :
+                          col.key === "reference_source" ? () => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); } :
+                          col.key === "notes" ? () => { setSortKey("notes"); setSortAsc(sortKey !== "notes" ? true : !sortAsc); } :
+                          col.key === "is_active" ? () => { setSortKey("is_active"); setSortAsc(sortKey !== "is_active" ? true : !sortAsc); } : undefined
                         }
                         className={"cursor-pointer group"}
                       >
-                        {label}
+                        {col.label}
                         {/* Resizer */}
                         <div
                           style={{
@@ -790,13 +805,13 @@ export default function LotterySubTypePage() {
                           onMouseDown={(e) => handleResize(idx, e)}
                         />
                         {/* Sort indicator */}
-                        {idx === 0 && sortKey === "lottery_sub_type_id" && (sortAsc ? " ▲" : " ▼")}
-                        {idx === 1 && sortKey === "lottery_type_id" && (sortAsc ? " ▲" : " ▼")}
-                        {idx === 2 && sortKey === "sub_type_name" && (sortAsc ? " ▲" : " ▼")}
-                        {idx === 3 && sortKey === "country_origin" && (sortAsc ? " ▲" : " ▼")}
-                        {idx === 4 && sortKey === "reference_source" && (sortAsc ? " ▲" : " ▼")}
-                        {idx === 5 && sortKey === "notes" && (sortAsc ? " ▲" : " ▼")}
-                        {idx === 6 && sortKey === "is_active" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "index" && sortKey === "lottery_sub_type_id" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "lottery_type_id" && sortKey === "lottery_type_id" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "sub_type_name" && sortKey === "sub_type_name" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "country_origin" && sortKey === "country_origin" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "reference_source" && sortKey === "reference_source" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "notes" && sortKey === "notes" && (sortAsc ? " ▲" : " ▼")}
+                        {col.key === "is_active" && sortKey === "is_active" && (sortAsc ? " ▲" : " ▼")}
                       </TableHead>
                     )
                   )}
@@ -806,8 +821,13 @@ export default function LotterySubTypePage() {
                 <AnimatePresence>
                   {filteredSubTypes.map((item, index) => (
                     <React.Fragment key={item.lottery_sub_type_id}>
-                      <TableRow>
-                        {showColumns[0] && (
+                      <motion.tr
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {showColumns.index && (
                           <TableCell style={{ width: colWidths[0], minWidth: 60 }}>
                             <button
                               className="mr-2 text-lg focus:outline-none"
@@ -820,24 +840,24 @@ export default function LotterySubTypePage() {
                             {index + 1}
                           </TableCell>
                         )}
-                        {showColumns[1] && (
+                        {showColumns.lottery_type_id && (
                           <TableCell style={{ width: colWidths[1], minWidth: 60 }}>
                             {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name || "-"}
                           </TableCell>
                         )}
-                        {showColumns[2] && (
+                        {showColumns.sub_type_name && (
                           <TableCell style={{ width: colWidths[2], minWidth: 60 }}>{item.sub_type_name}</TableCell>
                         )}
-                        {showColumns[3] && (
+                        {showColumns.country_origin && (
                           <TableCell style={{ width: colWidths[3], minWidth: 60 }}>{item.country_origin}</TableCell>
                         )}
-                        {showColumns[4] && (
+                        {showColumns.reference_source && (
                           <TableCell style={{ width: colWidths[4], minWidth: 60 }}>{item.reference_source}</TableCell>
                         )}
-                        {showColumns[5] && (
+                        {showColumns.notes && (
                           <TableCell style={{ width: colWidths[5], minWidth: 60 }}>{item.notes}</TableCell>
                         )}
-                        {showColumns[6] && (
+                        {showColumns.is_active && (
                           <TableCell style={{ width: colWidths[6], minWidth: 60 }}>
                             <div className="flex items-center gap-2">
                               <Switch
@@ -851,7 +871,7 @@ export default function LotterySubTypePage() {
                             </div>
                           </TableCell>
                         )}
-                        {showColumns[7] && (
+                        {showColumns.actions && (
                           <TableCell style={{ width: colWidths[7], minWidth: 60 }}>
                             <div className="flex gap-1">
                               <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
@@ -872,10 +892,10 @@ export default function LotterySubTypePage() {
                             </div>
                           </TableCell>
                         )}
-                      </TableRow>
-                      {expandedRow === item.lottery_sub_type_id && (
+                      </motion.tr>
+                      {expandedRow === item.lottery_sub_type_id && showColumns.index && (
                         <tr>
-                          <td colSpan={showColumns.filter(Boolean).length} className="bg-zinc-50 dark:bg-zinc-800 p-4">
+                          <td colSpan={Object.values(showColumns).filter(Boolean).length} className="bg-zinc-50 dark:bg-zinc-800 p-4">
                             <DrawingScheduleCollapse lottery_sub_type_id={item.lottery_sub_type_id} supabase={supabase} />
                           </td>
                         </tr>
