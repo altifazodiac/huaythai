@@ -110,6 +110,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       icon: ClipboardList,
     },
     {
+      title: "จัดการผู้ใช้",
+      href: "/UsersManage",
+      icon: Users,
+    },
+    {
       title: "ประวัติการเข้าใช้งาน",
       href: "/login-history",
       icon: Globe,
