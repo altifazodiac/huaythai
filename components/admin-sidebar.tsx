@@ -170,7 +170,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       </div>
       {/* Back to Home Link */}
       <div className="flex-shrink-0 px-4 py-3 border-b dark:border-warning-800">
-        <Link href="/" className="flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 font-medium" onClick={handleNavClick}>
+        <Link href="/" className="flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500   font-medium" onClick={handleNavClick}>
           <Home className="h-5 w-5" />
           <span>กลับหน้าหลัก</span>
         </Link>
@@ -185,12 +185,12 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
                    setOpenSubMenu(openSubMenu === item.title ? null : item.title)
                 }}
                 className={cn(
-                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 transition-colors"
+                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:text-red-500 hover:text-red-500 dark:hover:bg-warning-800 transition-colors"
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
-                  <span className="whitespace-nowrap">{item.title}</span>
+                  <item.icon className="h-5 w-5 flex-shrink-0 dark:hover:text-red-500" />
+                  <span className="whitespace-nowrap dark:hover:text-red-500">{item.title}</span>
                 </div>
                 <ChevronDown className={cn("h-4 w-4 transition-transform", openSubMenu === item.title && "rotate-180")} />
               </button>
@@ -201,7 +201,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
                       key={subItem.href}
                       href={subItem.href}
                       className={cn(
-                        "flex items-center gap-2 py-2 px-4 rounded hover:bg-gray-100 dark:hover:bg-warning-800 transition-colors text-sm",
+                        "flex items-center gap-2 py-2 px-4 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500  dark:hover:bg-warning-800 transition-colors text-sm",
                         pathname === subItem.href && "bg-gray-100 dark:bg-warning-800"
                       )}
                       onClick={handleNavClick}
@@ -217,7 +217,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
               key={item.href}
               href={item.href!}
               className={cn(
-                "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 transition-colors",
+                "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500  transition-colors",
                 pathname === item.href && "bg-gray-100 dark:bg-warning-800"
               )}
               onClick={handleNavClick}
@@ -229,7 +229,9 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
         )}
       </nav>
       {/* Theme Switcher */}
-      <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t dark:border-warning-800 p-3 flex justify-center bg-white dark:bg-warning-900">
+      <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t dark:border-warning-800 p-3 flex justify-center"
+        style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -243,7 +245,9 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
               <span className="sr-only">Toggle theme</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[130px] z-[9999] bg-white dark:bg-warning-900 text-warning-900 dark:text-slate-100 border-warning-700 shadow-xl">
+          <DropdownMenuContent align="end" className="w-[130px] z-[9999] border-warning-700 shadow-xl"
+            style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
+          >
             <DropdownMenuItem
               onClick={() => setTheme("light")}
               className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-100 dark:hover:!bg-warning-800 focus:!bg-warning-200 dark:focus:!bg-warning-800 !text-warning-900 dark:!text-slate-100"

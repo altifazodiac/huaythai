@@ -30,7 +30,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Loader2, Plus } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 // import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -60,6 +60,7 @@ interface LotterySubType {
   country_origin: string;
   reference_source: string;
   notes: string;
+  is_active: boolean;
 }
 
 interface DrawingSchedule {
@@ -137,6 +138,7 @@ export default function LotterySubTypePage() {
   const [editPayoutId, setEditPayoutId] = useState<number | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [payoutSubTypeId, setPayoutSubTypeId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // โหลด lottery_types สำหรับ select
   useEffect(() => {
@@ -148,8 +150,18 @@ export default function LotterySubTypePage() {
 
   // โหลดข้อมูล sub_types ทั้งหมด
   async function fetchSubTypes() {
-    const { data } = await supabase.from("lottery_sub_types").select();
-    if (data) setSubTypes(data);
+    const { data } = await supabase
+      .from("lottery_sub_types")
+      .select("*")
+      .order("lottery_sub_type_id", { ascending: true });
+    if (data) {
+      // ตั้งค่า default is_active = true หากไม่มีข้อมูล
+      const processedData = data.map(item => ({
+        ...item,
+        is_active: item.is_active ?? true
+      }));
+      setSubTypes(processedData);
+    }
   }
 
   // handle change
@@ -204,6 +216,26 @@ export default function LotterySubTypePage() {
     await supabase.from("lottery_sub_types").delete().eq("lottery_sub_type_id", id);
     toast.success("ลบสำเร็จ");
     await fetchSubTypes();
+  }
+
+  // handle toggle active
+  async function handleToggleActive(id: number, currentStatus: boolean) {
+    try {
+      const { error } = await supabase
+        .from("lottery_sub_types")
+        .update({ is_active: !currentStatus })
+        .eq("lottery_sub_type_id", id);
+      
+      if (error) {
+        toast.error("เกิดข้อผิดพลาด: " + error.message);
+        return;
+      }
+      
+      toast.success(currentStatus ? "ปิดใช้งานสำเร็จ" : "เปิดใช้งานสำเร็จ");
+      await fetchSubTypes();
+    } catch (error) {
+      toast.error("เกิดข้อผิดพลาดในการอัปเดต");
+    }
   }
 
   // ดึง schedules ของ sub_type
@@ -312,13 +344,17 @@ export default function LotterySubTypePage() {
   const filteredSubTypes = subTypes
     .filter((item) => {
       const q = search.toLowerCase();
-      return (
-        item.sub_type_name?.toLowerCase().includes(q) ||
+      const statusMatch = statusFilter === "all" || 
+        (statusFilter === "active" && item.is_active) || 
+        (statusFilter === "inactive" && !item.is_active);
+      
+      const textMatch = item.sub_type_name?.toLowerCase().includes(q) ||
         item.country_origin?.toLowerCase().includes(q) ||
         item.reference_source?.toLowerCase().includes(q) ||
         item.notes?.toLowerCase().includes(q) ||
-        lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name?.toLowerCase().includes(q)
-      );
+        lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name?.toLowerCase().includes(q);
+      
+      return statusMatch && textMatch;
     })
     .sort((a, b) => {
       if (!sortKey) return 0;
@@ -482,6 +518,14 @@ export default function LotterySubTypePage() {
                   />
                 </div>
 
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">เปิดใช้งาน</label>
+                  <Switch
+                    checked={form.is_active ?? true}
+                    onCheckedChange={(checked) => setForm({ ...form, is_active: checked })}
+                  />
+                </div>
+
                 <div className="flex gap-2 justify-end">
                   <Button type="submit" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -511,6 +555,16 @@ export default function LotterySubTypePage() {
             onChange={e => setSearch(e.target.value)}
             className="max-w-xs"
           />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="กรองตามสถานะ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทั้งหมด</SelectItem>
+              <SelectItem value="active">เปิดใช้งาน</SelectItem>
+              <SelectItem value="inactive">ปิดใช้งาน</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <Card>
@@ -527,6 +581,7 @@ export default function LotterySubTypePage() {
                   <TableHead onClick={() => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); }} className="cursor-pointer">ประเทศ {sortKey === "country_origin" && (sortAsc ? "▲" : "▼")}</TableHead>
                   <TableHead onClick={() => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); }} className="cursor-pointer">อ้างอิง {sortKey === "reference_source" && (sortAsc ? "▲" : "▼")}</TableHead>
                   <TableHead onClick={() => { setSortKey("notes"); setSortAsc(sortKey !== "notes" ? true : !sortAsc); }} className="cursor-pointer">หมายเหตุ {sortKey === "notes" && (sortAsc ? "▲" : "▼")}</TableHead>
+                  <TableHead onClick={() => { setSortKey("is_active"); setSortAsc(sortKey !== "is_active" ? true : !sortAsc); }} className="cursor-pointer">สถานะ {sortKey === "is_active" && (sortAsc ? "▲" : "▼")}</TableHead>
                   <TableHead className="w-[100px]">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
@@ -559,6 +614,18 @@ export default function LotterySubTypePage() {
                         <TableCell>{item.reference_source}</TableCell>
                         <TableCell>{item.notes}</TableCell>
                         <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={item.is_active}
+                              onCheckedChange={() => handleToggleActive(item.lottery_sub_type_id, item.is_active)}
+                              className="data-[state=checked]:bg-green-500"
+                            />
+                            <span className={`text-xs ${item.is_active ? 'text-green-600' : 'text-gray-400'}`}>
+                              {item.is_active ? 'เปิด' : 'ปิด'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <div className="flex gap-2">
                             <Button
                               variant="outline"
@@ -585,7 +652,7 @@ export default function LotterySubTypePage() {
                      
                       {expandedRow === item.lottery_sub_type_id && (
                         <tr>
-                          <td colSpan={7} className="bg-zinc-50 dark:bg-zinc-800 p-4">
+                          <td colSpan={8} className="bg-zinc-50 dark:bg-zinc-800 p-4">
                             <DrawingScheduleCollapse lottery_sub_type_id={item.lottery_sub_type_id} supabase={supabase} />
                           </td>
                         </tr>
