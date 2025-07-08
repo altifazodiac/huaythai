@@ -8,15 +8,39 @@ import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/AuthContext";
-import { GalleryVerticalEnd, BookOpen, PieChart, Calendar, Frame, Sun, Moon, Ticket, Settings, ShieldUser } from "lucide-react";
+import { GalleryVerticalEnd, BookOpen, PieChart, Calendar, Frame, Sun, Moon, Ticket, Settings, ShieldUser, UserCircle2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
  
 
 export default function UserHeader() {
   const router = useRouter();
-  const { user, credit, loading } = useAuth();
+  const { user, credit, loading, supabase } = useAuth();
   const { setTheme } = useTheme();
+  const [isAdmin, setIsAdmin] = React.useState(false);
+
+  // Check if user is admin
+  React.useEffect(() => {
+    const checkAdminRole = async () => {
+      if (user && supabase) {
+        const { data: roleData, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        console.log('roleData', roleData, 'error', error, 'user.id', user.id);
+        setIsAdmin(roleData?.role === 'admin');
+      }
+    };
+    
+    checkAdminRole();
+  }, [user, supabase]);
+
+  const handleAdminClick = () => {
+    if (isAdmin) {
+      router.push('/dashboard');
+    }
+  };
 
   const handleLogout = async () => {
     console.log('🚪 Logging out...');
@@ -93,9 +117,15 @@ export default function UserHeader() {
               initial={{ x: 15, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.4 }}
-              className="text-white text-xs sm:text-sm"
+              className={`text-white text-xs sm:text-sm flex items-center gap-2 ${
+                isAdmin ? 'cursor-pointer hover:bg-white/10 px-2 py-1 rounded-md transition-all duration-200' : ''
+              }`}
+              onClick={isAdmin ? handleAdminClick : undefined}
+              title={isAdmin ? 'คลิกเพื่อเข้าสู่หน้า Admin' : undefined}
             >
-              👤 {user?.user_metadata?.name || user?.email?.split('@')[0]}
+              <UserCircle2 className="h-4 w-4" />
+               {user?.user_metadata?.name || user?.email?.split('@')[0]}
+              
             </motion.div>
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}

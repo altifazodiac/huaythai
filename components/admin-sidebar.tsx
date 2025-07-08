@@ -5,6 +5,7 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
+  CreditCard,
   Database,
   FileText,
   Home,
@@ -60,27 +61,27 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
   const navItems = [
     {
       title: "แดชบอร์ด",
-      href: "/admin/AdminDashboardPage",
+      href: "DashboardPage",
       icon: LayoutDashboard,
     },
     {
       title: "จัดการผลสลาก",
-      href: "/admin/lottery-results",
+      href: "/lottery-results",
       icon: CalendarDays,
     },
     {
       title: "วันที่ออกสลาก",
-      href: "/admin/lottery-dates",
+      href: "/lottery-dates",
       icon: CalendarDays,
     },
     {
       title: "จัดการบิลหวย",
-      href: "/admin/tickets",
+      href: "/tickets",
       icon: Ticket,
     },
     {
       title: "รายการที่ลบ",
-      href: "/admin/lottery-ticketAd",
+      href: "/lottery-ticketAd",
       icon: Trash,
     },
     {
@@ -89,28 +90,28 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       icon: Ticket,
     },
     {
-      title: "จัดการผู้ใช้",
-      href: "/admin/users",
-      icon: Users,
+      title: "ประวัติการทำธุรกรรมเครดิต",
+      href: "/CreditHistory",
+      icon: CreditCard,
     },
     {
       title: "รายงาน",
-      href: "/admin/lottery-managesummary",
+      href: "/lottery-managesummary",
       icon: BarChart3,
     },
     {
       title: "การจ่ายเงิน",
-      href: "/admin/payments",
+      href: "/payments",
       icon: FileText,
     },
     {
       title: "ประวัติการทำรายการ",
-      href: "/admin/transactions",
+      href: "/transactions",
       icon: ClipboardList,
     },
     {
       title: "ประวัติการเข้าใช้งาน",
-      href: "/admin/login-history",
+      href: "/login-history",
       icon: Globe,
     },
     {
@@ -119,11 +120,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       items: [
         {
           title: "รายการหวย API ทั้งหมด",
-          href: "/admin/lottery-api-results",
+          href: "/lottery-api-results",
         },
         {
           title: "จับคู่ API หวย",
-          href: "/admin/lottery-typeof-api",
+          href: "/lottery-typeof-api",
         },
         
         
@@ -131,17 +132,17 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
     },
     {
       title: "ฐานข้อมูล",
-      href: "/admin/database",
+      href: "/database",
       icon: Database,
     },
     {
       title: "เติมเครดิต",
-      href: "/admin/credit-topup",
+      href: "/credit-topup",
       icon: ShieldCheck,
     },
     {
       title: "ตั้งค่าระบบ",
-      href: "/admin/settings",
+      href: "/settings",
       icon: Settings,
     },
   ]
