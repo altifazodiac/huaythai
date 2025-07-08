@@ -157,6 +157,7 @@ export default function LotteryTypeGrid({
     return grouped.map(group => ({
       ...group,
       subTypes: group.subTypes.filter((sub: any) => {
+        if (sub.is_active === false) return false; // แสดงเฉพาะที่เปิดใช้งาน
         if (filterCountry !== "all" && sub.country_origin !== filterCountry) return false;
         const schedule = schedules.find(s => s.lottery_sub_type_id === sub.lottery_sub_type_id);
         const scheduleEn = schedule

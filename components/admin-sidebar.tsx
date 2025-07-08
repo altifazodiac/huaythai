@@ -85,7 +85,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
     },
     {
       title: "จัดการประเภทหวย",
-      href: "/admin/lotterysubtype",
+      href: "/lotterysubtype",
       icon: Ticket,
     },
     {
