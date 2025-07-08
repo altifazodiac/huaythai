@@ -6,11 +6,11 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { title: "ผลหวย", url: "/", icon: Calendar },
+  { title: "ผลหวย", url: "/api-results", icon: Calendar },
   { title: "ตรวจผล", url: "/results", icon: BookOpen }, 
   { title: "ซื้อหวย", url: "/", icon: Ticket },
   { title: "สรุปรายงาน", url: "/summary", icon: PieChart },
-  { title: "ช่วยเหลือ", url: "/ticket-purchases", icon: ShieldUser },
+  { title: "ช่วยเหลือ", url: "/", icon: ShieldUser },
 
   
 ];
