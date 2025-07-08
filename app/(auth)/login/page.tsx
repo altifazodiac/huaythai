@@ -91,7 +91,34 @@ const LoginPage = () => {
             console.error('🚨 History error:', historyCatchError);
         }
         
-        console.log('🔄 Redirecting to lottery-main...');
+        // ตรวจสอบ role ของผู้ใช้
+        let userRole = null;
+        try {
+          // ดึง role จากตาราง user_roles ก่อน
+          const { data: userRoleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', data.user.id)
+            .single();
+
+          if (roleError) {
+            console.log('⚠️ Role query error:', roleError.message);
+          }
+
+          userRole = userRoleData?.role;
+          
+          // ถ้าไม่มี role ในตาราง user_roles ให้ fallback ไป user_metadata
+          if (!userRole) {
+            userRole = data.user.user_metadata?.role;
+          }
+        } catch (roleCheckError) {
+          console.error('🚨 Role check error:', roleCheckError);
+          // fallback ไป user_metadata
+          userRole = data.user.user_metadata?.role;
+        }
+
+        console.log('🔍 User role:', userRole);
+        console.log('🔄 Redirecting...');
         
         // รอให้ session อัปเดต
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -102,8 +129,14 @@ const LoginPage = () => {
         if (sessionCheck.session) {
           console.log('✅ Session confirmed');
           
-          // ใช้ window.location.href เพื่อให้ full page reload และให้ middleware ทำงาน
-          window.location.href = '/lottery-main';
+          // ตรวจสอบ role และ redirect ตามสิทธิ์
+          if (userRole === 'admin') {
+            console.log('👑 Admin detected, redirecting to dashboard');
+            router.push('/dashboard');
+          } else {
+            console.log('👤 Regular user, redirecting to homepage');
+            router.push('/homepage');
+          }
           
         } else {
           console.error('❌ Session validation failed');

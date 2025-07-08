@@ -43,7 +43,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const userNavItems: NavSubItem[] = [
     { title: "รายการหวยทั้งหมด", url: "/", icon: GalleryVerticalEnd },
     { title: "รายการซื้อ", url: "/ticketpurchases", icon: BookOpen },
-    { title: "ตรวจผลหวย", url: "/lottery-ticketresults", icon: PieChart },
+    { title: "ตรวจผลหวย", url: "/results", icon: PieChart },
     { title: "ผลหวยล่าสุด", url: "/lottery-results", icon: Calendar },
     { title: "สรุปรายการหวย", url: "/lottery-summary", icon: Frame },
     { title: "ธุรกรรมเครดิต", url: "/transactions", icon: Command },

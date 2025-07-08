@@ -374,3 +374,16 @@
 .animate-pulse {
   animation: pulse 1s infinite;
 }
+.nav-curve::before {
+  content: "";
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 80px;
+  background: #ac0101; /* เปลี่ยนเป็นสีพื้นหลังของ app */
+  border: 3px solid #b6b6b6;
+  border-radius: 70px 70px 70px 70px;
+  z-index: 2;
+}

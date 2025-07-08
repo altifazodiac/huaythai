@@ -1,16 +1,18 @@
 "use client"
 import { useRouter, usePathname } from "next/navigation";
-import { GalleryVerticalEnd, BookOpen, PieChart, Calendar, Frame, Sun, Moon } from "lucide-react";
+import { GalleryVerticalEnd, BookOpen, PieChart, Calendar, Frame, Sun, Moon, Ticket, Settings, ShieldUser } from "lucide-react";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { title: "หวย", url: "/", icon: GalleryVerticalEnd },
-  { title: "ซื้อ", url: "/ticket-purchases", icon: BookOpen },
-  { title: "ตรวจผล", url: "/lottery-ticketresults", icon: PieChart }, // ปุ่มกลาง
-  { title: "ผลล่าสุด", url: "/lottery-results", icon: Calendar },
-  { title: "สรุป", url: "/lottery-summary", icon: Frame },
+  { title: "ผลหวย", url: "/", icon: Calendar },
+  { title: "ตรวจผล", url: "/results", icon: BookOpen }, 
+  { title: "ซื้อหวย", url: "/", icon: Ticket },
+  { title: "สรุปรายงาน", url: "/lottery-summary", icon: PieChart },
+  { title: "ช่วยเหลือ", url: "/ticket-purchases", icon: ShieldUser },
+
+  
 ];
 
 export function AppBottomNav() {
@@ -21,25 +23,26 @@ export function AppBottomNav() {
 
   return (
     <nav
-      className="
-        fixed bottom-0 left-0 right-0 z-50
-        bg-gradient-to-b from-red-600 to-red-900
-        opacity-95
-        backdrop-blur-lg
-        rounded-t-2xl
-        shadow-2xl
-        flex justify-between items-center
-        h-16
-        px-2
-        transition-all
-        md:rounded-b-none
-        md:rounded-t-2xl
-        md:border-x md:border-red-700/30
-        md:bottom-0
-        md:left-1/2 md:-translate-x-1/2
-        md:w-full
-      "
-    >
+    className="
+      relative nav-curve
+      fixed bottom-0 left-0 right-0 z-50
+      bg-gradient-to-b from-red-600 to-red-900
+      opacity-95
+      backdrop-blur-lg
+      rounded-t-2xl
+      shadow-2xl
+      flex justify-between items-center
+      h-16  
+      px-2
+      transition-all
+      md:rounded-b-none
+      md:rounded-t-2xl
+      md:border-x md:border-red-700/30
+      md:bottom-0
+      md:left-1/2 md:-translate-x-1/2
+      md:w-full
+    "
+  >
       {/* ซ้าย */}
       <div className="flex flex-1 justify-evenly">
         {navItems.slice(0, 2).map((item) => (
@@ -61,12 +64,12 @@ export function AppBottomNav() {
       {/* ปุ่มกลาง */}
       <button
         onClick={() => router.push(navItems[2].url)}
-        className="circle-us"
+        className="circle-us mt-[-20px]"
         style={{ zIndex: 2 }}
         aria-label={navItems[2].title}
       >
-        <CenterIcon className="h-7 w-7 mb-1 text-red-600" />
-        <span className="text-xs font-bold text-red-600">{navItems[2].title}</span>
+        <CenterIcon className="h-7 w-7 text-white ml-1" />
+        <span className="text-xs font-bold text-white">{navItems[2].title}</span>
       </button>
       {/* ขวา */}
       <div className="flex flex-1 justify-evenly items-center">

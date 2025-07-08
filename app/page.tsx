@@ -23,7 +23,7 @@ export default function Home() {
   // เพิ่ม useEffect สำหรับ redirect เมื่อ user login แล้ว
   useEffect(() => {
     if (!loading && user) {
-      router.replace("/lottery-main");
+      router.replace("/homepage");
     }
   }, [loading, user, router]);
 

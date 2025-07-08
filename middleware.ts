@@ -89,7 +89,7 @@ export async function middleware(request: NextRequest) {
   }
   
   // กำหนด protected routes
-  const protectedRoutes = ['/lottery-main', '/lottery-ticket', '/lottery-orders', '/profile']
+  const protectedRoutes = ['/homepage', '/lottery-ticket', '/lottery-orders', '/profile']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
   // ถ้าเป็น protected route แต่ไม่มี user ให้ redirect ไป login
@@ -99,10 +99,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
   
-  // ถ้าเป็นหน้า login หรือ auth routes แต่มี user แล้ว ให้ redirect ไป lottery-main
+  // ถ้าเป็นหน้า login หรือ auth routes แต่มี user แล้ว ให้ redirect ไป homepage
   if ((pathname === '/login' || pathname.startsWith('/login')) && user) {
-    console.log('✅ User logged in -> redirecting to lottery-main');
-    const mainUrl = new URL('/lottery-main', request.url)
+    console.log('✅ User logged in -> redirecting to homepage');
+    const mainUrl = new URL('/homepage', request.url)
     return NextResponse.redirect(mainUrl)
   }
 

@@ -10,17 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from 'framer-motion';
 import { FaCrown, FaMedal, FaRandom, FaRunning, FaMoneyBillWave, FaCoins } from 'react-icons/fa';
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+ 
 import { DirectionProvider } from "@radix-ui/react-direction";
 import { toZonedTime } from "date-fns-tz";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
@@ -221,28 +211,7 @@ export default function LotteryTicketResultsPage() {
   const thaiNow = toZonedTime(new Date(), 'Asia/Bangkok').toISOString();
 
   return (
-    <DirectionProvider dir="ltr">
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className={`flex ${isMobile ? 'h-7 gap-0.5 px-1' : 'h-8 sm:h-10 gap-1 px-2'} shrink-0 items-center transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-8`}>
-          <div className={`flex items-center gap-${isMobile ? '0.5' : '1'} px-${isMobile ? '1' : '2'}`}>
-            <SidebarTrigger className={`-ml-1 ${isMobile ? 'scale-75' : 'scale-90'}`} />
-            <Separator orientation="vertical" className={`mr-1 data-[orientation=vertical]:h-3`} />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/" className={`text-xs ${isMobile ? 'text-[10px]' : ''}`}>แดชบอร์ด</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className={`text-xs ${isMobile ? 'text-[10px]' : ''}`}>รายการที่ถูกรางวัล</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex justify-center w-full min-h-[calc(100vh-40px)] items-start bg-[#f7fafd]">
+     <div className="flex justify-center w-full min-h-[calc(100vh-40px)] items-start bg-[#f7fafd]">
           <div className={`w-full ${isMobile ? 'px-0 mt-0 space-y-0' : 'px-1 mt-2 space-y-2'} sm:px-0`}>
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
               <Card className={`rounded-${isMobile ? 'lg' : 'xl'} shadow border-none bg-white ${isMobile ? 'text-[11px] w-full max-w-full' : ''}`}
@@ -417,8 +386,6 @@ export default function LotteryTicketResultsPage() {
             </motion.div>
           </div>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
-    </DirectionProvider>
+  
   );
 } 

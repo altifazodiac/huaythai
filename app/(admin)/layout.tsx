@@ -1,49 +1,85 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase/supabaseClient";
 import { AdminLayout } from "@/components/admin-layout"
 
 export default function AdminLayoutWrapper({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState<null | boolean>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
+    const checkAdminAccess = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          console.log('❌ No user found, redirecting to login');
+          router.replace("/login");
+          return;
+        }
+
+        console.log('👤 User found:', user.email);
+
+        // 1. ลองดึง role จากตาราง user_roles ก่อน
+        const { data: userRow, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+
+        let role = userRow?.role;
+        
+        // 2. ถ้าไม่มี role ในตาราง user_roles ให้ fallback ไป user_metadata
+        if (!role) {
+          role = user.user_metadata?.role;
+        }
+
+        console.log('🔍 User role from admin layout:', role);
+
+        if (role !== "admin") {
+          console.log('🚫 Not admin, redirecting to homepage');
+          router.replace("/homepage");
+          setIsAdmin(false);
+        } else {
+          console.log('✅ Admin access granted');
+          setIsAdmin(true);
+        }
+      } catch (error) {
+        console.error('🚨 Error checking admin access:', error);
         router.replace("/login");
-        return;
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      // 1. ลองดึง role จากตาราง users ก่อน
-      const { data: userRow, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      let role = userRow?.role;
-      // 2. ถ้าไม่มี role ในตาราง users ให้ fallback ไป user_metadata
-      if (!role) {
-        role = user.user_metadata?.role;
-      }
-
-      if (role !== "admin") {
-        router.replace("/");
-        setIsAdmin(false);
-      } else {
-        setIsAdmin(true);
-      }
-    });
+    checkAdminAccess();
   }, [router]);
 
-  if (isAdmin === null) return null; // หรือ loading spinner
+  // แสดง loading spinner
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-warning-950">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-red-900 mb-4"></div>
+          <span className="text-lg text-red-900 dark:text-warning-100 font-semibold">กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...</span>
+        </div>
+      </div>
+    );
+  }
 
-  if (!isAdmin) return null; // หรือแสดง error
+  // ถ้าไม่ใช่ admin ให้แสดงข้อความแจ้งเตือน
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-warning-950">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-900 dark:text-warning-100 mb-4">ไม่มีสิทธิ์เข้าถึง</h1>
+          <p className="text-gray-600 dark:text-warning-200">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p>
+        </div>
+      </div>
+    );
+  }
 
   return <AdminLayout>{children}</AdminLayout>
 }
