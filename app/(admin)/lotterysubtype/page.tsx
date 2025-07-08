@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Loader2, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
@@ -143,28 +144,16 @@ export default function LotterySubTypePage() {
   const [colWidths, setColWidths] = useState<number[]>([60, 120, 160, 120, 120, 120, 100, 180]);
   const tableRef = useRef<HTMLTableElement>(null);
 
-  const handleResize = (index: number, e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = colWidths[index];
+  // Debounced search
+  const [searchTerm, setSearchTerm] = useState("");
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(60, startWidth + moveEvent.clientX - startX);
-      setColWidths((widths) => {
-        const updated = [...widths];
-        updated[index] = newWidth;
-        return updated;
-      });
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  };
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   // โหลด lottery_types สำหรับ select
   useEffect(() => {
@@ -190,51 +179,88 @@ export default function LotterySubTypePage() {
     }
   }
 
-  // handle change
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  }
-
-  // handle submit
-  async function handleSubmit(e: React.FormEvent) {
+  const handleResize = useCallback((index: number, e: React.MouseEvent) => {
     e.preventDefault();
-    setLoading(true);
-    // Validate
-    if (!form.lottery_type_id || !form.sub_type_name) {
-      toast.error("กรุณากรอกข้อมูลให้ครบถ้วน");
-      setLoading(false);
-      return;
-    }
-    // Ensure lottery_type_id is number
-    const insertData = {
-      ...form,
-      lottery_type_id: typeof form.lottery_type_id === "string" ? parseInt(form.lottery_type_id) : form.lottery_type_id,
-    };
-    if (editId) {
-      await supabase.from("lottery_sub_types").update(insertData).eq("lottery_sub_type_id", editId);
-      toast.success("แก้ไขสำเร็จ");
-    } else {
-      const { error } = await supabase.from("lottery_sub_types").insert([insertData]);
-      if (error) {
-        toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึก");
-        setLoading(false);
-        return;
-      }
-      toast.success("บันทึกสำเร็จ");
-    }
-    setForm({});
-    setEditId(null);
-    await fetchSubTypes();
-    setLoading(false);
-    setOpen(false);
-  }
+    const startX = e.clientX;
+    const startWidth = colWidths[index];
 
-  // handle edit
-  function handleEdit(subType: LotterySubType) {
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(60, startWidth + moveEvent.clientX - startX);
+      setColWidths((widths) => {
+        const updated = [...widths];
+        updated[index] = newWidth;
+        return updated;
+      });
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [colWidths]);
+
+  // Memoize handlers
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  }, []);
+
+  const handleEdit = useCallback((subType: LotterySubType) => {
     setForm(subType);
     setEditId(subType.lottery_sub_type_id);
     setOpen(true);
-  }
+  }, []);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.lottery_type_id || !form.sub_type_name) return;
+    
+    setLoading(true);
+    
+    try {
+      const formData = {
+      ...form,
+        lottery_type_id: Number(form.lottery_type_id),
+        is_active: form.is_active ?? true
+    };
+      
+    if (editId) {
+        const { error } = await supabase
+          .from("lottery_sub_types")
+          .update(formData)
+          .eq("lottery_sub_type_id", editId);
+        
+        if (error) {
+          toast.error("เกิดข้อผิดพลาด: " + error.message);
+          return;
+        }
+        toast.success("อัปเดตสำเร็จ");
+    } else {
+        const { error } = await supabase
+          .from("lottery_sub_types")
+          .insert([formData]);
+        
+      if (error) {
+          toast.error("เกิดข้อผิดพลาด: " + error.message);
+        return;
+      }
+        toast.success("เพิ่มสำเร็จ");
+    }
+      
+    setForm({});
+    setEditId(null);
+      setOpen(false);
+    await fetchSubTypes();
+    } catch (error) {
+      console.error("Submit error:", error);
+      toast.error("เกิดข้อผิดพลาด");
+    } finally {
+    setLoading(false);
+    }
+  }, [form, editId, supabase]);
 
   // handle delete
   async function handleDelete(id: number) {
@@ -308,7 +334,7 @@ export default function LotterySubTypePage() {
     };
     
     try {
-      if (editScheduleId) {
+    if (editScheduleId) {
         const { error } = await supabase
           .from("drawing_schedules")
           .update(formData)
@@ -319,8 +345,8 @@ export default function LotterySubTypePage() {
           toast.error("เกิดข้อผิดพลาดในการแก้ไข: " + error.message);
           return;
         }
-        toast.success("แก้ไขตารางเวลาสำเร็จ");
-      } else {
+      toast.success("แก้ไขตารางเวลาสำเร็จ");
+    } else {
         const { error } = await supabase
           .from("drawing_schedules")
           .insert([formData]);
@@ -330,12 +356,12 @@ export default function LotterySubTypePage() {
           toast.error("เกิดข้อผิดพลาดในการบันทึก: " + error.message);
           return;
         }
-        toast.success("บันทึกตารางเวลาสำเร็จ");
-      }
+      toast.success("บันทึกตารางเวลาสำเร็จ");
+    }
       
-      await fetchSchedules(currentSubTypeId);
-      setScheduleForm({});
-      setEditScheduleId(null);
+    await fetchSchedules(currentSubTypeId);
+    setScheduleForm({});
+    setEditScheduleId(null);
     } catch (error) {
       console.error("Unexpected error:", error);
       toast.error("เกิดข้อผิดพลาดที่ไม่คาดคิด");
@@ -398,33 +424,33 @@ export default function LotterySubTypePage() {
   };
 
   // ฟังก์ชัน filter และ sort
-  const filteredSubTypes = subTypes
+  const filteredSubTypes = useMemo(() => {
+    return subTypes
     .filter((item) => {
       const q = search.toLowerCase();
-      const statusMatch = statusFilter === "all" || 
-        (statusFilter === "active" && item.is_active) || 
-        (statusFilter === "inactive" && !item.is_active);
-      
-      const textMatch = item.sub_type_name?.toLowerCase().includes(q) ||
+        const statusMatch = statusFilter === "all" || 
+          (statusFilter === "active" && item.is_active) || 
+          (statusFilter === "inactive" && !item.is_active);
+        
+        const textMatch = item.sub_type_name?.toLowerCase().includes(q) ||
         item.country_origin?.toLowerCase().includes(q) ||
         item.reference_source?.toLowerCase().includes(q) ||
         item.notes?.toLowerCase().includes(q) ||
-        lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name?.toLowerCase().includes(q);
-      
-      return statusMatch && textMatch;
+          lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name?.toLowerCase().includes(q);
+        
+        return statusMatch && textMatch;
     })
     .sort((a, b) => {
       if (!sortKey) return 0;
       let aValue = a[sortKey];
       let bValue = b[sortKey];
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortAsc ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-      }
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortAsc ? aValue - bValue : bValue - aValue;
-      }
+        if (typeof aValue === "string") aValue = aValue.toLowerCase();
+        if (typeof bValue === "string") bValue = bValue.toLowerCase();
+        if (aValue < bValue) return sortAsc ? -1 : 1;
+        if (aValue > bValue) return sortAsc ? 1 : -1;
       return 0;
     });
+  }, [subTypes, search, statusFilter, sortKey, sortAsc, lotteryTypes]);
 
   // --- LotterySubNumber CRUD ---
   const fetchPayouts = async (lottery_sub_type_id: number) => {
@@ -496,6 +522,84 @@ export default function LotterySubTypePage() {
     await fetchPayouts(payoutSubTypeId);
   };
 
+  // Memoized TableRow Component
+  const TableRowComponent = React.memo(({ item, index, colWidths, lotteryTypes, handleEdit, handleDelete, handleToggleActive, openScheduleDialog, openAnimalDialog, openPayoutDrawer, expandedRow, setExpandedRow }: {
+    item: LotterySubType;
+    index: number;
+    colWidths: number[];
+    lotteryTypes: LotteryType[];
+    handleEdit: (item: LotterySubType) => void;
+    handleDelete: (id: number) => void;
+    handleToggleActive: (id: number, status: boolean) => void;
+    openScheduleDialog: (id: number) => void;
+    openAnimalDialog: (id: number) => void;
+    openPayoutDrawer: (id: number) => void;
+    expandedRow: number | null;
+    setExpandedRow: (id: number | null) => void;
+  }) => (
+    <motion.tr
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.2 }}
+    >
+      <TableCell style={{ width: colWidths[0], minWidth: 60 }}>
+        <button
+          className="mr-2 text-lg focus:outline-none"
+          onClick={() => setExpandedRow(expandedRow === item.lottery_sub_type_id ? null : item.lottery_sub_type_id)}
+          title="แสดง/ซ่อนตารางเวลา"
+          type="button"
+        >
+          {expandedRow === item.lottery_sub_type_id ? "▼" : "▶"}
+        </button>
+        {index + 1}
+      </TableCell>
+      <TableCell style={{ width: colWidths[1], minWidth: 60 }}>
+        {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name || "-"}
+      </TableCell>
+      <TableCell style={{ width: colWidths[2], minWidth: 60 }}>{item.sub_type_name}</TableCell>
+      <TableCell style={{ width: colWidths[3], minWidth: 60 }}>{item.country_origin}</TableCell>
+      <TableCell style={{ width: colWidths[4], minWidth: 60 }}>{item.reference_source}</TableCell>
+      <TableCell style={{ width: colWidths[5], minWidth: 60 }}>{item.notes}</TableCell>
+      <TableCell style={{ width: colWidths[6], minWidth: 60 }}>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={item.is_active}
+            onCheckedChange={() => handleToggleActive(item.lottery_sub_type_id, item.is_active)}
+            className="data-[state=checked]:bg-green-500"
+          />
+          <span className={`text-xs ${item.is_active ? 'text-green-600' : 'text-gray-400'}`}>
+            {item.is_active ? 'เปิด' : 'ปิด'}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell style={{ width: colWidths[7], minWidth: 60 }}>
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
+            แก้ไข
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
+            ลบ
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>
+            ตารางเวลา
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>
+            สัตว์
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
+            อัตรา
+          </Button>
+        </div>
+      </TableCell>
+    </motion.tr>
+  ));
+
+  TableRowComponent.displayName = 'TableRowComponent';
+
+  const columnLabels = ["ลำดับ", "ประเภทหวย", "ชื่อชนิดย่อย", "ประเทศ", "อ้างอิง", "หมายเหตุ", "สถานะ", "จัดการ"];
+  const [showColumns, setShowColumns] = useState<boolean[]>(Array(columnLabels.length).fill(true));
+
   return (
     <>
       <motion.div
@@ -515,6 +619,9 @@ export default function LotterySubTypePage() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>{editId ? "แก้ไขชนิดย่อยของหวย" : "เพิ่มชนิดย่อยของหวย"}</DialogTitle>
+                <DialogDescription>
+                  {editId ? "แก้ไขข้อมูลชนิดย่อยของหวยที่เลือก" : "เพิ่มชนิดย่อยของหวยใหม่"}
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -608,8 +715,8 @@ export default function LotterySubTypePage() {
         <div className="mb-4 flex gap-2 items-center">
           <Input
             placeholder="ค้นหาชื่อ, ประเทศ, อ้างอิง, หมายเหตุ หรือประเภทหวย"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
             className="max-w-xs"
           />
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -624,6 +731,25 @@ export default function LotterySubTypePage() {
           </Select>
         </div>
 
+        {/* ปุ่มเลือกคอลัมน์ */}
+        <div className="mb-2">
+          <label className="font-medium mr-2">แสดงคอลัมน์:</label>
+          {columnLabels.map((label, idx) => (
+            <label key={label} className="mr-2">
+              <input
+                type="checkbox"
+                checked={showColumns[idx]}
+                onChange={() => {
+                  const updated = [...showColumns];
+                  updated[idx] = !updated[idx];
+                  setShowColumns(updated);
+                }}
+              />
+              <span className="ml-1">{label}</span>
+            </label>
+          ))}
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>รายการชนิดย่อยของหวย</CardTitle>
@@ -632,60 +758,57 @@ export default function LotterySubTypePage() {
             <Table ref={tableRef}>
               <TableHeader>
                 <TableRow>
-                  {["ลำดับ", "ประเภทหวย", "ชื่อชนิดย่อย", "ประเทศ", "อ้างอิง", "หมายเหตุ", "สถานะ", "จัดการ"].map((label, idx) => (
-                    <TableHead
-                      key={label}
-                      style={{ width: colWidths[idx], minWidth: 60, position: "relative" }}
-                      onClick={
-                        idx === 0 ? () => { setSortKey("lottery_sub_type_id"); setSortAsc(sortKey !== "lottery_sub_type_id" ? true : !sortAsc); } :
-                        idx === 1 ? () => { setSortKey("lottery_type_id"); setSortAsc(sortKey !== "lottery_type_id" ? true : !sortAsc); } :
-                        idx === 2 ? () => { setSortKey("sub_type_name"); setSortAsc(sortKey !== "sub_type_name" ? true : !sortAsc); } :
-                        idx === 3 ? () => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); } :
-                        idx === 4 ? () => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); } :
-                        idx === 5 ? () => { setSortKey("notes"); setSortAsc(sortKey !== "notes" ? true : !sortAsc); } :
-                        idx === 6 ? () => { setSortKey("is_active"); setSortAsc(sortKey !== "is_active" ? true : !sortAsc); } : undefined
-                      }
-                      className={"cursor-pointer group"}
-                    >
-                      {label}
-                      {/* Resizer */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          right: 0,
-                          top: 0,
-                          height: "100%",
-                          width: 6,
-                          cursor: "col-resize",
-                          zIndex: 10,
-                          userSelect: "none"
-                        }}
-                        onMouseDown={(e) => handleResize(idx, e)}
-                      />
-                      {/* Sort indicator */}
-                      {idx === 0 && sortKey === "lottery_sub_type_id" && (sortAsc ? " ▲" : " ▼")}
-                      {idx === 1 && sortKey === "lottery_type_id" && (sortAsc ? " ▲" : " ▼")}
-                      {idx === 2 && sortKey === "sub_type_name" && (sortAsc ? " ▲" : " ▼")}
-                      {idx === 3 && sortKey === "country_origin" && (sortAsc ? " ▲" : " ▼")}
-                      {idx === 4 && sortKey === "reference_source" && (sortAsc ? " ▲" : " ▼")}
-                      {idx === 5 && sortKey === "notes" && (sortAsc ? " ▲" : " ▼")}
-                      {idx === 6 && sortKey === "is_active" && (sortAsc ? " ▲" : " ▼")}
-                    </TableHead>
-                  ))}
+                  {columnLabels.map((label, idx) =>
+                    showColumns[idx] && (
+                      <TableHead
+                        key={label}
+                        style={{ width: colWidths[idx], minWidth: 60, position: "relative" }}
+                        onClick={
+                          idx === 0 ? () => { setSortKey("lottery_sub_type_id"); setSortAsc(sortKey !== "lottery_sub_type_id" ? true : !sortAsc); } :
+                          idx === 1 ? () => { setSortKey("lottery_type_id"); setSortAsc(sortKey !== "lottery_type_id" ? true : !sortAsc); } :
+                          idx === 2 ? () => { setSortKey("sub_type_name"); setSortAsc(sortKey !== "sub_type_name" ? true : !sortAsc); } :
+                          idx === 3 ? () => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); } :
+                          idx === 4 ? () => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); } :
+                          idx === 5 ? () => { setSortKey("notes"); setSortAsc(sortKey !== "notes" ? true : !sortAsc); } :
+                          idx === 6 ? () => { setSortKey("is_active"); setSortAsc(sortKey !== "is_active" ? true : !sortAsc); } : undefined
+                        }
+                        className={"cursor-pointer group"}
+                      >
+                        {label}
+                        {/* Resizer */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                            height: "100%",
+                            width: 6,
+                            cursor: "col-resize",
+                            zIndex: 10,
+                            userSelect: "none"
+                          }}
+                          onMouseDown={(e) => handleResize(idx, e)}
+                        />
+                        {/* Sort indicator */}
+                        {idx === 0 && sortKey === "lottery_sub_type_id" && (sortAsc ? " ▲" : " ▼")}
+                        {idx === 1 && sortKey === "lottery_type_id" && (sortAsc ? " ▲" : " ▼")}
+                        {idx === 2 && sortKey === "sub_type_name" && (sortAsc ? " ▲" : " ▼")}
+                        {idx === 3 && sortKey === "country_origin" && (sortAsc ? " ▲" : " ▼")}
+                        {idx === 4 && sortKey === "reference_source" && (sortAsc ? " ▲" : " ▼")}
+                        {idx === 5 && sortKey === "notes" && (sortAsc ? " ▲" : " ▼")}
+                        {idx === 6 && sortKey === "is_active" && (sortAsc ? " ▲" : " ▼")}
+                      </TableHead>
+                    )
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <AnimatePresence>
-                  {filteredSubTypes.map((item) => (
+                  {filteredSubTypes.map((item, index) => (
                     <React.Fragment key={item.lottery_sub_type_id}>
-                      <motion.tr
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {[ // Render TableCell with width
-                          <TableCell key="col0" style={{ width: colWidths[0], minWidth: 60 }}>
+                      <TableRow>
+                        {showColumns[0] && (
+                          <TableCell style={{ width: colWidths[0], minWidth: 60 }}>
                             <button
                               className="mr-2 text-lg focus:outline-none"
                               onClick={() => setExpandedRow(expandedRow === item.lottery_sub_type_id ? null : item.lottery_sub_type_id)}
@@ -694,16 +817,28 @@ export default function LotterySubTypePage() {
                             >
                               {expandedRow === item.lottery_sub_type_id ? "▼" : "▶"}
                             </button>
-                            {filteredSubTypes.indexOf(item) + 1}
-                          </TableCell>,
-                          <TableCell key="col1" style={{ width: colWidths[1], minWidth: 60 }}>
+                            {index + 1}
+                          </TableCell>
+                        )}
+                        {showColumns[1] && (
+                          <TableCell style={{ width: colWidths[1], minWidth: 60 }}>
                             {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name || "-"}
-                          </TableCell>,
-                          <TableCell key="col2" style={{ width: colWidths[2], minWidth: 60 }}>{item.sub_type_name}</TableCell>,
-                          <TableCell key="col3" style={{ width: colWidths[3], minWidth: 60 }}>{item.country_origin}</TableCell>,
-                          <TableCell key="col4" style={{ width: colWidths[4], minWidth: 60 }}>{item.reference_source}</TableCell>,
-                          <TableCell key="col5" style={{ width: colWidths[5], minWidth: 60 }}>{item.notes}</TableCell>,
-                          <TableCell key="col6" style={{ width: colWidths[6], minWidth: 60 }}>
+                          </TableCell>
+                        )}
+                        {showColumns[2] && (
+                          <TableCell style={{ width: colWidths[2], minWidth: 60 }}>{item.sub_type_name}</TableCell>
+                        )}
+                        {showColumns[3] && (
+                          <TableCell style={{ width: colWidths[3], minWidth: 60 }}>{item.country_origin}</TableCell>
+                        )}
+                        {showColumns[4] && (
+                          <TableCell style={{ width: colWidths[4], minWidth: 60 }}>{item.reference_source}</TableCell>
+                        )}
+                        {showColumns[5] && (
+                          <TableCell style={{ width: colWidths[5], minWidth: 60 }}>{item.notes}</TableCell>
+                        )}
+                        {showColumns[6] && (
+                          <TableCell style={{ width: colWidths[6], minWidth: 60 }}>
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={item.is_active}
@@ -714,35 +849,33 @@ export default function LotterySubTypePage() {
                                 {item.is_active ? 'เปิด' : 'ปิด'}
                               </span>
                             </div>
-                          </TableCell>,
-                          <TableCell key="col7" style={{ width: colWidths[7], minWidth: 60 }}>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEdit(item)}
-                              >
+                          </TableCell>
+                        )}
+                        {showColumns[7] && (
+                          <TableCell style={{ width: colWidths[7], minWidth: 60 }}>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
                                 แก้ไข
                               </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleDelete(item.lottery_sub_type_id)}
-                              >
+                              <Button size="sm" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
                                 ลบ
                               </Button>
-                              <Button onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>ตารางเวลา</Button>
-                              <Button onClick={() => openPayoutDrawer(item.lottery_sub_type_id)} variant="secondary">ราคาจ่าย</Button>
-                              {lotteryTypes.find((t) => t.lottery_type_id === item.lottery_type_id)?.type_name === "หวยลาว" && (
-                                <Button onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>เลขสัตว์</Button>
-                              )}
+                              <Button size="sm" variant="outline" onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>
+                                ตารางเวลา
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>
+                                สัตว์
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
+                                อัตรา
+                              </Button>
                             </div>
                           </TableCell>
-                        ]}
-                      </motion.tr>
+                        )}
+                      </TableRow>
                       {expandedRow === item.lottery_sub_type_id && (
                         <tr>
-                          <td colSpan={8} className="bg-zinc-50 dark:bg-zinc-800 p-4">
+                          <td colSpan={showColumns.filter(Boolean).length} className="bg-zinc-50 dark:bg-zinc-800 p-4">
                             <DrawingScheduleCollapse lottery_sub_type_id={item.lottery_sub_type_id} supabase={supabase} />
                           </td>
                         </tr>
@@ -759,7 +892,10 @@ export default function LotterySubTypePage() {
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>จัดการตารางเวลา (Drawing Schedules)</DialogTitle>
+            <DialogTitle>ตารางเวลาสำหรับ {subTypes.find(s => s.lottery_sub_type_id === currentSubTypeId)?.sub_type_name}</DialogTitle>
+            <DialogDescription>
+              จัดการตารางเวลาการเปิดปิดรับสำหรับชนิดย่อยของหวยที่เลือก
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleScheduleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
