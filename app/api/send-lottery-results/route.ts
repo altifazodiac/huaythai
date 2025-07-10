@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Client } from '@line/bot-sdk';
-import { formatInTimeZone, subMinutes } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
+import { subMinutes } from 'date-fns';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

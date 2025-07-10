@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
-import { formatInTimeZone, subMinutes } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
+import {subMinutes } from 'date-fns';
+
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,7 +94,7 @@ async function scrapeAndParseResults(targetUrl: string, context: any, targetLott
     
     // กรองเฉพาะ lottery ที่ต้องการ (ถ้าระบุ)
     if (targetLotteryNames && targetLotteryNames.length > 0) {
-      const filteredData = scrapedData.filter(item => 
+      const filteredData = scrapedData.filter((item: LotteryResult) => 
         targetLotteryNames.includes(item.lottery_name)
       );
       

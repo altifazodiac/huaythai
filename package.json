@@ -7,7 +7,11 @@
     "dev": "next dev",
     "start": "next start",
     "clean": "rm -rf .next && rm -rf node_modules/.cache",
-    "lint": "next lint"
+    "lint": "next lint",
+    "start:scheduler": "bun run scripts/scheduler.ts",
+    "setup:scheduler": "bun run setup-dynamic-cron.ts",
+    "import:lottery": "bun run import-lottery-results.ts",
+    "send:lottery": "bun run send-lottery-results.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
