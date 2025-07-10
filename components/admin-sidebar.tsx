@@ -62,7 +62,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
   const navItems = [
     {
       title: "แดชบอร์ด",
-      href: "DashboardPage",
+      href: "/dashboard",
       icon: LayoutDashboard,
     },
     {
@@ -76,9 +76,9 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       icon: CalendarDays,
     },
     {
-      title: "จัดการบิลหวย",
-      href: "/tickets",
-      icon: Ticket,
+      title: "จัดการ Task Scheduler",
+      href: "/task-manager",
+      icon: Settings,
     },
     {
       title: "รายการที่ลบ",
@@ -99,11 +99,6 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       title: "รายงาน",
       href: "/lottery-managesummary",
       icon: BarChart3,
-    },
-    {
-      title: "การจ่ายเงิน",
-      href: "/payments",
-      icon: FileText,
     },
     {
       title: "ประวัติการทำรายการ",
@@ -142,18 +137,13 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       ],
     },
     {
-      title: "ฐานข้อมูล",
-      href: "/database",
-      icon: Database,
-    },
-    {
       title: "เติมเครดิต",
       href: "/credit-topup",
       icon: ShieldCheck,
     },
     {
       title: "ตั้งค่าระบบ",
-      href: "/settings",
+      href: "/setup",
       icon: Settings,
     },
   ]
