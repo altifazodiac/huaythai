@@ -35,9 +35,23 @@ sudo apt install -y git curl wget build-essential
 ## Project Deployment
 
 ### 1. Clone and Setup Project
+
+**Option A: If repository already exists (Update existing code):**
+```bash
+# Navigate to existing project
+cd /root/huaylotto
+
+# Update with latest code
+git pull origin main
+
+# Install dependencies
+bun install
+```
+
+**Option B: If repository doesn't exist (Clone new):**
 ```bash
 # Clone the project (or upload via FTP/SCP)
-cd /var/www
+cd /root
 git clone <your-repository-url> huaylotto
 cd huaylotto
 
@@ -102,7 +116,7 @@ module.exports = {
       name: 'huaylotto-web',
       script: 'bun',
       args: 'run start',
-      cwd: '/var/www/huaylotto',
+      cwd: '/root/huaylotto',
       env: {
         NODE_ENV: 'production',
         PORT: 3000
@@ -121,7 +135,7 @@ module.exports = {
     {
       name: 'huaylotto-scheduler',
       script: 'scripts/start-scheduler-linux.sh',
-      cwd: '/var/www/huaylotto',
+      cwd: '/root/huaylotto',
       env_file: '.env.production',
       instances: 1,
       exec_mode: 'fork',
@@ -139,7 +153,7 @@ module.exports = {
 
 ### 2. Create Logs Directory
 ```bash
-mkdir -p /var/www/huaylotto/logs
+mkdir -p /root/huaylotto/logs
 ```
 
 ### 3. Start Services
@@ -216,14 +230,14 @@ pm2 monit
 http://119.59.102.145/admin/task-manager
 
 # Or check logs directly
-tail -f /var/www/huaylotto/logs/scheduler-combined.log
+tail -f /root/huaylotto/logs/scheduler-combined.log
 ```
 
 ## Maintenance Commands
 
 ### 1. Update Application
 ```bash
-cd /var/www/huaylotto
+cd /root/huaylotto
 git pull origin main
 bun install
 bun run build
@@ -287,10 +301,10 @@ sudo dpkg-reconfigure -plow unattended-upgrades
 netstat -tulpn | grep :3000
 
 # Check application logs
-tail -f /var/www/huaylotto/logs/web-combined.log
+tail -f /root/huaylotto/logs/web-combined.log
 
 # Check scheduler logs
-tail -f /var/www/huaylotto/logs/scheduler-combined.log
+tail -f /root/huaylotto/logs/scheduler-combined.log
 ```
 
 ### 3. Manual Scheduler Test
@@ -320,10 +334,10 @@ nano /root/backup-huaylotto.sh
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="/var/backups/huaylotto"
-APP_DIR="/var/www/huaylotto"
+APP_DIR="/root/huaylotto"
 
 mkdir -p $BACKUP_DIR
-tar -czf $BACKUP_DIR/huaylotto_$DATE.tar.gz -C /var/www huaylotto
+tar -czf $BACKUP_DIR/huaylotto_$DATE.tar.gz -C /root huaylotto
 find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
 ```
 
@@ -355,10 +369,27 @@ pm2 start ecosystem.config.js --only huaylotto-web
 
 ## Quick Start Commands
 
+### For New Repository:
 ```bash
 # Complete deployment in one go
 ssh root@119.59.102.145
-cd /var/www && git clone <repo> huaylotto && cd huaylotto
+cd /root && git clone <repo> huaylotto && cd huaylotto
+chmod +x deploy.sh && ./deploy.sh --initial
+```
+
+### For Existing Repository:
+```bash
+# Update existing deployment
+ssh root@119.59.102.145
+cd /root/huaylotto && git pull origin main
+chmod +x deploy.sh && ./deploy.sh --update
+```
+
+### Manual Setup (if you prefer):
+```bash
+# Manual deployment steps
+ssh root@119.59.102.145
+cd /root/huaylotto  # or clone first if needed
 bun install && bun run build
 cp .env.example .env.production && nano .env.production
 pm2 start ecosystem.config.js && pm2 save && pm2 startup systemd

@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 APP_NAME="huaylotto"
-APP_DIR="/var/www/$APP_NAME"
+APP_DIR="/root/$APP_NAME"
 BACKUP_DIR="/var/backups/$APP_NAME"
 LOG_DIR="$APP_DIR/logs"
 
@@ -50,7 +50,7 @@ create_backup() {
     
     if [ -d "$APP_DIR" ]; then
         DATE=$(date +%Y%m%d_%H%M%S)
-        tar -czf "$BACKUP_DIR/${APP_NAME}_$DATE.tar.gz" -C "/var/www" "$APP_NAME"
+        tar -czf "$BACKUP_DIR/${APP_NAME}_$DATE.tar.gz" -C "/root" "$APP_NAME"
         log_success "Backup created: $BACKUP_DIR/${APP_NAME}_$DATE.tar.gz"
         
         # Keep only last 5 backups
@@ -94,9 +94,21 @@ install_dependencies() {
 setup_app() {
     log_info "Setting up application..."
     
-    # Create app directory
-    mkdir -p "$APP_DIR"
-    cd "$APP_DIR"
+    # Check if app directory exists and is a git repository
+    if [ -d "$APP_DIR" ] && [ -d "$APP_DIR/.git" ]; then
+        log_info "Git repository found. Updating existing code..."
+        cd "$APP_DIR"
+        git pull origin main
+        log_success "Code updated from repository"
+    else
+        log_info "No git repository found. Please clone your repository first."
+        log_warning "Run: cd /root && git clone <your-repo-url> huaylotto"
+        log_warning "Or if you want to continue with existing files, remove .git requirement"
+        
+        # Create app directory if it doesn't exist
+        mkdir -p "$APP_DIR"
+        cd "$APP_DIR"
+    fi
     
     # Install dependencies
     if [ -f "package.json" ]; then

@@ -2,12 +2,28 @@
 
 ## 🚀 One-Command Deployment
 
+### If Repository Already Exists (Update):
+```bash
+# SSH to your VPS
+ssh root@119.59.102.145
+
+# Update existing repository
+cd /root/huaylotto && git pull origin main
+
+# Make deploy script executable
+chmod +x deploy.sh
+
+# Run initial deployment
+./deploy.sh --initial
+```
+
+### If Repository Doesn't Exist (Clone):
 ```bash
 # SSH to your VPS
 ssh root@119.59.102.145
 
 # Clone and setup
-cd /var/www && git clone <your-repo-url> huaylotto && cd huaylotto
+cd /root && git clone <your-repo-url> huaylotto && cd huaylotto
 
 # Make deploy script executable
 chmod +x deploy.sh
@@ -62,7 +78,7 @@ npm install -g pm2
 ### 2. Application Setup
 ```bash
 # Clone project
-cd /var/www
+cd /root
 git clone <your-repo-url> huaylotto
 cd huaylotto
 
@@ -165,7 +181,7 @@ pm2 logs huaylotto-scheduler
 ./deploy.sh --update
 
 # Or manual update
-cd /var/www/huaylotto
+cd /root/huaylotto
 git pull origin main
 bun install
 bun run build
@@ -182,8 +198,8 @@ netstat -tulpn | grep :3000
 
 ### Check logs
 ```bash
-tail -f /var/www/huaylotto/logs/web-combined.log
-tail -f /var/www/huaylotto/logs/scheduler-combined.log
+tail -f /root/huaylotto/logs/web-combined.log
+tail -f /root/huaylotto/logs/scheduler-combined.log
 ```
 
 ### Restart services

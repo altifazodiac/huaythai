@@ -4,7 +4,7 @@ module.exports = {
       name: 'huaylotto-web',
       script: 'bun',
       args: 'run start',
-      cwd: '/var/www/huaylotto',
+      cwd: '/root/huaylotto',
       env: {
         NODE_ENV: 'production',
         PORT: 3000
@@ -25,7 +25,7 @@ module.exports = {
     {
       name: 'huaylotto-scheduler',
       script: 'scripts/start-scheduler-linux.sh',
-      cwd: '/var/www/huaylotto',
+      cwd: '/root/huaylotto',
       env_file: '.env.production',
       instances: 1,
       exec_mode: 'fork',
