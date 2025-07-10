@@ -19,8 +19,10 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# โหลด environment variables
-export $(cat .env | xargs)
+# โหลด environment variables (แก้ไขให้ปลอดภัยกว่า)
+set -a  # automatically export all variables
+source .env
+set +a  # stop automatically exporting
 echo "Environment variables loaded from .env"
 
 # ตรวจสอบ required environment variables
@@ -51,14 +53,14 @@ echo "Logs directory created/verified"
 cleanup() {
     echo ""
     echo "Received interrupt signal, shutting down..."
-    
+
     # หยุด scheduler ก่อนปิดแอป
     echo "Stopping scheduler..."
     curl -s "http://localhost:3000/api/scheduler?action=stop" > /dev/null 2>&1
-    
+
     # ปิด background jobs
     jobs -p | xargs -r kill
-    
+
     echo "Scheduler stopped gracefully"
     exit 0
 }
