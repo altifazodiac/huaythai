@@ -16,6 +16,75 @@ interface FormattedResult {
     bottom2: string;
 }
 
+// =================================================================================
+// TOAST NOTIFICATION FUNCTIONS
+// =================================================================================
+
+/**
+ * สร้าง toast notification สำหรับแสดงผลหวยที่ส่งไปยัง LINE
+ */
+async function createLotterySendToast(sentResults: FormattedResult[], supabaseClient: any) {
+    const currentTime = new Date().toLocaleString('th-TH', { 
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    if (sentResults.length === 0) {
+        console.log(`[Toast] ${currentTime} - ไม่มีผลหวยที่ส่งไปยัง LINE`);
+        return;
+    }
+
+    // สร้างข้อความแจ้งเตือน
+    const lotteryNames = sentResults.map(result => result.name);
+    const toastMessage = `📤 ส่งผลหวยไปยัง LINE สำเร็จ (${currentTime})\n📋 หวยที่ส่ง: ${lotteryNames.join(', ')}\n🔢 รวม ${sentResults.length} รายการ`;
+
+    console.log(`[Toast] ${toastMessage}`);
+    
+    // เก็บข้อมูลสำหรับ toast ในฐานข้อมูล (สำหรับแสดงใน UI)
+    try {
+        await supabaseClient.from('lottery_send_notifications').insert({
+            notification_time: new Date().toISOString(),
+            lottery_names: lotteryNames,
+            total_results: sentResults.length,
+            message: toastMessage,
+            notification_type: 'send_success'
+        });
+    } catch (error) {
+        console.log('[Toast] Note: lottery_send_notifications table not found, skipping notification storage');
+    }
+}
+
+/**
+ * สร้าง toast notification สำหรับแสดงข้อผิดพลาดในการส่งผลหวย
+ */
+async function createLotterySendErrorToast(errorMessage: string, supabaseClient: any) {
+    const currentTime = new Date().toLocaleString('th-TH', { 
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    const toastMessage = `❌ เกิดข้อผิดพลาดในการส่งผลหวย (${currentTime})\n🔍 สาเหตุ: ${errorMessage}`;
+
+    console.log(`[Toast] ${toastMessage}`);
+    
+    // เก็บข้อมูลสำหรับ toast ในฐานข้อมูล (สำหรับแสดงใน UI)
+    try {
+        await supabaseClient.from('lottery_send_notifications').insert({
+            notification_time: new Date().toISOString(),
+            lottery_names: [],
+            total_results: 0,
+            message: toastMessage,
+            notification_type: 'send_error'
+        });
+    } catch (error) {
+        console.log('[Toast] Note: lottery_send_notifications table not found, skipping notification storage');
+    }
+}
+
 // --- Utility Functions ---
 function getCountryCode(countryOrigin: string): string {
     const map: Record<string, string> = {
@@ -52,6 +121,7 @@ function countryCodeToFlagEmoji(code: string): string {
 // --- Main Logic Function ---
 async function main() {
     console.log('Starting stateful lottery result script...');
+    console.log(`⏰ Started at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
 
     // --- Setup Clients ---
     const lineClient = new Client({
@@ -217,6 +287,10 @@ async function main() {
         await lineClient.broadcast([{ type: 'text', text: messageText }]);
         console.log('Message has been sent successfully!');
 
+        // สร้าง toast notification สำหรับผลหวยที่ส่งสำเร็จ
+        const sentResults = Object.values(groupedResults);
+        await createLotterySendToast(sentResults, supabaseClient);
+
         // 6. อัปเดตสถานะในฐานข้อมูล (เฉพาะรายการที่ส่งสำเร็จ)
         const resultIds = finalResultsToSend.map(r => r.id);
         console.log(`Updating ${resultIds.length} rows in database to is_sent_to_line = true`);
@@ -231,9 +305,15 @@ async function main() {
         }
 
         console.log('Database updated successfully. Script finished.');
+        console.log(`⏰ Finished at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
 
     } catch (error: any) {
         console.error('An error occurred during script execution:', error);
+        console.error(`⏰ Failed at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
+        
+        // สร้าง toast notification สำหรับข้อผิดพลาด
+        await createLotterySendErrorToast(error.message || 'Unknown error', supabaseClient);
+        
         process.exit(1);
     }
 }

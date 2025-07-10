@@ -7,6 +7,7 @@ import { LoadingProvider } from "@/components/LoadingProvider";
 import AppLayoutClient from "@/components/AppLayoutClient";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import ReactQueryProvider from "@/components/ReactQueryProvider";
+import LotteryNotificationToast from "@/components/LotteryNotificationToast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({
                 disableTransitionOnChange
               >
                 <Toaster position="top-right" />
+                <LotteryNotificationToast />
                 <AppLayoutClient>
                   {children}
                 </AppLayoutClient>

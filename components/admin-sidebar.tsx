@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react"
 import {
   BarChart3,
+  Bell,
   CalendarDays,
   ClipboardList,
   CreditCard,
@@ -118,6 +119,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       title: "ประวัติการเข้าใช้งาน",
       href: "/login-history",
       icon: Globe,
+    },
+    {
+      title: "การแจ้งเตือนหวย",
+      href: "/lottery-notifications",
+      icon: Bell,
     },
     {
       title: "จัดการ API หวย",

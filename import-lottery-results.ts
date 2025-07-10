@@ -31,7 +31,85 @@ type LotteryResult = {
 };
 
 // =================================================================================
-// 2. SCRAPING & PARSING FUNCTIONS
+// 2. TOAST NOTIFICATION FUNCTIONS
+// =================================================================================
+
+/**
+ * สร้าง toast notification สำหรับแสดงผลหวยที่ดึงมาตามเวลา
+ */
+async function createLotteryImportToast(importedResults: LotteryResult[]) {
+    const currentTime = new Date().toLocaleString('th-TH', { 
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    if (importedResults.length === 0) {
+        console.log(`[Toast] ${currentTime} - ไม่มีผลหวยใหม่ที่ต้องดึงมา`);
+        return;
+    }
+
+    // จัดกลุ่มผลหวยตามชื่อหวย
+    const groupedResults = importedResults.reduce((acc, result) => {
+        if (!acc[result.lottery_name]) {
+            acc[result.lottery_name] = [];
+        }
+        acc[result.lottery_name].push(result);
+        return acc;
+    }, {} as Record<string, LotteryResult[]>);
+
+    // สร้างข้อความแจ้งเตือน
+    const lotteryNames = Object.keys(groupedResults);
+    const toastMessage = `🎯 ดึงผลหวยสำเร็จ (${currentTime})\n📋 หวยที่ดึงมา: ${lotteryNames.join(', ')}\n🔢 รวม ${importedResults.length} รายการ`;
+
+    console.log(`[Toast] ${toastMessage}`);
+    
+    // เก็บข้อมูลสำหรับ toast ในฐานข้อมูล (สำหรับแสดงใน UI)
+    try {
+        await supabase.from('lottery_import_notifications').insert({
+            notification_time: new Date().toISOString(),
+            lottery_names: lotteryNames,
+            total_results: importedResults.length,
+            message: toastMessage,
+            notification_type: 'import_success'
+        });
+    } catch (error) {
+        console.log('[Toast] Note: lottery_import_notifications table not found, skipping notification storage');
+    }
+}
+
+/**
+ * สร้าง toast notification สำหรับแสดงข้อผิดพลาดในการดึงผลหวย
+ */
+async function createLotteryImportErrorToast(errorMessage: string) {
+    const currentTime = new Date().toLocaleString('th-TH', { 
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
+    const toastMessage = `❌ เกิดข้อผิดพลาดในการดึงผลหวย (${currentTime})\n🔍 สาเหตุ: ${errorMessage}`;
+
+    console.log(`[Toast] ${toastMessage}`);
+    
+    // เก็บข้อมูลสำหรับ toast ในฐานข้อมูล (สำหรับแสดงใน UI)
+    try {
+        await supabase.from('lottery_import_notifications').insert({
+            notification_time: new Date().toISOString(),
+            lottery_names: [],
+            total_results: 0,
+            message: toastMessage,
+            notification_type: 'import_error'
+        });
+    } catch (error) {
+        console.log('[Toast] Note: lottery_import_notifications table not found, skipping notification storage');
+    }
+}
+
+// =================================================================================
+// 3. SCRAPING & PARSING FUNCTIONS
 // =================================================================================
 
 async function autoScroll(page: Page): Promise<void> {
@@ -151,7 +229,7 @@ async function scrapeAndParseResults(url: string, context: BrowserContext): Prom
 }
 
 // =================================================================================
-// 3. DATA IMPORT & UTILITY LOGIC
+// 4. DATA IMPORT & UTILITY LOGIC
 // =================================================================================
 
 function getPermutations(str: string): string[] {
@@ -242,32 +320,41 @@ async function automateBatchImportLotteryResults(drawDate: string) {
 }
 
 // =================================================================================
-// 4. MAIN ORCHESTRATOR
+// 5. MAIN ORCHESTRATOR
 // =================================================================================
 
 async function main() {
     let browser: Browser | null = null;
     try {
         console.log('🚀 Starting the scrape and import process...');
+        console.log(`⏰ Started at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
+        
         browser = await chromium.launch({ headless: true, args: ['--disable-gpu', '--no-sandbox'] });
         const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' });
         
         const targetUrl = 'https://xn--t3cjebmjd5a.com/';
         
         console.log('--- Scraping Phase ---');
-        const { error: deleteError } = await supabase.from('lottery_api_results').delete().neq('id', 0);
-        if (deleteError) throw new Error(`Supabase delete error: ${deleteError.message}`);
-        console.log('Successfully cleared `lottery_api_results` table.');
+        // ไม่ลบข้อมูลเก่าทั้งหมด เพื่อป้องกันการสูญเสียข้อมูล
+        console.log('Scraping new lottery results...');
 
         const scrapedData = await scrapeAndParseResults(targetUrl, context);
 
         if (scrapedData.length > 0) {
-            console.log(`Attempting to insert ${scrapedData.length} scraped results...`);
-            const { error } = await supabase.from('lottery_api_results').insert(scrapedData);
-            if (error) throw new Error(`Supabase insert error: ${error.message}`);
-            console.log(`${scrapedData.length} items inserted into temporary table successfully.`);
+            console.log(`Attempting to upsert ${scrapedData.length} scraped results...`);
+            // ใช้ upsert แทน insert เพื่อป้องกันข้อมูลซ้ำ
+            const { error } = await supabase.from('lottery_api_results').upsert(scrapedData, {
+                onConflict: 'lottery_name, draw_date, draw_time'
+            });
+            if (error) throw new Error(`Supabase upsert error: ${error.message}`);
+            console.log(`${scrapedData.length} items upserted into temporary table successfully.`);
+            
+            // สร้าง toast notification สำหรับผลหวยที่ดึงมาสำเร็จ
+            await createLotteryImportToast(scrapedData);
         } else {
             console.log('No new data was scraped to insert.');
+            // สร้าง toast notification สำหรับกรณีไม่มีข้อมูลใหม่
+            await createLotteryImportToast([]);
         }
 
         // --- IMPROVED: PROCESSING & IMPORTING FOR ALL SCRAPED DATES ---
@@ -277,11 +364,19 @@ async function main() {
             for (const date of uniqueDates) {
                 await automateBatchImportLotteryResults(date);
             }
+        } else {
+            console.log('No new data to process. This might be normal if results are not yet available.');
         }
 
         console.log('\n✅ Process completed successfully!');
+        console.log(`⏰ Finished at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
     } catch (error) {
         console.error('\n❌ A critical error occurred during the main process:', error);
+        console.error(`⏰ Failed at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
+        
+        // สร้าง toast notification สำหรับข้อผิดพลาด
+        await createLotteryImportErrorToast(error instanceof Error ? error.message : 'Unknown error');
+        
         process.exit(1);
     } finally {
         if (browser) {
