@@ -1,34 +1,29 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Kanit } from "next/font/google";
+import { GeistSans } from 'geist/font/sans';
+import { Kanit } from 'next/font/google';
+import { GeistMono } from 'geist/font/mono';
 import "./globals.css";
 import { Toaster } from 'sonner'
-import { ThemeProvider } from "@/components/theme-provider"
+
 import { LoadingProvider } from "@/components/LoadingProvider";
-import AppLayoutClient from "@/components/AppLayoutClient";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
-import ReactQueryProvider from "@/components/ReactQueryProvider";
+import ReactQueryProvider from '@/components/ReactQueryProvider';
+import { ThemeProvider } from "@/components/theme-provider";
+import AppLayoutClient from "@/components/AppLayoutClient";
 import LotteryNotificationToast from "@/components/LotteryNotificationToast";
 import { SchedulerInitializer } from '@/components/SchedulerInitializer';
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { cn } from "@/lib/utils";
 
 const kanit = Kanit({
-  variable: "--font-kanit",
-  subsets: ["latin", "thai"],
-  weight: ["400", "500", "700"],
+  subsets: ['thai'],
+  display: 'swap',
+  variable: '--font-kanit',
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
 });
 
 export const metadata: Metadata = {
-  title: "สิงโตทองคำ 77",
-  description: "เว็บหวยออนไลน์ที่ครบทุกชนิด",
+  title: "หวยไลโอ",
+  description: "หวยไลโอ",
 };
 
 export default function RootLayout({
@@ -37,25 +32,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
+    <html lang="th" suppressHydrationWarning>
       <body
-        className={`${kanit.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={cn(
+          "min-h-screen bg-background font-sans antialiased",
+          kanit.variable,
+          GeistSans.variable,
+          GeistMono.variable
+        )}
       >
         <ReactQueryProvider>
           <AuthProvider>
             <LoadingProvider>
               <ThemeProvider
                 attribute="class"
-                defaultTheme="system"
+                defaultTheme="dark"
                 enableSystem
                 disableTransitionOnChange
               >
-                <Toaster position="top-right" />
-                <LotteryNotificationToast />
-                <SchedulerInitializer />
-                <AppLayoutClient>
-                  {children}
-                </AppLayoutClient>
+                  <Toaster position="top-right" />
+                  <LotteryNotificationToast />
+                  <SchedulerInitializer />
+                  <AppLayoutClient>
+                    {children}
+                  </AppLayoutClient>
               </ThemeProvider>
             </LoadingProvider>
           </AuthProvider>
