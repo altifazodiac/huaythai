@@ -8,6 +8,7 @@ import AppLayoutClient from "@/components/AppLayoutClient";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
 import ReactQueryProvider from "@/components/ReactQueryProvider";
 import LotteryNotificationToast from "@/components/LotteryNotificationToast";
+import { SchedulerInitializer } from '@/components/SchedulerInitializer';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="th">
       <body
         className={`${kanit.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -51,6 +52,7 @@ export default function RootLayout({
               >
                 <Toaster position="top-right" />
                 <LotteryNotificationToast />
+                <SchedulerInitializer />
                 <AppLayoutClient>
                   {children}
                 </AppLayoutClient>
