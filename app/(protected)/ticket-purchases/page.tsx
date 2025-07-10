@@ -439,7 +439,7 @@ export default function LotteryPurchasePage() {
         <SidebarProvider>
           <SidebarInset>
             <div className="flex items-center justify-center h-screen">
-              <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           </SidebarInset>
         </SidebarProvider>
@@ -558,7 +558,7 @@ export default function LotteryPurchasePage() {
                                 colSpan={table.getAllColumns().length}
                                 className="p-2"
                               >
-                                <div className="p-4 bg-gray-50 rounded-md">
+                                <div className="p-4 bg-card rounded-md">
                                   <h4 className="text-sm font-semibold mb-2">
                                     รายละเอียดการแทง
                                   </h4>
@@ -570,7 +570,7 @@ export default function LotteryPurchasePage() {
                                         <div className="text-xs">
                                           {group.digit_number} ตัว
                                         </div>
-                                        <div className="text-xs text-blue-600">
+                                        <div className="text-xs text-primary">
                                           {group.typeLabels.join(" x ")}
                                         </div>
                                         <div className="text-xs">
@@ -581,7 +581,7 @@ export default function LotteryPurchasePage() {
                                             )
                                             .join(" x ")}
                                         </div>
-                                        <div className="text-xs text-gray-500">
+                                        <div className="text-xs text-muted-foreground">
                                           รวม{" "}
                                           {group.typeLabels
                                             .reduce(
@@ -596,8 +596,14 @@ export default function LotteryPurchasePage() {
                                         </div>
                                       </div>
                                       <div className="flex-1">
-                                        <div className="text-xs bg-white p-2 rounded border">
-                                          {group.numbers.join("  ")}
+                                        <div className="text-xs bg-background p-2 rounded border border-border">
+                                          {group.numbers
+                                            .map((num) =>
+                                              typeof num === "string"
+                                                ? num.replace(/[\[\]"]+/g, "") // ลบ [, ], "
+                                                : num
+                                            )
+                                            .join("  ")}
                                         </div>
                                       </div>
                                     </div>
@@ -639,7 +645,7 @@ export default function LotteryPurchasePage() {
                     <SelectItem value="50">50</SelectItem>
                   </SelectContent>
                 </Select>
-                <span className="text-sm text-gray-500">รายการต่อหน้า</span>
+                <span className="text-sm text-muted-foreground">รายการต่อหน้า</span>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -650,7 +656,7 @@ export default function LotteryPurchasePage() {
                 >
                   ย้อนกลับ
                 </Button>
-                <span className="text-sm text-gray-500">หน้า {page}</span>
+                <span className="text-sm text-muted-foreground">หน้า {page}</span>
                 <Button
                   variant="outline"
                   size="sm"

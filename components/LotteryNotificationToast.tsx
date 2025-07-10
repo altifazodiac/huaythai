@@ -47,13 +47,13 @@ export default function LotteryNotificationToast({
                     .from('lottery_import_notifications')
                     .select('*')
                     .gte('created_at', cutoffTime)
-                    .gt('created_at', lastNotificationTime)
+                    .gt('created_at', lastNotificationTime ? lastNotificationTime : '1970-01-01T00:00:00.000Z')
                     .order('created_at', { ascending: false }),
                 supabase
                     .from('lottery_send_notifications')
                     .select('*')
                     .gte('created_at', cutoffTime)
-                    .gt('created_at', lastNotificationTime)
+                    .gt('created_at', lastNotificationTime ? lastNotificationTime : '1970-01-01T00:00:00.000Z')
                     .order('created_at', { ascending: false })
             ]);
 

@@ -1,8 +1,4 @@
-#!/usr/bin/env bun
-// setup-dynamic-cron.ts
-// สคริปต์สำหรับดึงเวลาจาก drawing_schedules และสร้าง cron jobs อัตโนมัติ
-
-import { createClient } from '@supabase/supabase-js';
+ import { createClient } from '@supabase/supabase-js';
 import { writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import 'dotenv/config';

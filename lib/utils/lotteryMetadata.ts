@@ -21,6 +21,7 @@ const lotterySchedule = [
   { "time": "10:30:00", "name": "หวยลาวTV", "type": "หวยลาว", "country": "LA" },
   { "time": "10:35:00", "name": "หุ้นฮั่งเส็งเช้าVIP", "type": "หวยหุ้น", "country": "STOCK" },
   { "time": "10:50:00", "name": "ฮั่งเส็งเช้า ดิจิตอล", "type": "หวยหุ้น", "country": "STOCK" },
+  { "time": "11:00:00", "name": "หุ้นฮั่งเส็งเช้า", "type": "หวยหุ้น", "country": "STOCK" },
   { "time": "11:05:00", "name": "หุ้นฮั่งเส็งเช้า", "type": "หวยหุ้น", "country": "STOCK" },
   { "time": "11:30:00", "name": "หวยฮานอยHD", "type": "หวยฮานอย", "country": "VN" },
   { "time": "11:35:00", "name": "หุ้นไต้หวันVIP", "type": "หวยหุ้น", "country": "STOCK" },

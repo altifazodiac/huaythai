@@ -6,6 +6,8 @@ import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
 import { LOTTERY_METADATA } from '@/lib/utils/lotteryMetadata'; // Ensure this path is correct for your project
+import { formatInTimeZone } from 'date-fns-tz';
+import { subMinutes } from 'date-fns';
 
 // Load environment variables for local execution
 import * as dotenv from 'dotenv';
@@ -174,17 +176,24 @@ function parseGovLotteryCards($: cheerio.CheerioAPI, url: string): LotteryResult
         if (bottom3.length > 0) availablePrizes.push(`3 ตัวล่าง: ${bottom3.join(', ')}`);
         const bottom2 = prizeContainer.find('.colGov5 .txt-num').text().trim();
         if (bottom2) availablePrizes.push(`2 ตัวล่าง: ${bottom2}`);
-        const meta = LOTTERY_METADATA[lotteryName as keyof typeof LOTTERY_METADATA];
+        
+        // Use the non-alias name 'หวยรัฐบาล' for metadata lookup
+        const metaLookupName = (lotteryName === 'หวยรัฐบาล' || lotteryName === 'หวยออมสิน' || lotteryName === 'หวย ธกส.') ? lotteryName : null;
+        if (!metaLookupName) return;
+
+        const meta = LOTTERY_METADATA[metaLookupName as keyof typeof LOTTERY_METADATA];
         if (!meta) return;
+
         cardResults.push({ draw_date: date, country: meta.country, lottery_name: lotteryName, results: availablePrizes, source_url: url });
     });
     console.log(`[Parser] Found ${cardResults.length} results from special cards.`);
     return cardResults;
 }
 
-async function scrapeAndParseResults(url: string, context: BrowserContext): Promise<LotteryResult[]> {
+async function scrapeAndParseResults(url: string, context: BrowserContext, targetLotteryNames: string[]): Promise<LotteryResult[]> {
     let page = null;
     console.log(`[Scraper] Navigating to ${url}`);
+    console.log(`[Scraper] Targeting ${targetLotteryNames.length} lotteries: ${targetLotteryNames.join(', ')}`);
     try {
         page = await context.newPage();
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90000 });
@@ -203,10 +212,22 @@ async function scrapeAndParseResults(url: string, context: BrowserContext): Prom
             $(tableEl).find('tbody tr').each((_, rowEl) => {
                 const columns = $(rowEl).find('td');
                 if (columns.length < 6) return;
+                
+                const lotteryName = $(columns[1]).text().trim();
+                console.log(`[Parser] Evaluating row for lottery: "${lotteryName}"...`);
+                
+                // --- FILTERING LOGIC ---
+                // Skip if not a target lottery for this specific cron run
+                if (!targetLotteryNames.includes(lotteryName)) {
+                    console.log(`[Parser] -> Skipping "${lotteryName}" as it's not a target.`);
+                    return; 
+                }
+                console.log(`[Parser] -> MATCH! "${lotteryName}" is a target. Processing...`);
+
                 const prize3Top = $(columns[2]).text().trim();
                 const statusText = $(columns[5]).text().trim();
                 if (statusText.includes('รอผล') || statusText.includes('ปิด') || prize3Top.includes('XXX') || !prize3Top) return;
-                const lotteryName = $(columns[1]).text().trim();
+                
                 const meta = LOTTERY_METADATA[lotteryName as keyof typeof LOTTERY_METADATA];
                 if (!meta) return;
                 const drawTime = $(columns[0]).text().trim();
@@ -215,10 +236,13 @@ async function scrapeAndParseResults(url: string, context: BrowserContext): Prom
                 tableResults.push({ draw_date: drawDate, draw_time: drawTime, country: meta.country, lottery_name: lotteryName, results: availablePrizes, source_url: url });
             });
         });
-        console.log(`[Parser] Found ${tableResults.length} results from tables.`);
+        console.log(`[Parser] Found ${tableResults.length} relevant results from tables.`);
         const cardResults = parseGovLotteryCards($, url);
-        const allPageData = [...tableResults, ...cardResults];
-        console.log(`[Scraper] Finished processing. Total valid results found: ${allPageData.length}`);
+        // Also filter the special government lottery cards
+        const filteredCardResults = cardResults.filter(result => targetLotteryNames.includes(result.lottery_name));
+
+        const allPageData = [...tableResults, ...filteredCardResults];
+        console.log(`[Scraper] Finished processing. Total valid, targeted results found: ${allPageData.length}`);
         return allPageData;
     } catch (error) {
         console.error(`[Scraper] Critical error during scraping:`, error instanceof Error ? error.message : error);
@@ -259,7 +283,8 @@ async function automateBatchImportLotteryResults(drawDate: string) {
 
     const { data: aliases, error: aliasError } = await supabase.from('lottery_name_aliases').select('alias_name, lottery_sub_type_id');
     if (aliasError) throw aliasError;
-    console.log(`[Import][Debug] lottery_name_aliases:`, aliases);
+    
+    const unaliasedNames = new Set<string>();
 
     const { data: schedules, error: scheduleError } = await supabase.from('drawing_schedules').select('schedule_id, lottery_sub_type_id, drawing_time');
     if (scheduleError) throw scheduleError;
@@ -270,15 +295,24 @@ async function automateBatchImportLotteryResults(drawDate: string) {
     for (const apiResult of apiResults) {
         console.log(`[Import][Debug] Processing apiResult.lottery_name: "${apiResult.lottery_name}"`);
         const alias = aliases.find(a => a.alias_name === apiResult.lottery_name);
-        if (!alias) { 
-            console.warn(`[Import][Warning] No alias found for: "${apiResult.lottery_name}"`);
-            continue; 
+        if (!alias) {
+            unaliasedNames.add(apiResult.lottery_name);
+            continue;
         }
-        const schedule = schedules.find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
+        
+        // Normalize scraped time to HH:mm:ss format to match database
+        let normalizedScrapedTime = apiResult.draw_time;
+        if (normalizedScrapedTime && /^\d{2}:\d{2}$/.test(normalizedScrapedTime)) {
+            normalizedScrapedTime += ':00';
+        }
+
+        const schedule = schedules.find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id && s.drawing_time === normalizedScrapedTime);
+        
         if (!schedule) { 
-            console.warn(`[Import][Warning] No schedule found for: "${apiResult.lottery_name}" (sub_type_id: ${alias.lottery_sub_type_id})`);
+            console.warn(`[Import][Warning] No matching schedule found for: "${apiResult.lottery_name}" at time "${apiResult.draw_time}" (normalized to "${normalizedScrapedTime}") (sub_type_id: ${alias.lottery_sub_type_id}). Skipping.`);
             continue; 
         }
+        console.log(`[Import] Match found for "${apiResult.lottery_name}": Alias -> SubTypeID ${alias.lottery_sub_type_id} -> ScheduleID ${schedule.schedule_id}`);
         const subType = subTypes.find(st => st.lottery_sub_type_id === alias.lottery_sub_type_id);
         if (!subType) {
             console.warn(`[Import][Warning] No subType found for: "${apiResult.lottery_name}" (sub_type_id: ${alias.lottery_sub_type_id})`);
@@ -291,19 +325,33 @@ async function automateBatchImportLotteryResults(drawDate: string) {
             if (!prizeValue || prizeValue.includes('X')) continue;
             switch (prizeLabel) {
                 case '3 ตัวบน':
-                    if (prizeValue.length >= 3) { upsertRows.push(createRow('3 ตัวบน', prizeValue), createRow('2 ตัวบน', prizeValue.slice(-2)), createRow('3 ตัวโต๊ด', getPermutations(prizeValue).join(',')), createRow('วิ่งบน', getUniqueDigits(prizeValue).join(','))); }
+                    if (prizeValue.length >= 3) { 
+                        console.log(`[Import] -> Generating prizes for '3 ตัวบน': '3 ตัวบน', '2 ตัวบน', '3 ตัวโต๊ด', 'วิ่งบน'`);
+                        upsertRows.push(createRow('3 ตัวบน', prizeValue), createRow('2 ตัวบน', prizeValue.slice(-2)), createRow('3 ตัวโต๊ด', getPermutations(prizeValue).join(',')), createRow('วิ่งบน', getUniqueDigits(prizeValue).join(','))); 
+                    }
                     break;
                 case '2 ตัวล่าง':
-                    if (prizeValue.length >= 2) { upsertRows.push(createRow('2 ตัวล่าง', prizeValue), createRow('วิ่งล่าง', getUniqueDigits(prizeValue).join(','))); }
+                    if (prizeValue.length >= 2) { 
+                        console.log(`[Import] -> Generating prizes for '2 ตัวล่าง': '2 ตัวล่าง', 'วิ่งล่าง'`);
+                        upsertRows.push(createRow('2 ตัวล่าง', prizeValue), createRow('วิ่งล่าง', getUniqueDigits(prizeValue).join(','))); 
+                    }
                     break;
                 case 'รางวัลที่ 1':
                 case '3 ตัวหน้า':
                 case '3 ตัวล่าง':
+                    console.log(`[Import] -> Generating prize for '${prizeLabel}'`);
                     upsertRows.push(createRow(prizeLabel, prizeValue));
                     break;
             }
         }
     }
+
+    if (unaliasedNames.size > 0) {
+        console.warn(`\n[Import][CRITICAL WARNING] The following ${unaliasedNames.size} lottery names were found on the source website but do not have an alias in the 'lottery_name_aliases' table. Their results were SKIPPED:`);
+        unaliasedNames.forEach(name => console.warn(`- ${name}`));
+        console.warn(`\nPlease add these aliases to the database to ensure all results are imported.`);
+    }
+    
     if (upsertRows.length > 0) {
         console.log('[Import][Debug] ตัวอย่างข้อมูลที่จะ upsert ลง lottery_results:');
         upsertRows.slice(0, 3).forEach((row, idx) => {
@@ -326,46 +374,133 @@ async function automateBatchImportLotteryResults(drawDate: string) {
 async function main() {
     let browser: Browser | null = null;
     try {
-        console.log('🚀 Starting the scrape and import process...');
-        console.log(`⏰ Started at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
+        const timeZone = 'Asia/Bangkok';
+        const now = new Date();
+        console.log('🚀 Starting the TARGETED scrape and import process...');
+        console.log(`⏰ Started at: ${now.toLocaleString('th-TH', { timeZone })}`);
         
-        browser = await chromium.launch({ headless: true, args: ['--disable-gpu', '--no-sandbox'] });
+        // --- Determine Target Lotteries based on Schedule ---
+        console.log('\n[Step 1/4] Determining Target Lotteries...');
+        const currentTime = formatInTimeZone(now, timeZone, 'HH:mm:ss');
+        const windowStartTime = formatInTimeZone(subMinutes(now, 10), timeZone, 'HH:mm:ss');
+        
+        console.log(`Checking for scheduled draws between ${windowStartTime} and ${currentTime}`);
+
+        const { data: scheduledDraws, error: scheduleError } = await supabase
+            .from('drawing_schedules')
+            .select('lottery_sub_type_id, drawing_time')
+            .gte('drawing_time', windowStartTime)
+            .lte('drawing_time', currentTime);
+
+        if (scheduleError) throw new Error(`Error fetching schedules: ${scheduleError.message}`);
+
+        if (!scheduledDraws || scheduledDraws.length === 0) {
+            console.log('No lotteries scheduled to draw in the current time window. Exiting gracefully.');
+            return;
+        }
+
+        console.log(`Found ${scheduledDraws.length} scheduled draws:`, scheduledDraws.map(s => `ID ${s.lottery_sub_type_id} at ${s.drawing_time}`).join('; '));
+        
+        const { data: nextDraw, error: nextDrawError } = await supabase
+            .from('drawing_schedules')
+            .select('drawing_time')
+            .gt('drawing_time', currentTime)
+            .order('drawing_time', { ascending: true })
+            .limit(1)
+            .single();
+
+        const nextDrawTime = nextDraw?.drawing_time;
+        if (nextDrawTime) {
+            console.log(`[Info] Next scheduled draw is at: ${nextDrawTime}`);
+        } else {
+            console.log('[Info] No subsequent draws found for today.');
+        }
+
+        const scheduledSubTypeIds = scheduledDraws.map(s => s.lottery_sub_type_id);
+        const { data: aliases, error: aliasError } = await supabase
+            .from('lottery_name_aliases')
+            .select('alias_name')
+            .in('lottery_sub_type_id', scheduledSubTypeIds);
+
+        if (aliasError) throw new Error(`Error fetching aliases: ${aliasError.message}`);
+        
+        if (!aliases || aliases.length === 0) {
+            console.warn(`Warning: Found scheduled draws but no corresponding aliases. Check sub_type_ids: ${scheduledSubTypeIds.join(', ')}`);
+            return;
+        }
+
+        const targetLotteryNames = aliases.map(a => a.alias_name);
+
+        // --- Scraping Phase with Retry Logic ---
+        console.log('\n[Step 2/4] Scraping Phase (with up to 20 retries)...');
+        browser = await chromium.launch({ 
+            headless: true, 
+            args: ['--disable-gpu', '--no-sandbox'],
+            timeout: 360000 
+        });
         const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' });
         
         const targetUrl = 'https://xn--t3cjebmjd5a.com/';
         
-        console.log('--- Scraping Phase ---');
-        // ไม่ลบข้อมูลเก่าทั้งหมด เพื่อป้องกันการสูญเสียข้อมูล
-        console.log('Scraping new lottery results...');
+        let scrapedData: LotteryResult[] = [];
+        const maxRetries = 20;
+        const retryInterval = 60000; // 60 seconds
 
-        const scrapedData = await scrapeAndParseResults(targetUrl, context);
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            console.log(`\n[Attempt ${attempt}/${maxRetries}] Scraping for: ${targetLotteryNames.join(', ')}`);
+            
+            scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+
+            if (scrapedData.length > 0) {
+                console.log(`✅ Success! Found results on attempt ${attempt}.`);
+                break; 
+            }
+            
+            console.log(`[Attempt ${attempt}/${maxRetries}] No results found yet.`);
+
+            if (attempt === maxRetries) {
+                console.warn(`[MAX RETRIES] Reached maximum of ${maxRetries} attempts. Stopping.`);
+                break;
+            }
+
+            const nowForCheck = new Date();
+            const currentTimeForCheck = formatInTimeZone(nowForCheck, timeZone, 'HH:mm:ss');
+            if (nextDrawTime && currentTimeForCheck >= nextDrawTime) {
+                console.warn(`[STOP] Current time (${currentTimeForCheck}) has passed the next scheduled draw time (${nextDrawTime}). Stopping retries for the current target.`);
+                break;
+            }
+
+            console.log(`Waiting for ${retryInterval / 1000} seconds before retrying...`);
+            await new Promise(resolve => setTimeout(resolve, retryInterval));
+        }
+
 
         if (scrapedData.length > 0) {
-            console.log(`Attempting to upsert ${scrapedData.length} scraped results...`);
-            // ใช้ upsert แทน insert เพื่อป้องกันข้อมูลซ้ำ
+            console.log(`\n[Step 3/4] Upserting ${scrapedData.length} results to temporary table...`);
             const { error } = await supabase.from('lottery_api_results').upsert(scrapedData, {
                 onConflict: 'lottery_name, draw_date, draw_time'
             });
             if (error) throw new Error(`Supabase upsert error: ${error.message}`);
-            console.log(`${scrapedData.length} items upserted into temporary table successfully.`);
+            console.log(`[Step 3/4] ✅ Success: Upserted to 'lottery_api_results'.`);
             
-            // สร้าง toast notification สำหรับผลหวยที่ดึงมาสำเร็จ
             await createLotteryImportToast(scrapedData);
         } else {
-            console.log('No new data was scraped to insert.');
-            // สร้าง toast notification สำหรับกรณีไม่มีข้อมูลใหม่
+            console.log('\nNo new data was ultimately scraped for the targeted lotteries after all attempts.');
+            const expectedLotteries = scheduledDraws.map(d => `ID ${d.lottery_sub_type_id} at ${d.drawing_time}`);
+            console.warn(`Warning: The script was triggered for scheduled lotteries, but no results were found on the website after multiple attempts. This might be due to a publication delay. Expected: ${expectedLotteries.join(', ')}`);
             await createLotteryImportToast([]);
         }
 
-        // --- IMPROVED: PROCESSING & IMPORTING FOR ALL SCRAPED DATES ---
+        // --- Processing & Importing for all scraped dates (which are now targeted) ---
         if (scrapedData.length > 0) {
             const uniqueDates = [...new Set(scrapedData.map(item => item.draw_date))];
-            console.log(`\nFound unique dates to process: ${uniqueDates.join(', ')}`);
+            console.log(`\n[Step 4/4] Processing and Importing to final 'lottery_results' table for dates: ${uniqueDates.join(', ')}...`);
             for (const date of uniqueDates) {
                 await automateBatchImportLotteryResults(date);
             }
+            console.log(`[Step 4/4] ✅ Success: Finished processing all dates.`);
         } else {
-            console.log('No new data to process. This might be normal if results are not yet available.');
+            console.log('\nNo new data to process. This might be normal if results are not yet available.');
         }
 
         console.log('\n✅ Process completed successfully!');
@@ -374,7 +509,7 @@ async function main() {
         console.error('\n❌ A critical error occurred during the main process:', error);
         console.error(`⏰ Failed at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
         
-        // สร้าง toast notification สำหรับข้อผิดพลาด
+        // Create a toast notification for the error
         await createLotteryImportErrorToast(error instanceof Error ? error.message : 'Unknown error');
         
         process.exit(1);

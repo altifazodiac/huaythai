@@ -230,7 +230,7 @@ const LoginPage = () => {
             <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-red-900 ">
               <span className="text-red-600  ">เข้าสู่ระบบ</span>
             </motion.h1>
-            <motion.p variants={itemVariants} className="mt-2 text-lg text-red-700 mb-8 font-semibold animate-glow-text2">
+            <motion.p variants={itemVariants} className="mt-2 text-md text-red-700 mb-8 font-semibold animate-glow-text2">
               ยินดีต้อนรับสู่ <span className="text-red-400 font-bold">สิงโตทองคำ 77</span>
             </motion.p>
             <form onSubmit={handleLogin} className="space-y-7">

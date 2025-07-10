@@ -138,7 +138,8 @@ const LotterySummaryPage: React.FC = () => {
   const [numberDetails, setNumberDetails] = useState<NumberDetail[]>([]);
 
   // Filter states
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedLotteryType, setSelectedLotteryType] = useState<number | null>(null);
   const [selectedBillNumber, setSelectedBillNumber] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
