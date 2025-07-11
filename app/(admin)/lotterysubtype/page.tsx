@@ -413,21 +413,32 @@ export default function LotterySubTypePage() {
     if (!currentSubTypeId) return;
     if (!confirm("ยืนยันการลบตารางเวลานี้?")) return;
 
-    console.log(`Deleting schedule_id: ${schedule_id}`);
     try {
-      const { error } = await supabase.from("drawing_schedules").delete().eq("schedule_id", schedule_id);
+      // 1. ลบ scheduled_tasks ที่อ้างอิง schedule_id นี้ก่อน
+      const { error: taskError } = await supabase
+        .from("scheduled_tasks")
+        .delete()
+        .eq("schedule_id", schedule_id);
 
-      if (error) {
-        console.error("Delete Schedule Error:", error);
-        toast.error("เกิดข้อผิดพลาดในการลบ: " + error.message);
+      if (taskError) {
+        toast.error("เกิดข้อผิดพลาดในการลบงานที่เกี่ยวข้อง: " + taskError.message);
         return;
       }
 
-      console.log("Delete Schedule Success");
+      // 2. ลบ schedule จริง
+      const { error } = await supabase
+        .from("drawing_schedules")
+        .delete()
+        .eq("schedule_id", schedule_id);
+
+      if (error) {
+        toast.error("เกิดข้อผิดพลาดในการลบตารางเวลา: " + error.message);
+        return;
+      }
+
       toast.success("ลบตารางเวลาสำเร็จ");
       await fetchSchedules(currentSubTypeId);
     } catch (error) {
-      console.error("Unexpected Delete Schedule Error:", error);
       toast.error("เกิดข้อผิดพลาดที่ไม่คาดคิดในการลบ");
     }
   };
