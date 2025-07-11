@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase/supabaseClient';
 import { useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 const SignUpPage = () => {
   const router = useRouter();
@@ -50,39 +50,115 @@ const SignUpPage = () => {
     return cleanPhone;
   };
 
-  const handleSignUp = async () => {
-    setError(null);
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!validateInputs()) return;
-
+    
     setLoading(true);
+    setError(null);
+
     try {
       const formattedPhone = formatPhoneNumber(phone);
       console.log('📱 เบอร์โทรที่จัดรูปแบบแล้ว:', formattedPhone);
 
+      // ตรวจสอบว่าเบอร์โทรนี้ถูกใช้แล้วหรือไม่
+      const { data: existingUser, error: checkError } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('phone', formattedPhone)
+        .single();
+
+      if (existingUser) {
+        throw new Error('เบอร์โทรศัพท์นี้ถูกใช้แล้ว');
+      }
+
+      if (checkError && !checkError.message.includes('No rows')) {
+        console.error('Check error:', checkError);
+      }
+
+      // ใช้ email authentication แทน phone authentication
+      // แปลงเบอร์โทรเป็น email format
+      const phoneAsEmail = `${formattedPhone.replace(/[^0-9]/g, '')}@phone.local`;
+
+      // สร้างผู้ใช้ใหม่ด้วย email authentication
       const { data, error } = await supabase.auth.signUp({
-        phone: formattedPhone,
-        password,
+        email: phoneAsEmail,
+        password: password,
         options: {
-          data: { name },
-        },
+          data: {
+            name: name,
+            phone: formattedPhone,
+          }
+        }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Signup error:', error);
+        throw error;
+      }
 
       if (data.user) {
-        toast.success('สมัครสมาชิกสำเร็จ! คุณสามารถใช้งานได้ทันที', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-        router.push('/homepage');
+        // สร้าง profile สำหรับผู้ใช้ใหม่
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: phoneAsEmail,
+            phone: formattedPhone,
+            name: name,
+            credit_balance: 0
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          // ถ้าสร้าง profile ไม่ได้ ให้ลบ user ที่สร้างไปแล้ว
+          await supabase.auth.admin.deleteUser(data.user.id);
+          throw new Error('เกิดข้อผิดพลาดในการสร้างโปรไฟล์');
+        }
+
+        // สร้าง user role (default เป็น user)
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: data.user.id,
+            role: 'user'
+          });
+
+        if (roleError) {
+          console.error('Role creation error:', roleError);
+          // ไม่ต้องหยุดการทำงานถ้าสร้าง role ไม่ได้
+        }
+
+        toast.success('สมัครสมาชิกสำเร็จ! กำลังเข้าสู่ระบบ...');
+        
+        // รอให้ session อัปเดต
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // ตรวจสอบ session
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        if (sessionData.session) {
+          router.push('/homepage');
+        } else {
+          toast.success('สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ');
+          router.push('/login');
+        }
+      } else {
+        throw new Error('ไม่สามารถสร้างบัญชีผู้ใช้ได้');
       }
     } catch (err: any) {
-      if (err.message.includes('already registered')) {
-        setError('เบอร์โทรศัพท์นี้มีผู้ใช้งานแล้ว กรุณาใช้เบอร์โทรศัพท์อื่น');
+      console.error('Registration error:', err);
+      
+      if (err.message.includes('User already registered')) {
+        setError('เบอร์โทรศัพท์นี้ถูกใช้แล้ว');
+      } else if (err.message.includes('เบอร์โทรศัพท์นี้ถูกใช้แล้ว')) {
+        setError('เบอร์โทรศัพท์นี้ถูกใช้แล้ว');
+      } else if (err.message.includes('Password should be at least')) {
+        setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
       } else {
         setError(err.message || 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
       }
-      console.error('Error:', err);
     } finally {
       setLoading(false);
     }

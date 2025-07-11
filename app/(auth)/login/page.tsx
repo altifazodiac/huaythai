@@ -92,8 +92,26 @@ const LoginPage = () => {
       const formattedPhone = formatPhoneNumber(phone);
       console.log('📱 เบอร์โทรที่จัดรูปแบบแล้ว:', formattedPhone);
 
+      // ใช้ email authentication แทน phone authentication เนื่องจาก phone auth ยังไม่ได้เปิดใช้งาน
+      // แปลงเบอร์โทรเป็น email format เพื่อหาผู้ใช้จาก profiles table
+      const phoneAsEmail = `${formattedPhone.replace(/[^0-9]/g, '')}@phone.local`;
+
+      // หาผู้ใช้จาก phone number ใน profiles table ก่อน
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email, phone')
+        .eq('phone', formattedPhone)
+        .single();
+
+      if (profileError || !userProfile) {
+        throw new Error('ไม่พบผู้ใช้ที่มีเบอร์โทรศัพท์นี้');
+      }
+
+      // ใช้ email ที่เก็บไว้ใน profile สำหรับ login
+      const loginEmail = userProfile.email || phoneAsEmail;
+
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
-        phone: formattedPhone, 
+        email: loginEmail,
         password 
       });
 
@@ -102,7 +120,7 @@ const LoginPage = () => {
         throw signInError;
       }
 
-      console.log('✅ Login successful:', data.user?.phone);
+      console.log('✅ Login successful:', data.user?.email);
 
       if (data.user && data.session) {
         // บันทึก login history
@@ -110,7 +128,7 @@ const LoginPage = () => {
           const ip = await fetch("https://api.ipify.org?format=json").then(res => res.json()).then(d => d.ip).catch(() => null);
           const { error: historyError } = await supabase.from("login_history").insert([{
             user_id: data.user.id,
-            email: data.user.phone, // ใช้ phone แทน email ในการบันทึก
+            email: userProfile.phone, // ใช้ phone แทน email ในการบันทึก
             ip_address: ip,
             user_agent: typeof window !== "undefined" ? window.navigator.userAgent : null,
           }]);
@@ -183,6 +201,8 @@ const LoginPage = () => {
         setError('เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง');
       } else if (err.message.includes('Phone not confirmed')) {
         setError('กรุณายืนยันเบอร์โทรศัพท์ของคุณก่อนเข้าสู่ระบบ');
+      } else if (err.message.includes('ไม่พบผู้ใช้ที่มีเบอร์โทรศัพท์นี้')) {
+        setError('ไม่พบผู้ใช้ที่มีเบอร์โทรศัพท์นี้ กรุณาตรวจสอบเบอร์โทรให้ถูกต้อง');
       } else {
         setError(err.message || 'เกิดข้อผิดพลาดที่ไม่รู้จัก');
       }
