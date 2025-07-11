@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-import { Trash2, ArrowLeft, MoreHorizontal, Calendar, Hash, Tag, TicketIcon, Repeat, CoinsIcon, Coins, Ticket } from 'lucide-react';
+import { Trash2, ArrowLeft, MoreHorizontal, Calendar, Hash, Tag, TicketIcon, Repeat, CoinsIcon, Coins, Ticket, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -2026,6 +2026,45 @@ const LotteryOrderPage = () => {
                 ))}
               </div>
 
+              {/* ช่องระบุจำนวนเอง */}
+              <div className="mb-3">
+                <label className="block text-[10px] md:text-sm font-medium text-foreground mb-1">ระบุจำนวนเอง</label>
+                <div className="flex gap-1">
+                  <Input
+                    type="number"
+                    placeholder="จำนวนเงิน"
+                    min="1"
+                    max="10000"
+                    className="flex-1 text-xs px-2 py-1 h-7"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const value = parseInt((e.target as HTMLInputElement).value);
+                        if (value && value > 0) {
+                          handleQuickPriceSet(value);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    className="h-7 px-2 text-[10px] md:text-sm border hover:bg-red-50 hover:border-red-500 hover:text-red-600"
+                    onClick={(e) => {
+                      const input = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement;
+                      const value = parseInt(input?.value || '0');
+                      if (value && value > 0) {
+                        handleQuickPriceSet(value);
+                        input.value = '';
+                      } else {
+                        toast.error('กรุณาระบุจำนวนเงินที่ถูกต้อง');
+                      }
+                    }}
+                  >
+                    ใช้
+                  </Button>
+                </div>
+              </div>
+
               {/* ช่องกรอกชื่อบิล */}
               <div className="mb-2">
                 <label className="block text-[10px] md:text-sm font-medium text-foreground mb-0.5">ชื่อบิล/โพย (ไม่บังคับ)</label>
@@ -2061,7 +2100,7 @@ const LotteryOrderPage = () => {
                 {/* ปุ่มดำเนินการ */}
                 <div className="mt-4">
                   <Button
-                    className="w-full bg-red-600 hover:bg-red-700 text-white h-12 text-sm md:text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white h-12 text-sm md:text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed relative"
                     disabled={
                       orders.length === 0 ||
                       !isCreditSufficient ||
@@ -2071,6 +2110,9 @@ const LotteryOrderPage = () => {
                     }
                     onClick={handleConfirmOrder}
                   >
+                    {isSaving && (
+                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin mr-2" />
+                    )}
                     {isSaving ? 'กำลังบันทึก...' : (isCreditSufficient ? 'ยืนยันการสั่งซื้อ' : 'เครดิตไม่พอ')}
                   </Button>
                 </div>
@@ -2079,6 +2121,50 @@ const LotteryOrderPage = () => {
           )}
         </div>
       </main>
+
+      {/* Loading Overlay */}
+      <AnimatePresence>
+        {isSaving && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-2xl flex flex-col items-center gap-4 max-w-sm mx-4"
+            >
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+                <span className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+                  กำลังบันทึกรายการ
+                </span>
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                กรุณารอสักครู่... กำลังสร้างรายการสั่งซื้อและเตรียมข้อมูลสรุป
+              </div>
+              <motion.div 
+                className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 2, ease: "easeInOut" }}
+                />
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Dialog ยืนยันลบประเภท */}
       <Dialog open={!!confirmDeleteType} onOpenChange={open => { if (!open) setConfirmDeleteType(null); }}>
         <DialogContent>
