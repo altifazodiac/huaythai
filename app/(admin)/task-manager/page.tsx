@@ -216,43 +216,30 @@ export default function TaskManagerPage() {
       let errorMessage = '';
       
       try {
-        if (task.type === 'scrape') {
-          // เรียก import API
-          const response = await fetch(`/api/import-lottery-results`, {
+        if (task.type === 'scrape' || task.type === 'send') {
+          // เรียก task runner API (ไม่ต้องใช้ API key)
+          const response = await fetch(`/api/task-runner`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': process.env.NEXT_PUBLIC_INTERNAL_API_KEY || ''
             },
             body: JSON.stringify({
+              task_type: task.type,
               drawing_time: task.drawing_time,
-              lottery_sub_type_id: task.lottery_sub_type_id,
-              action: 'scrape_and_import'
+              lottery_sub_type_id: task.lottery_sub_type_id
             })
           });
           
           if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            const errorData = await response.json();
+            throw new Error(errorData.details || `HTTP ${response.status}`);
           }
           
-          success = true;
-        } else if (task.type === 'send') {
-          // เรียก send API
-          const response = await fetch(`/api/send-lottery-results`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': process.env.NEXT_PUBLIC_INTERNAL_API_KEY || ''
-            },
-            body: JSON.stringify({
-              drawing_time: task.drawing_time,
-              lottery_sub_type_id: task.lottery_sub_type_id,
-              draw_date: new Date().toISOString().split('T')[0]
-            })
-          });
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+          const result = await response.json();
+          if (task.type === 'scrape') {
+            console.log(`✅ Scrape completed: ${result.scrapedCount} scraped, ${result.importedCount} imported`);
+          } else {
+            console.log(`✅ Send completed: ${result.sentCount} sent`);
           }
           
           success = true;
