@@ -130,32 +130,34 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
       context = await browserManager.getBrowserContext();
       page = await context.newPage();
       
-      await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 120000 });
-      
-      // รอให้ข้อมูลโหลดเสร็จ
-      await page.waitForTimeout(3000);
+      // เปลี่ยน waitUntil เป็น 'domcontentloaded' และรอ table
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 120000 });
+      try {
+        await page.waitForSelector('table', { timeout: 10000 }); // รอให้ table โผล่
+      } catch (e) {
+        console.warn('[Scraper] ไม่เจอ <table> ในหน้าเว็บภายใน 10 วินาที');
+      }
+      await page.waitForTimeout(3000); // รอ JS render เพิ่มเติม
       
       // ดึงข้อมูลจากหน้าเว็บ
       const scrapedData = await page.evaluate(() => {
         const results: LotteryResult[] = [];
-        
-        // ตรวจสอบว่ามีตารางข้อมูลหรือไม่
         const tables = document.querySelectorAll('table');
-        
+        if (tables.length === 0) {
+          // เพิ่ม log ฝั่ง browser (จะถูก log ฝั่ง node ด้วย)
+          // @ts-ignore
+          if (window && window.console) window.console.log('[Scraper] [Browser] ไม่เจอ <table> ในหน้าเว็บ');
+        }
         tables.forEach(table => {
           const rows = table.querySelectorAll('tr');
-          
           rows.forEach(row => {
             const cells = row.querySelectorAll('td');
-            
             if (cells.length >= 3) {
               const draw_time = cells[0]?.textContent?.trim();
               const lottery_name = cells[1]?.textContent?.trim();
               const first_prize = cells[2]?.textContent?.trim();
-              
               if (lottery_name && draw_time && first_prize && first_prize !== 'รอผล') {
                 const today = new Date().toISOString().split('T')[0];
-                
                 results.push({
                   lottery_name,
                   draw_date: today,
@@ -170,17 +172,20 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
                   eighth_prize: cells[9]?.textContent?.trim(),
                   ninth_prize: cells[10]?.textContent?.trim(),
                   tenth_prize: cells[11]?.textContent?.trim(),
-                  country: "Thailand" // เพิ่มค่า Default
+                  country: "Thailand"
                 });
               }
             }
           });
         });
-        
+        // log ข้อมูลที่ scrape ได้ (ฝั่ง browser)
+        // @ts-ignore
+        if (window && window.console) window.console.log('[Scraper] [Browser] scrapedData:', results);
         return results;
       });
       
-      console.log(`[Scraper] Found ${scrapedData.length} results`);
+      // log ข้อมูลที่ scrape ได้ (ฝั่ง node)
+      console.log('[Scraper] DEBUG: scrapedData =', scrapedData);
       
       // DEBUG: แสดงชื่อหวยที่ scrape มาจริงๆ
       if (scrapedData.length > 0) {
