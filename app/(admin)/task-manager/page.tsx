@@ -11,6 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Input } from '@/components/ui/input';
 import { Play, Square, RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Search, ListFilter, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { executeTask } from '@/lib/task-actions';
 
 // --- Interfaces ---
 interface ScheduledTask {
@@ -217,29 +218,17 @@ export default function TaskManagerPage() {
       
       try {
         if (task.type === 'scrape' || task.type === 'send') {
-          // เรียก task runner API (ไม่ต้องใช้ API key)
-          const response = await fetch(`/api/task-runner`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              task_type: task.type,
-              drawing_time: task.drawing_time,
-              lottery_sub_type_id: task.lottery_sub_type_id
-            })
-          });
+          // เรียก Server Action โดยตรง (ไม่ต้องใช้ API)
+          const result = await executeTask(task.type, task.drawing_time, task.lottery_sub_type_id);
           
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.details || `HTTP ${response.status}`);
+          if (!result.success) {
+            throw new Error(result.details || result.error || 'Task execution failed');
           }
           
-          const result = await response.json();
           if (task.type === 'scrape') {
-            console.log(`✅ Scrape completed: ${result.scrapedCount} scraped, ${result.importedCount} imported`);
+            console.log(`✅ Scrape completed: ${(result as any).scrapedCount || 0} scraped, ${(result as any).importedCount || 0} imported`);
           } else {
-            console.log(`✅ Send completed: ${result.sentCount} sent`);
+            console.log(`✅ Send completed: ${(result as any).sentCount || 0} sent`);
           }
           
           success = true;
