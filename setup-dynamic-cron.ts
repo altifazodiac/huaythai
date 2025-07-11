@@ -83,6 +83,10 @@ async function setupDynamicCron() {
         const updateCron = `5 0 * * * cd ${projectPath} && ${envVars} bun run setup-dynamic-cron.ts >> ${logDir}/update-cron.log 2>&1`;
         cronEntries.push(updateCron);
 
+        // 6. เพิ่ม cron สำหรับรัน background task processor (restart ทุกชั่วโมง)
+        const processorCron = `0 * * * * cd ${projectPath} && ${envVars} bun run scripts/start-background-processor.ts >> ${logDir}/background-processor.log 2>&1`;
+        cronEntries.push(processorCron);
+
         // 6. สร้างไฟล์ crontab ใหม่
         const crontabContent = [
             '# Dynamic Cron Jobs for Lottery System',

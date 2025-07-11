@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Play, Square, RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Search, ListFilter, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { startTask } from '@/lib/task-actions';
+import { backgroundTaskProcessor } from '@/lib/background-task-processor';
 
 // --- Interfaces ---
 interface ScheduledTask {
@@ -43,6 +44,13 @@ interface TaskLog {
 interface SchedulerData {
   tasks: ScheduledTask[];
   recentLogs: TaskLog[];
+  queueStatus?: {
+    queued: number;
+    running: number;
+    completed: number;
+    failed: number;
+    total: number;
+  };
 }
 
 type StatusFilter = 'all' | 'pending' | 'running' | 'completed' | 'failed';
@@ -131,9 +139,20 @@ export default function TaskManagerPage() {
       }
       console.log('✅ Logs fetched:', logs?.length || 0, 'items');
 
+      // ดึงข้อมูล queue status
+      console.log('📋 Fetching queue status...');
+      const { data: queueData, error: queueError } = await supabase.rpc('get_queue_status');
+      
+      if (queueError) {
+        console.error('❌ Queue Status Error:', queueError);
+      } else {
+        console.log('✅ Queue status fetched:', queueData);
+      }
+
       setSchedulerData({
         tasks: tasks || [],
-        recentLogs: logs || []
+        recentLogs: logs || [],
+        queueStatus: queueData?.stats || null
       });
       setError(null);
       console.log('✅ Scheduler data fetch completed successfully');
@@ -356,6 +375,35 @@ export default function TaskManagerPage() {
                             <span className="text-gray-500 dark:text-gray-400 capitalize">{status === 'all' ? 'ทั้งหมด' : status}</span>
                         </div>
                     ))}
+                </CardContent>
+            </Card>
+
+            {/* Queue Status Card */}
+            <Card>
+                <CardHeader><CardTitle>Queue Status</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                    {schedulerData?.queueStatus ? (
+                        <>
+                            <div className="flex items-center space-x-2 text-sm">
+                                <Badge className="bg-yellow-500 text-white">Queue</Badge>
+                                <span className="font-semibold text-gray-700 dark:text-gray-300">{schedulerData.queueStatus.queued}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm">
+                                <Badge className="bg-blue-500 text-white">Running</Badge>
+                                <span className="font-semibold text-gray-700 dark:text-gray-300">{schedulerData.queueStatus.running}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm">
+                                <Badge className="bg-green-500 text-white">Complete</Badge>
+                                <span className="font-semibold text-gray-700 dark:text-gray-300">{schedulerData.queueStatus.completed}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm">
+                                <Badge className="bg-red-500 text-white">Failed</Badge>
+                                <span className="font-semibold text-gray-700 dark:text-gray-300">{schedulerData.queueStatus.failed}</span>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="col-span-2 text-center text-gray-500 dark:text-gray-400">No queue data</div>
+                    )}
                 </CardContent>
             </Card>
           </div>
