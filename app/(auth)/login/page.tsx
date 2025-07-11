@@ -96,19 +96,47 @@ const LoginPage = () => {
       // แปลงเบอร์โทรเป็น email format เพื่อหาผู้ใช้จาก profiles table
       const phoneAsEmail = `${formattedPhone.replace(/[^0-9]/g, '')}@phone.local`;
 
-      // หาผู้ใช้จาก phone number ใน profiles table ก่อน
-      const { data: userProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('email, phone')
-        .eq('phone', formattedPhone)
-        .single();
+      // สร้างรูปแบบเบอร์โทรหลายรูปแบบเพื่อค้นหา
+      const phoneFormats = [
+        formattedPhone,  // +66999999999
+        phone,           // 0999999999 (input เดิม)
+        phone.replace(/^0/, '+66'), // +66999999999 จาก 0999999999
+        formattedPhone.replace(/^\+66/, '0') // 0999999999 จาก +66999999999
+      ];
 
-      if (profileError || !userProfile) {
+      console.log('🔍 ค้นหาเบอร์โทรในรูปแบบต่างๆ:', phoneFormats);
+
+      // หาผู้ใช้จาก phone number ใน profiles table โดยใช้ function
+      let userProfile = null;
+      let profileError = null;
+
+      // ลองค้นหาด้วยรูปแบบต่างๆ โดยใช้ function lookup_user_by_phone
+      for (const phoneFormat of phoneFormats) {
+        const { data, error } = await supabase
+          .rpc('lookup_user_by_phone', { phone_number: phoneFormat });
+
+        if (data && data.length > 0) {
+          userProfile = {
+            email: data[0].user_email,
+            phone: data[0].user_phone,
+            name: null // function ไม่ return name เพื่อความปลอดภัย
+          };
+          console.log('✅ พบผู้ใช้ด้วยเบอร์โทร:', phoneFormat);
+          break;
+        } else if (error) {
+          profileError = error;
+          console.log('⚠️ Error searching with phone format', phoneFormat, ':', error.message);
+        }
+      }
+
+      if (!userProfile) {
+        console.error('❌ ไม่พบผู้ใช้ด้วยเบอร์โทรใดๆ');
         throw new Error('ไม่พบผู้ใช้ที่มีเบอร์โทรศัพท์นี้');
       }
 
       // ใช้ email ที่เก็บไว้ใน profile สำหรับ login
       const loginEmail = userProfile.email || phoneAsEmail;
+      console.log('🔑 ใช้ email สำหรับ login:', loginEmail);
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
         email: loginEmail,
