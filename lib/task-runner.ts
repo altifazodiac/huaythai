@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { chromium } from 'playwright';
+import { chromium, Browser, BrowserContext } from 'playwright';
 import { formatInTimeZone } from 'date-fns-tz';
 
 const supabase = createClient(
@@ -24,99 +24,234 @@ interface LotteryResult {
   [key: string]: string | undefined;
 }
 
-// ฟังก์ชันสำหรับ scrape ข้อมูล
-export async function scrapeAndParseResults(targetUrl: string, context: any, targetLotteryNames?: string[]): Promise<LotteryResult[]> {
-  console.log(`[Scraper] Starting scrape for URL: ${targetUrl}`);
-  
-  const page = await context.newPage();
-  
-  try {
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
-    
-    // รอให้ข้อมูลโหลดเสร็จ
-    await page.waitForTimeout(3000);
-    
-    // ดึงข้อมูลจากหน้าเว็บ
-    const scrapedData = await page.evaluate(() => {
-      const results: LotteryResult[] = [];
-      
-      // ตรวจสอบว่ามีตารางข้อมูลหรือไม่
-      const tables = document.querySelectorAll('table');
-      
-      tables.forEach(table => {
-        const rows = table.querySelectorAll('tr');
-        
-        rows.forEach(row => {
-          const cells = row.querySelectorAll('td');
-          
-          if (cells.length >= 3) {
-            const draw_time = cells[0]?.textContent?.trim();
-            const lottery_name = cells[1]?.textContent?.trim();
-            const first_prize = cells[2]?.textContent?.trim();
-            
-            if (lottery_name && draw_time && first_prize && first_prize !== 'รอผล') {
-              const today = new Date().toISOString().split('T')[0];
-              
-              results.push({
-                lottery_name,
-                draw_date: today,
-                draw_time,
-                first_prize,
-                second_prize: cells[3]?.textContent?.trim(),
-                third_prize: cells[4]?.textContent?.trim(),
-                fourth_prize: cells[5]?.textContent?.trim(),
-                fifth_prize: cells[6]?.textContent?.trim(),
-                sixth_prize: cells[7]?.textContent?.trim(),
-                seventh_prize: cells[8]?.textContent?.trim(),
-                eighth_prize: cells[9]?.textContent?.trim(),
-                ninth_prize: cells[10]?.textContent?.trim(),
-                tenth_prize: cells[11]?.textContent?.trim(),
-              });
-            }
-          }
-        });
+// Browser Manager Singleton to handle concurrent scraping
+class BrowserManager {
+  private static instance: BrowserManager;
+  private browser: Browser | null = null;
+  private context: BrowserContext | null = null;
+  private initPromise: Promise<void> | null = null;
+  private activeTasks = 0;
+  private maxRetries = 3;
+
+  private constructor() {}
+
+  static getInstance(): BrowserManager {
+    if (!BrowserManager.instance) {
+      BrowserManager.instance = new BrowserManager();
+    }
+    return BrowserManager.instance;
+  }
+
+  private async initBrowser(): Promise<void> {
+    if (this.browser && this.context) {
+      return;
+    }
+
+    try {
+      console.log('[BrowserManager] Initializing browser...');
+      this.browser = await chromium.launch({ 
+        headless: true, 
+        args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--disable-web-security'], 
+        timeout: 60000 
       });
       
-      return results;
-    });
+      this.context = await this.browser.newContext({ 
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        viewport: { width: 1920, height: 1080 }
+      });
+      
+      console.log('[BrowserManager] Browser initialized successfully');
+    } catch (error) {
+      console.error('[BrowserManager] Failed to initialize browser:', error);
+      throw error;
+    }
+  }
+
+  async getBrowserContext(): Promise<BrowserContext> {
+    if (!this.initPromise) {
+      this.initPromise = this.initBrowser();
+    }
+    await this.initPromise;
     
-    console.log(`[Scraper] Found ${scrapedData.length} results`);
-    
-    // DEBUG: แสดงชื่อหวยที่ scrape มาจริงๆ
-    if (scrapedData.length > 0) {
-      console.log(`[Scraper] DEBUG: All scraped lottery names:`, scrapedData.map((item: LotteryResult) => item.lottery_name));
+    if (!this.context) {
+      throw new Error('Browser context not available');
     }
     
-    // กรองเฉพาะ lottery ที่ต้องการ (ถ้าระบุ__)
-    if (targetLotteryNames && targetLotteryNames.length > 0) {
-      console.log(`[Scraper] DEBUG: Target lottery names:`, targetLotteryNames);
+    this.activeTasks++;
+    return this.context;
+  }
+
+  async releaseContext(): Promise<void> {
+    this.activeTasks--;
+    
+    // Clean up browser if no active tasks and it's been idle
+    if (this.activeTasks <= 0) {
+      setTimeout(() => {
+        if (this.activeTasks <= 0) {
+          this.cleanup();
+        }
+      }, 30000); // Clean up after 30 seconds of inactivity
+    }
+  }
+
+  private async cleanup(): Promise<void> {
+    if (this.browser) {
+      try {
+        console.log('[BrowserManager] Cleaning up browser...');
+        await this.browser.close();
+        this.browser = null;
+        this.context = null;
+        this.initPromise = null;
+        console.log('[BrowserManager] Browser cleaned up');
+      } catch (error) {
+        console.error('[BrowserManager] Error during cleanup:', error);
+      }
+    }
+  }
+
+  async forceCleanup(): Promise<void> {
+    this.activeTasks = 0;
+    await this.cleanup();
+  }
+}
+
+// ฟังก์ชันสำหรับ scrape ข้อมูล
+export async function scrapeAndParseResults(targetUrl: string, targetLotteryNames?: string[]): Promise<LotteryResult[]> {
+  console.log(`[Scraper] Starting scrape for URL: ${targetUrl}`);
+  
+  const browserManager = BrowserManager.getInstance();
+  let context: BrowserContext | null = null;
+  let page: any = null;
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (retryCount < maxRetries) {
+    try {
+      context = await browserManager.getBrowserContext();
+      page = await context.newPage();
       
-      const filteredData = scrapedData.filter((item: LotteryResult) => 
-        targetLotteryNames.includes(item.lottery_name)
-      );
+      await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
       
-      console.log(`[Scraper] Filtered to ${filteredData.length} results for target lotteries`);
+      // รอให้ข้อมูลโหลดเสร็จ
+      await page.waitForTimeout(3000);
       
-      // DEBUG: แสดงชื่อหวยที่ไม่ตรงกับ target
-      if (filteredData.length === 0 && scrapedData.length > 0) {
-        console.log(`[Scraper] DEBUG: No matches found. Scraped names vs Target names:`);
-        scrapedData.forEach((item: LotteryResult) => {
-          const isMatch = targetLotteryNames.includes(item.lottery_name);
-          console.log(`[Scraper] DEBUG: "${item.lottery_name}" ${isMatch ? '✅ MATCH' : '❌ NO MATCH'}`);
+      // ดึงข้อมูลจากหน้าเว็บ
+      const scrapedData = await page.evaluate(() => {
+        const results: LotteryResult[] = [];
+        
+        // ตรวจสอบว่ามีตารางข้อมูลหรือไม่
+        const tables = document.querySelectorAll('table');
+        
+        tables.forEach(table => {
+          const rows = table.querySelectorAll('tr');
+          
+          rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            
+            if (cells.length >= 3) {
+              const draw_time = cells[0]?.textContent?.trim();
+              const lottery_name = cells[1]?.textContent?.trim();
+              const first_prize = cells[2]?.textContent?.trim();
+              
+              if (lottery_name && draw_time && first_prize && first_prize !== 'รอผล') {
+                const today = new Date().toISOString().split('T')[0];
+                
+                results.push({
+                  lottery_name,
+                  draw_date: today,
+                  draw_time,
+                  first_prize,
+                  second_prize: cells[3]?.textContent?.trim(),
+                  third_prize: cells[4]?.textContent?.trim(),
+                  fourth_prize: cells[5]?.textContent?.trim(),
+                  fifth_prize: cells[6]?.textContent?.trim(),
+                  sixth_prize: cells[7]?.textContent?.trim(),
+                  seventh_prize: cells[8]?.textContent?.trim(),
+                  eighth_prize: cells[9]?.textContent?.trim(),
+                  ninth_prize: cells[10]?.textContent?.trim(),
+                  tenth_prize: cells[11]?.textContent?.trim(),
+                });
+              }
+            }
+          });
         });
+        
+        return results;
+      });
+      
+      console.log(`[Scraper] Found ${scrapedData.length} results`);
+      
+      // DEBUG: แสดงชื่อหวยที่ scrape มาจริงๆ
+      if (scrapedData.length > 0) {
+        console.log(`[Scraper] DEBUG: All scraped lottery names:`, scrapedData.map((item: LotteryResult) => item.lottery_name));
       }
       
-      return filteredData;
+      // กรองเฉพาะ lottery ที่ต้องการ (ถ้าระบุ__)
+      if (targetLotteryNames && targetLotteryNames.length > 0) {
+        console.log(`[Scraper] DEBUG: Target lottery names:`, targetLotteryNames);
+        
+        const filteredData = scrapedData.filter((item: LotteryResult) => 
+          targetLotteryNames.includes(item.lottery_name)
+        );
+        
+        console.log(`[Scraper] Filtered to ${filteredData.length} results for target lotteries`);
+        
+        // DEBUG: แสดงชื่อหวยที่ไม่ตรงกับ target
+        if (filteredData.length === 0 && scrapedData.length > 0) {
+          console.log(`[Scraper] DEBUG: No matches found. Scraped names vs Target names:`);
+          scrapedData.forEach((item: LotteryResult) => {
+            const isMatch = targetLotteryNames.includes(item.lottery_name);
+            console.log(`[Scraper] DEBUG: "${item.lottery_name}" ${isMatch ? '✅ MATCH' : '❌ NO MATCH'}`);
+          });
+        }
+        
+        return filteredData;
+      }
+      
+      return scrapedData;
+      
+    } catch (error) {
+      console.error(`[Scraper] Error during scraping (attempt ${retryCount + 1}/${maxRetries}):`, error);
+      
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {
+          console.error('[Scraper] Error closing page:', e);
+        }
+      }
+      
+      retryCount++;
+      
+      if (retryCount >= maxRetries) {
+        console.error('[Scraper] Max retries reached, giving up');
+        throw error;
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      // Force cleanup and reinitialize browser on persistent errors
+      if (error instanceof Error && (error.message.includes('Target page') || error.message.includes('browser has been closed'))) {
+        console.log('[Scraper] Browser connection lost, forcing cleanup and reinit...');
+        await browserManager.forceCleanup();
+      }
+    } finally {
+      if (page) {
+        try {
+          await page.close();
+        } catch (e) {
+          console.error('[Scraper] Error closing page in finally:', e);
+        }
+      }
+      
+      if (context) {
+        await browserManager.releaseContext();
+      }
     }
-    
-    return scrapedData;
-    
-  } catch (error) {
-    console.error('[Scraper] Error during scraping:', error);
-    return [];
-  } finally {
-    await page.close();
   }
+  
+  return [];
 }
 
 // ฟังก์ชันสำหรับ import ข้อมูลจาก lottery_api_results ไปยัง lottery_results
@@ -282,7 +417,6 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
   const POLLING_INTERVAL_ERROR = 30 * 1000; // 30 วินาที
   const startTime = Date.now();
 
-  let browser: any = null;
   let scrapedData: LotteryResult[] = [];
   
   try {
@@ -311,9 +445,6 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
     
     console.log(`[Task] Target lottery names: ${targetLotteryNames.join(', ')}`);
 
-    // เปิด browser และ context ครั้งเดียว
-    browser = await chromium.launch({ headless: true, args: ['--disable-gpu', '--no-sandbox'], timeout: 360000 });
-    const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' });
     const targetUrl = 'https://xn--t3cjebmjd5a.com/';
 
     // เริ่ม Smart Polling Loop
@@ -322,7 +453,7 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
       console.log(`[Task] Polling attempt... (Elapsed: ${elapsedTime}s)`);
       
       try {
-        scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+        scrapedData = await scrapeAndParseResults(targetUrl, targetLotteryNames);
         
         // ตรวจสอบว่ามีข้อมูลจริงหรือไม่ (ไม่ใช่แค่ "รอผล")
         if (scrapedData.length > 0) {
@@ -340,8 +471,6 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
       }
     }
 
-    if (browser) await browser.close();
-
     if (scrapedData.length === 0) {
       console.warn(`[Task] 🚫 Polling timed out after ${POLLING_TIMEOUT / 1000}s. No results found.`);
       // ไม่ต้อง throw error แต่ return ค่าว่างไป เพื่อให้ task อื่นทำงานต่อได้
@@ -349,7 +478,6 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
     
   } catch (error) {
     console.error('[Task] A critical error occurred during the scrape setup:', error);
-    if (browser) await browser.close();
     throw error; // throw error ที่ร้ายแรงจริงๆ เช่น ดึง alias ไม่ได้
   }
   
