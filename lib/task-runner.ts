@@ -50,8 +50,8 @@ export async function scrapeAndParseResults(targetUrl: string, context: any, tar
           const cells = row.querySelectorAll('td');
           
           if (cells.length >= 3) {
-            const lottery_name = cells[0]?.textContent?.trim();
-            const draw_time = cells[1]?.textContent?.trim();
+            const draw_time = cells[0]?.textContent?.trim();
+            const lottery_name = cells[1]?.textContent?.trim();
             const first_prize = cells[2]?.textContent?.trim();
             
             if (lottery_name && draw_time && first_prize && first_prize !== 'รอผล') {
