@@ -52,7 +52,7 @@ class BrowserManager {
       this.browser = await chromium.launch({ 
         headless: true, 
         args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--disable-web-security'], 
-        timeout: 60000 
+        timeout: 120000 
       });
       
       this.context = await this.browser.newContext({ 
@@ -170,6 +170,7 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
                   eighth_prize: cells[9]?.textContent?.trim(),
                   ninth_prize: cells[10]?.textContent?.trim(),
                   tenth_prize: cells[11]?.textContent?.trim(),
+                  country: "Thailand" // เพิ่มค่า Default
                 });
               }
             }
