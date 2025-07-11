@@ -590,7 +590,7 @@ export default function LotterySubTypePage() {
   };
 
   const handleEditPayout = (payout: LotterySubNumber) => {
-    setPayoutForm(payout);
+    setPayoutForm({ ...payout });
     setEditPayoutId(payout.id);
   };
 
