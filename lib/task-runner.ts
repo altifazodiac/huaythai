@@ -82,13 +82,30 @@ export async function scrapeAndParseResults(targetUrl: string, context: any, tar
     
     console.log(`[Scraper] Found ${scrapedData.length} results`);
     
+    // DEBUG: แสดงชื่อหวยที่ scrape มาจริงๆ
+    if (scrapedData.length > 0) {
+      console.log(`[Scraper] DEBUG: All scraped lottery names:`, scrapedData.map((item: LotteryResult) => item.lottery_name));
+    }
+    
     // กรองเฉพาะ lottery ที่ต้องการ (ถ้าระบุ)
     if (targetLotteryNames && targetLotteryNames.length > 0) {
+      console.log(`[Scraper] DEBUG: Target lottery names:`, targetLotteryNames);
+      
       const filteredData = scrapedData.filter((item: LotteryResult) => 
         targetLotteryNames.includes(item.lottery_name)
       );
       
       console.log(`[Scraper] Filtered to ${filteredData.length} results for target lotteries`);
+      
+      // DEBUG: แสดงชื่อหวยที่ไม่ตรงกับ target
+      if (filteredData.length === 0 && scrapedData.length > 0) {
+        console.log(`[Scraper] DEBUG: No matches found. Scraped names vs Target names:`);
+        scrapedData.forEach((item: LotteryResult) => {
+          const isMatch = targetLotteryNames.includes(item.lottery_name);
+          console.log(`[Scraper] DEBUG: "${item.lottery_name}" ${isMatch ? '✅ MATCH' : '❌ NO MATCH'}`);
+        });
+      }
+      
       return filteredData;
     }
     
