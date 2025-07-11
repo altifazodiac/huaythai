@@ -40,10 +40,10 @@ interface UserProfile {
 }
 
 interface CreateUserForm {
-  email: string;
-  password: string;
-  name: string;
   phone: string;
+  password: string;
+  email: string;
+  name: string;
   line_id: string;
   branch: string;
   credit_balance: number;
@@ -53,6 +53,7 @@ interface CreateUserForm {
 interface EditUserForm {
   name: string;
   phone: string;
+  email: string;
   line_id: string;
   branch: string;
   credit_balance: number;
@@ -71,10 +72,10 @@ export default function UsersManagePage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [createForm, setCreateForm] = useState<CreateUserForm>({
-    email: "",
-    password: "",
-    name: "",
     phone: "",
+    password: "",
+    email: "",
+    name: "",
     line_id: "",
     branch: "",
     credit_balance: 0,
@@ -84,6 +85,7 @@ export default function UsersManagePage() {
   const [editForm, setEditForm] = useState<EditUserForm>({
     name: "",
     phone: "",
+    email: "",
     line_id: "",
     branch: "",
     credit_balance: 0,
@@ -92,6 +94,27 @@ export default function UsersManagePage() {
 
   const { supabase } = useAuth();
   useRequireAuth();
+
+  // Validation function for Thai phone numbers
+  const validatePhoneNumber = (phone: string) => {
+    const phoneRegex = /^(\+66|66|0)[0-9]{8,9}$/;
+    return phoneRegex.test(phone.replace(/[-\s]/g, ''));
+  };
+
+  // Format phone number to international format
+  const formatPhoneNumber = (phoneInput: string) => {
+    let cleanPhone = phoneInput.replace(/[-\s]/g, '');
+    
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '+66' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('66') && !cleanPhone.startsWith('+66')) {
+      cleanPhone = '+' + cleanPhone;
+    } else if (!cleanPhone.startsWith('+66')) {
+      cleanPhone = '+66' + cleanPhone;
+    }
+    
+    return cleanPhone;
+  };
 
   const fetchUsers = async () => {
     try {
@@ -140,13 +163,26 @@ export default function UsersManagePage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate phone number
+    if (!validatePhoneNumber(createForm.phone)) {
+      toast.error("รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678 หรือ +66812345678)");
+      return;
+    }
+
     try {
+      const formattedPhone = formatPhoneNumber(createForm.phone);
+      
+      const requestData = {
+        ...createForm,
+        phone: formattedPhone
+      };
+
       const response = await fetch('/api/admin-users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify(requestData),
       });
 
       const result = await response.json();
@@ -158,10 +194,10 @@ export default function UsersManagePage() {
       toast.success("สร้างผู้ใช้สำเร็จ");
       setShowCreateDialog(false);
       setCreateForm({
-        email: "",
-        password: "",
-        name: "",
         phone: "",
+        password: "",
+        email: "",
+        name: "",
         line_id: "",
         branch: "",
         credit_balance: 0,
@@ -178,17 +214,26 @@ export default function UsersManagePage() {
     
     if (!selectedUser) return;
 
+    // Validate phone number if it's changed
+    if (editForm.phone && !validatePhoneNumber(editForm.phone)) {
+      toast.error("รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678 หรือ +66812345678)");
+      return;
+    }
+
     try {
       // Check if credit balance changed
       const creditChanged = selectedUser.credit_balance !== editForm.credit_balance;
       const creditDifference = editForm.credit_balance - selectedUser.credit_balance;
+
+      const formattedPhone = editForm.phone ? formatPhoneNumber(editForm.phone) : editForm.phone;
 
       // Update profile
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
           name: editForm.name,
-          phone: editForm.phone,
+          phone: formattedPhone,
+          email: editForm.email,
           line_id: editForm.line_id,
           branch: editForm.branch,
           credit_balance: editForm.credit_balance
@@ -293,6 +338,7 @@ export default function UsersManagePage() {
     setEditForm({
       name: user.name || "",
       phone: user.phone || "",
+      email: user.email || "",
       line_id: user.line_id || "",
       branch: user.branch || "",
       credit_balance: user.credit_balance,
@@ -307,9 +353,9 @@ export default function UsersManagePage() {
   };
 
   const filteredUsers = users.filter(user =>
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.phone?.includes(searchTerm) ||
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.branch?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -348,12 +394,13 @@ export default function UsersManagePage() {
               <form onSubmit={handleCreateUser} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">อีเมล *</Label>
+                    <Label htmlFor="phone">เบอร์โทรศัพท์ *</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      value={createForm.email}
-                      onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                      id="phone"
+                      type="tel"
+                      value={createForm.phone}
+                      onChange={(e) => setCreateForm({...createForm, phone: e.target.value})}
+                      placeholder="เช่น 0812345678"
                       required
                     />
                   </div>
@@ -388,11 +435,13 @@ export default function UsersManagePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">เบอร์โทรศัพท์</Label>
+                    <Label htmlFor="email">อีเมล</Label>
                     <Input
-                      id="phone"
-                      value={createForm.phone}
-                      onChange={(e) => setCreateForm({...createForm, phone: e.target.value})}
+                      id="email"
+                      type="email"
+                      value={createForm.email}
+                      onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                      placeholder="optional"
                     />
                   </div>
                   <div className="space-y-2">
@@ -455,7 +504,7 @@ export default function UsersManagePage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
-              placeholder="ค้นหาด้วยอีเมล, ชื่อ, เบอร์โทร หรือสาขา..."
+              placeholder="ค้นหาด้วยเบอร์โทร, ชื่อ, อีเมล หรือสาขา..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -498,13 +547,13 @@ export default function UsersManagePage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-gray-600">
                               <div className="flex items-center gap-1">
-                                <Mail className="h-4 w-4" />
-                                <span>{user.email}</span>
+                                <Phone className="h-4 w-4 text-blue-600" />
+                                <span className="font-medium">{user.phone || "ไม่ระบุเบอร์"}</span>
                               </div>
-                              {user.phone && (
+                              {user.email && (
                                 <div className="flex items-center gap-1">
-                                  <Phone className="h-4 w-4" />
-                                  <span>{user.phone}</span>
+                                  <Mail className="h-4 w-4" />
+                                  <span>{user.email}</span>
                                 </div>
                               )}
                               {user.line_id && (
@@ -574,11 +623,21 @@ export default function UsersManagePage() {
           <DialogHeader>
             <DialogTitle>แก้ไขข้อมูลผู้ใช้</DialogTitle>
             <DialogDescription>
-              แก้ไขข้อมูลของ {selectedUser?.email}
+              แก้ไขข้อมูลของ {selectedUser?.phone || selectedUser?.email}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEditUser} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">เบอร์โทรศัพท์</Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  placeholder="เช่น 0812345678"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-name">ชื่อ-นามสกุล</Label>
                 <Input
@@ -588,11 +647,12 @@ export default function UsersManagePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-phone">เบอร์โทรศัพท์</Label>
+                <Label htmlFor="edit-email">อีเมล</Label>
                 <Input
-                  id="edit-phone"
-                  value={editForm.phone}
-                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
                 />
               </div>
               <div className="space-y-2">
@@ -653,7 +713,7 @@ export default function UsersManagePage() {
           <DialogHeader>
             <DialogTitle>ยืนยันการลบผู้ใช้</DialogTitle>
             <DialogDescription>
-              คุณต้องการลบผู้ใช้ <strong>{selectedUser?.email}</strong> ใช่หรือไม่?
+              คุณต้องการลบผู้ใช้ <strong>{selectedUser?.phone || selectedUser?.email}</strong> ใช่หรือไม่?
               <br />
               <span className="text-red-600 font-medium">
                 การดำเนินการนี้ไม่สามารถย้อนกลับได้

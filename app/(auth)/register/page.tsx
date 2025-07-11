@@ -7,16 +7,17 @@ import { toast } from 'react-toastify';
 
 const SignUpPage = () => {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const validateInputs = () => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('กรุณากรอกอีเมลที่ถูกต้อง');
+    // ตรวจสอบรูปแบบเบอร์โทรศัพท์ไทย
+    const phoneRegex = /^(\+66|66|0)[0-9]{8,9}$/;
+    if (!phoneRegex.test(phone.replace(/[-\s]/g, ''))) {
+      setError('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678 หรือ +66812345678)');
       return false;
     }
 
@@ -33,14 +34,33 @@ const SignUpPage = () => {
     return true;
   };
 
+  const formatPhoneNumber = (phoneInput: string) => {
+    // ลบ space และ dash ออก
+    let cleanPhone = phoneInput.replace(/[-\s]/g, '');
+    
+    // แปลง format ต่างๆ ให้เป็น international format
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '+66' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('66') && !cleanPhone.startsWith('+66')) {
+      cleanPhone = '+' + cleanPhone;
+    } else if (!cleanPhone.startsWith('+66')) {
+      cleanPhone = '+66' + cleanPhone;
+    }
+    
+    return cleanPhone;
+  };
+
   const handleSignUp = async () => {
     setError(null);
     if (!validateInputs()) return;
 
     setLoading(true);
     try {
+      const formattedPhone = formatPhoneNumber(phone);
+      console.log('📱 เบอร์โทรที่จัดรูปแบบแล้ว:', formattedPhone);
+
       const { data, error } = await supabase.auth.signUp({
-        email,
+        phone: formattedPhone,
         password,
         options: {
           data: { name },
@@ -54,11 +74,11 @@ const SignUpPage = () => {
           position: 'top-right',
           autoClose: 3000,
         });
-        router.push('/huaythai');
+        router.push('/homepage');
       }
     } catch (err: any) {
       if (err.message.includes('already registered')) {
-        setError('อีเมลนี้มีผู้ใช้งานแล้ว กรุณาใช้ที่อยู่อีเมลอื่น');
+        setError('เบอร์โทรศัพท์นี้มีผู้ใช้งานแล้ว กรุณาใช้เบอร์โทรศัพท์อื่น');
       } else {
         setError(err.message || 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
       }
@@ -80,10 +100,10 @@ const SignUpPage = () => {
           className="w-full p-2 mb-3 border rounded"
         />
         <input
-          type="email"
-          placeholder="อีเมล"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="tel"
+          placeholder="เบอร์โทรศัพท์ (เช่น 0812345678)"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
           className="w-full p-2 mb-3 border rounded"
         />
         <input

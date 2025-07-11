@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, easeOut } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { User, Lock, Eye, EyeOff, Loader2, Sparkles, Zap, Ticket } from 'lucide-react';
+import { Phone, Lock, Eye, EyeOff, Loader2, Sparkles, Zap, Ticket } from 'lucide-react';
 import Particles from "react-tsparticles";
 import { loadFull } from "tsparticles";
 import type { Engine, ISourceOptions } from "tsparticles-engine";
@@ -14,7 +14,7 @@ import Image from "next/image"
 
 const LoginPage = () => {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,10 +43,18 @@ const LoginPage = () => {
   };
 
   const validateInputs = () => {
-    if (!email) { 
-      setError('กรุณากรอกชื่อผู้ใช้หรืออีเมล'); 
+    if (!phone) { 
+      setError('กรุณากรอกเบอร์โทรศัพท์'); 
       return false; 
     }
+    
+    // ตรวจสอบรูปแบบเบอร์โทรศัพท์ไทย
+    const phoneRegex = /^(\+66|66|0)[0-9]{8,9}$/;
+    if (!phoneRegex.test(phone.replace(/[-\s]/g, ''))) {
+      setError('รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678 หรือ +66812345678)');
+      return false;
+    }
+    
     if (password.length < 6) { 
       setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'); 
       return false; 
@@ -55,9 +63,25 @@ const LoginPage = () => {
     return true;
   };
 
+  const formatPhoneNumber = (phoneInput: string) => {
+    // ลบ space และ dash ออก
+    let cleanPhone = phoneInput.replace(/[-\s]/g, '');
+    
+    // แปลง format ต่างๆ ให้เป็น international format
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '+66' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('66') && !cleanPhone.startsWith('+66')) {
+      cleanPhone = '+' + cleanPhone;
+    } else if (!cleanPhone.startsWith('+66')) {
+      cleanPhone = '+66' + cleanPhone;
+    }
+    
+    return cleanPhone;
+  };
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    console.log('🚀 เริ่มล็อกอิน:', email);
+    console.log('🚀 เริ่มล็อกอินด้วยเบอร์โทร:', phone);
     
     if (!validateInputs()) return;
     
@@ -65,14 +89,20 @@ const LoginPage = () => {
     setError(null);
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      const formattedPhone = formatPhoneNumber(phone);
+      console.log('📱 เบอร์โทรที่จัดรูปแบบแล้ว:', formattedPhone);
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({ 
+        phone: formattedPhone, 
+        password 
+      });
 
       if (signInError) {
         console.error('🚨 Login error:', signInError.message);
         throw signInError;
       }
 
-      console.log('✅ Login successful:', data.user?.email);
+      console.log('✅ Login successful:', data.user?.phone);
 
       if (data.user && data.session) {
         // บันทึก login history
@@ -80,7 +110,7 @@ const LoginPage = () => {
           const ip = await fetch("https://api.ipify.org?format=json").then(res => res.json()).then(d => d.ip).catch(() => null);
           const { error: historyError } = await supabase.from("login_history").insert([{
             user_id: data.user.id,
-            email: data.user.email,
+            email: data.user.phone, // ใช้ phone แทน email ในการบันทึก
             ip_address: ip,
             user_agent: typeof window !== "undefined" ? window.navigator.userAgent : null,
           }]);
@@ -150,9 +180,9 @@ const LoginPage = () => {
       console.error('🚨 Login error:', err.message);
       
       if (err.message.includes('Invalid login credentials')) {
-        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      } else if (err.message.includes('Email not confirmed')) {
-        setError('กรุณายืนยันอีเมลของคุณก่อนเข้าสู่ระบบ');
+        setError('เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง');
+      } else if (err.message.includes('Phone not confirmed')) {
+        setError('กรุณายืนยันเบอร์โทรศัพท์ของคุณก่อนเข้าสู่ระบบ');
       } else {
         setError(err.message || 'เกิดข้อผิดพลาดที่ไม่รู้จัก');
       }
@@ -237,15 +267,15 @@ const LoginPage = () => {
               <motion.div variants={itemVariants}>
                 <div className="relative mt-1">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                    <User className="h-6 w-6 text-red-400 animate-glow-text2" />
+                    <Phone className="h-6 w-6 text-red-400 animate-glow-text2" />
                   </span>
                   <Input
-                    id="username"
-                    type="text"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="w-full p-3 pl-12 pr-3 border-2 border-red-400 placeholder-red-400 text-red-900 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-500 transition-all bg-white/80 shadow-lg"
-                    placeholder="อีเมล"
+                    placeholder="เบอร์โทรศัพท์ (เช่น 0812345678)"
                     required
                   />
                 </div>
