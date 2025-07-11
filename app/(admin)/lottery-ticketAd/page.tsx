@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client"; // Use the project's client
 import { format, differenceInDays } from "date-fns";
 import { th } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -33,12 +33,7 @@ interface SoftDeletedTicket {
 }
 
 export default function RemoveLogsPage() {
-  const [supabase] = useState(() =>
-    createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  );
+  const supabase = createClient(); // Correctly initialize the client
   const [logs, setLogs] = useState<RemoveLog[]>([]);
   const [softDeletedTickets, setSoftDeletedTickets] = useState<SoftDeletedTicket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -257,7 +252,7 @@ export default function RemoveLogsPage() {
               </tbody>
             </table>
           </div>
-          <BillDetailDrawer isOpen={billDrawerOpen} onOpenChange={setBillDrawerOpen} billNumber={selectedBillNumber || undefined} />
+          <BillDetailDrawer isOpen={billDrawerOpen} onOpenChange={setBillDrawerOpen} billNumber={selectedBillNumber || undefined} supabase={supabase} />
         </CardContent>
       </Card>
       <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>

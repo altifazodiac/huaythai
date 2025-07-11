@@ -203,54 +203,28 @@ export default function TaskManagerPage() {
 
   const runTask = async (task: ScheduledTask) => {
     try {
-      console.log(`🎯 Running task: ${task.name}`);
+      console.log(`🎯 Instructing task to run: ${task.name}`);
       setError(null);
+
+      // เริ่ม task ใน background ผ่าน server action
+      const result = await startTask(
+        task.id,
+        task.type,
+        task.drawing_time,
+        task.lottery_sub_type_id
+      );
       
-      // รีเฟรชข้อมูล
-      await fetchSchedulerData();
-      
-      // จำลองการรัน task (ในความเป็นจริงควรเรียก API ที่เหมาะสม)
-      let success = false;
-      let errorMessage = '';
-      
-      try {
-        if (task.type === 'scrape' || task.type === 'send') {
-          // เริ่ม task ใน background (ไม่รอ response)
-          const result = await startTask(
-            task.id,
-            task.type,
-            task.drawing_time,
-            task.lottery_sub_type_id
-          );
-          
-          if (!result.success) {
-            throw new Error(result.details || result.error || 'Failed to start task');
-          }
-          
-          console.log(`✅ Task ${task.type} started in background`);
-          console.log(`📋 Task will run independently and update status in database`);
-          
-          success = true;
-        } else {
-          // cleanup task
-          success = true;
-        }
-      } catch (taskError) {
-        console.error('❌ Task Execution Error:', taskError);
-        errorMessage = taskError instanceof Error ? taskError.message : 'Unknown error';
-        success = false;
-      }
-      
-      // รีเฟรชข้อมูล (background job จะอัปเดตสถานะเอง)
-      setTimeout(fetchSchedulerData, 2000);
-      
+      console.log(`✅ ${result.message}`);
+
+      // รีเฟรชข้อมูลหลังจาก 2 วินาทีเพื่อให้ background job มีเวลาอัปเดตสถานะ
+      setTimeout(() => {
+        fetchSchedulerData();
+      }, 2000);
+
     } catch (err) {
       console.error('💥 Start Task Error:', err);
       const errorMessage = err instanceof Error ? err.message : 'การเริ่ม Task ไม่สำเร็จ';
       setError(errorMessage);
-      
-      // รีเฟรชข้อมูล
-      setTimeout(fetchSchedulerData, 1000);
     }
   };
 

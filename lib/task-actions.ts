@@ -8,24 +8,20 @@ export async function startTask(
   drawingTime?: string,
   lotterySubTypeId?: number
 ) {
-  try {
-    console.log(`[Server Action] Starting ${taskType} task in background...`);
-    
-    // เริ่ม task ใน background (ไม่รอ response)
-    const result = await startTaskInBackground(taskId, taskType, drawingTime, lotterySubTypeId);
-    
-    return {
-      success: true,
-      message: `Task ${taskType} started successfully`,
-      taskId
-    };
-    
-  } catch (error) {
-    console.error('[Server Action] Error starting task:', error);
-    return {
-      success: false,
-      error: 'Failed to start task',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
+  // ใช้ setTimeout เพื่อให้ Server Action return ทันที
+  // และรัน task ที่ใช้เวลานานใน background
+  setTimeout(() => {
+    console.log(`[Server Action] Starting ${taskType} task in background via setTimeout...`);
+    startTaskInBackground(taskId, taskType, drawingTime, lotterySubTypeId)
+      .catch(error => {
+        console.error(`[Server Action] Error executing background task for ${taskId}:`, error);
+      });
+  }, 0);
+
+  // Return ทันที
+  return {
+    success: true,
+    message: `Task ${taskType} instructed to start in background.`,
+    taskId
+  };
 } 

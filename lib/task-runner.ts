@@ -258,90 +258,85 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
   const now = new Date();
   const drawDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
   
-  console.log(`[Task] Starting scrape task for drawing_time: ${drawingTime}, sub_type_id: ${lotterySubTypeId}`);
+  console.log(`[Task] Starting SMART POLLING scrape task for drawing_time: ${drawingTime}, sub_type_id: ${lotterySubTypeId}`);
   
+  const POLLING_TIMEOUT = 5 * 60 * 1000; // 5 นาที
+  const POLLING_INTERVAL_SUCCESS = 15 * 1000; // 15 วินาที
+  const POLLING_INTERVAL_ERROR = 30 * 1000; // 30 วินาที
+  const startTime = Date.now();
+
   let browser: any = null;
   let scrapedData: LotteryResult[] = [];
   
   try {
-    console.log('[Task] Starting scrape process...');
-    
-    // ดึงข้อมูล aliases สำหรับหา target lottery names
+    // ดึงข้อมูล aliases และ target lottery names มาก่อนนอกลูป
     const { data: aliases, error: aliasError } = await supabase
       .from('lottery_name_aliases')
       .select('alias_name, lottery_sub_type_id');
     
-    if (aliasError) {
-      throw new Error(`Error fetching aliases: ${aliasError.message}`);
-    }
+    if (aliasError) throw new Error(`Error fetching aliases: ${aliasError.message}`);
     
-    // กรองเฉพาะ lottery ที่ต้องการ
     let targetLotteryNames: string[] = [];
     if (lotterySubTypeId) {
-      targetLotteryNames = aliases
-        .filter(a => a.lottery_sub_type_id === lotterySubTypeId)
-        .map(a => a.alias_name);
+      targetLotteryNames = aliases.filter(a => a.lottery_sub_type_id === lotterySubTypeId).map(a => a.alias_name);
     } else if (drawingTime) {
-      // ถ้าไม่มี sub_type_id ให้ใช้ drawing_time หา
-      const { data: schedules } = await supabase
-        .from('drawing_schedules')
-        .select('lottery_sub_type_id')
-        .eq('drawing_time', drawingTime);
-      
+      const { data: schedules } = await supabase.from('drawing_schedules').select('lottery_sub_type_id').eq('drawing_time', drawingTime);
       if (schedules && schedules.length > 0) {
         const subTypeIds = schedules.map(s => s.lottery_sub_type_id);
-        targetLotteryNames = aliases
-          .filter(a => subTypeIds.includes(a.lottery_sub_type_id))
-          .map(a => a.alias_name);
+        targetLotteryNames = aliases.filter(a => subTypeIds.includes(a.lottery_sub_type_id)).map(a => a.alias_name);
       }
     }
     
     if (targetLotteryNames.length === 0) {
-      console.log('[Task] No target lottery names found');
+      console.log('[Task] No target lottery names found, skipping scrape.');
       return { scrapedCount: 0, importedCount: 0 };
     }
     
     console.log(`[Task] Target lottery names: ${targetLotteryNames.join(', ')}`);
-    
-    // เปิด browser และ scrape
-    browser = await chromium.launch({ 
-      headless: true, 
-      args: ['--disable-gpu', '--no-sandbox'],
-      timeout: 360000 
-    });
-    
-    const context = await browser.newContext({ 
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' 
-    });
-    
+
+    // เปิด browser และ context ครั้งเดียว
+    browser = await chromium.launch({ headless: true, args: ['--disable-gpu', '--no-sandbox'], timeout: 360000 });
+    const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' });
     const targetUrl = 'https://xn--t3cjebmjd5a.com/';
-    
-    // ลองสครีป 3 ครั้ง
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      console.log(`[Task] Scrape attempt ${attempt}/3`);
+
+    // เริ่ม Smart Polling Loop
+    while (Date.now() - startTime < POLLING_TIMEOUT) {
+      const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[Task] Polling attempt... (Elapsed: ${elapsedTime}s)`);
       
-      scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
-      
-      if (scrapedData.length > 0) {
-        console.log(`[Task] Found ${scrapedData.length} results on attempt ${attempt}`);
-        break;
-      }
-      
-      if (attempt < 3) {
-        console.log(`[Task] No results found, waiting 30s before retry...`);
-        await new Promise(resolve => setTimeout(resolve, 30000));
+      try {
+        scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+        
+        // ตรวจสอบว่ามีข้อมูลจริงหรือไม่ (ไม่ใช่แค่ "รอผล")
+        if (scrapedData.length > 0) {
+          console.log(`[Task] ✅ Success! Found ${scrapedData.length} valid results.`);
+          break; // เจอข้อมูลแล้ว ออกจากลูป
+        }
+        
+        console.log(`[Task] ⏱️ No valid results yet (or still 'รอผล'). Waiting ${POLLING_INTERVAL_SUCCESS / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_SUCCESS));
+        
+      } catch (scrapeError) {
+        console.error(`[Task] ⚠️ Scrape attempt failed:`, scrapeError);
+        console.log(`[Task] Retrying after ${POLLING_INTERVAL_ERROR / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_ERROR));
       }
     }
-    
-    await browser.close();
+
+    if (browser) await browser.close();
+
+    if (scrapedData.length === 0) {
+      console.warn(`[Task] 🚫 Polling timed out after ${POLLING_TIMEOUT / 1000}s. No results found.`);
+      // ไม่ต้อง throw error แต่ return ค่าว่างไป เพื่อให้ task อื่นทำงานต่อได้
+    }
     
   } catch (error) {
-    console.error('[Task] Error during scraping:', error);
+    console.error('[Task] A critical error occurred during the scrape setup:', error);
     if (browser) await browser.close();
-    throw error;
+    throw error; // throw error ที่ร้ายแรงจริงๆ เช่น ดึง alias ไม่ได้
   }
   
-  // บันทึกข้อมูลลง lottery_api_results
+  // ส่วนของการบันทึกข้อมูลจะทำงานเฉพาะเมื่อมีข้อมูลที่ scrape มาได้
   if (scrapedData.length > 0) {
     console.log(`[Task] Saving ${scrapedData.length} results to lottery_api_results`);
     
@@ -355,11 +350,9 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
       throw new Error(`Error saving scraped data: ${upsertError.message}`);
     }
     
-    // สร้าง notification toast
     await createLotteryImportToast(scrapedData);
   }
   
-  // Import ข้อมูลไปยัง lottery_results
   const importedCount = await importLotteryResults(
     drawDate,
     drawingTime,
