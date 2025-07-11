@@ -11,7 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Input } from '@/components/ui/input';
 import { Play, Square, RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Search, ListFilter, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { executeTask } from '@/lib/task-actions';
+import { startTask } from '@/lib/task-actions';
 
 // --- Interfaces ---
 interface ScheduledTask {
@@ -206,9 +206,6 @@ export default function TaskManagerPage() {
       console.log(`🎯 Running task: ${task.name}`);
       setError(null);
       
-      // อัปเดตสถานะเป็น running
-      await updateTaskStatus(task.id, 'running');
-      
       // รีเฟรชข้อมูล
       await fetchSchedulerData();
       
@@ -218,18 +215,20 @@ export default function TaskManagerPage() {
       
       try {
         if (task.type === 'scrape' || task.type === 'send') {
-          // เรียก Server Action โดยตรง (ไม่ต้องใช้ API)
-          const result = await executeTask(task.type, task.drawing_time, task.lottery_sub_type_id);
+          // เริ่ม task ใน background (ไม่รอ response)
+          const result = await startTask(
+            task.id,
+            task.type,
+            task.drawing_time,
+            task.lottery_sub_type_id
+          );
           
           if (!result.success) {
-            throw new Error(result.details || result.error || 'Task execution failed');
+            throw new Error(result.details || result.error || 'Failed to start task');
           }
           
-          if (task.type === 'scrape') {
-            console.log(`✅ Scrape completed: ${(result as any).scrapedCount || 0} scraped, ${(result as any).importedCount || 0} imported`);
-          } else {
-            console.log(`✅ Send completed: ${(result as any).sentCount || 0} sent`);
-          }
+          console.log(`✅ Task ${task.type} started in background`);
+          console.log(`📋 Task will run independently and update status in database`);
           
           success = true;
         } else {
@@ -242,31 +241,23 @@ export default function TaskManagerPage() {
         success = false;
       }
       
-      // อัปเดตสถานะสุดท้าย
-      await updateTaskStatus(task.id, success ? 'completed' : 'failed', errorMessage);
+      // รีเฟรชข้อมูล (background job จะอัปเดตสถานะเอง)
+      setTimeout(fetchSchedulerData, 2000);
+      
+    } catch (err) {
+      console.error('💥 Start Task Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'การเริ่ม Task ไม่สำเร็จ';
+      setError(errorMessage);
       
       // รีเฟรชข้อมูล
       setTimeout(fetchSchedulerData, 1000);
-      
-    } catch (err) {
-      console.error('💥 Run Task Error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'การรัน Task ไม่สำเร็จ';
-      setError(errorMessage);
-      
-      // อัปเดตสถานะเป็น failed
-      try {
-        await updateTaskStatus(task.id, 'failed', errorMessage);
-        setTimeout(fetchSchedulerData, 1000);
-      } catch (updateError) {
-        console.error('💥 Update Failed Status Error:', updateError);
-      }
     }
   };
 
   // --- Effects ---
   useEffect(() => {
     fetchSchedulerData();
-    const interval = setInterval(fetchSchedulerData, 30000); // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchSchedulerData, 10000); // Auto-refresh every 10 seconds (background jobs need frequent updates)
     return () => clearInterval(interval);
   }, []);
 

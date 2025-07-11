@@ -1,37 +1,30 @@
 'use server';
 
-import { runScrapeTask, runSendTask } from './task-runner';
+import { startTaskInBackground } from './background-task-runner';
 
-export async function executeTask(taskType: string, drawingTime?: string, lotterySubTypeId?: number) {
+export async function startTask(
+  taskId: string,
+  taskType: string,
+  drawingTime?: string,
+  lotterySubTypeId?: number
+) {
   try {
-    console.log(`[Server Action] Running ${taskType} task...`);
+    console.log(`[Server Action] Starting ${taskType} task in background...`);
     
-    if (taskType === 'scrape') {
-      const result = await runScrapeTask(drawingTime, lotterySubTypeId);
-      return {
-        success: true,
-        message: 'Scrape task completed',
-        ...result
-      };
-    } else if (taskType === 'send') {
-      const result = await runSendTask(drawingTime, lotterySubTypeId);
-      return {
-        success: true,
-        message: 'Send task completed',
-        ...result
-      };
-    } else {
-      return {
-        success: true,
-        message: 'Cleanup task completed'
-      };
-    }
-
+    // เริ่ม task ใน background (ไม่รอ response)
+    const result = await startTaskInBackground(taskId, taskType, drawingTime, lotterySubTypeId);
+    
+    return {
+      success: true,
+      message: `Task ${taskType} started successfully`,
+      taskId
+    };
+    
   } catch (error) {
-    console.error('[Server Action] Task execution error:', error);
+    console.error('[Server Action] Error starting task:', error);
     return {
       success: false,
-      error: 'Task execution failed',
+      error: 'Failed to start task',
       details: error instanceof Error ? error.message : 'Unknown error'
     };
   }
