@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
-import { Play, Square, RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Search, ListFilter } from 'lucide-react';
+import { Play, Square, RefreshCw, AlertCircle, CheckCircle, Clock, XCircle, Search, ListFilter, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 // --- Interfaces ---
 interface ScheduledTask {
@@ -38,14 +39,12 @@ interface TaskLog {
   created_at: string;
 }
 
-interface SchedulerStatus {
-  status: 'running' | 'stopped';
+interface SchedulerData {
   tasks: ScheduledTask[];
   recentLogs: TaskLog[];
 }
 
 type StatusFilter = 'all' | 'pending' | 'running' | 'completed' | 'failed';
-
 
 // --- Helper Functions ---
 const formatDateTime = (dateString?: string) => {
@@ -87,75 +86,231 @@ const getTaskTypeBadge = (type: string) => {
   return <Badge className={`${config.color} text-white`}>{config.text}</Badge>;
 };
 
-
 // --- Main Page Component ---
 export default function TaskManagerPage() {
-  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
+  const [supabase] = useState(() => createClient());
+  const [schedulerData, setSchedulerData] = useState<SchedulerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // --- API Call Functions ---
-  const fetchSchedulerStatus = async () => {
+  // --- Supabase Functions ---
+  const fetchSchedulerData = async () => {
     try {
+      console.log('🔍 Task Manager: Fetching scheduler data from Supabase...');
       setRefreshing(true);
-      const response = await fetch('/api/scheduler?action=status');
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      setSchedulerStatus(data);
       setError(null);
+      
+      // ดึงข้อมูล scheduled_tasks
+      console.log('📋 Fetching scheduled tasks...');
+      const { data: tasks, error: tasksError } = await supabase
+        .from('scheduled_tasks')
+        .select('*')
+        .order('next_run');
+
+      if (tasksError) {
+        console.error('❌ Tasks Error:', tasksError);
+        throw new Error(`ไม่สามารถดึงข้อมูล Tasks ได้: ${tasksError.message}`);
+      }
+      console.log('✅ Tasks fetched:', tasks?.length || 0, 'items');
+
+      // ดึงข้อมูล task_logs
+      console.log('📋 Fetching task logs...');
+      const { data: logs, error: logsError } = await supabase
+        .from('task_logs')
+        .select('*')
+        .order('execution_time', { ascending: false })
+        .limit(20);
+
+      if (logsError) {
+        console.error('❌ Logs Error:', logsError);
+        throw new Error(`ไม่สามารถดึงข้อมูล Logs ได้: ${logsError.message}`);
+      }
+      console.log('✅ Logs fetched:', logs?.length || 0, 'items');
+
+      setSchedulerData({
+        tasks: tasks || [],
+        recentLogs: logs || []
+      });
+      setError(null);
+      console.log('✅ Scheduler data fetch completed successfully');
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      console.error('💥 Fetch Scheduler Data Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'ไม่สามารถดึงข้อมูล Scheduler ได้';
+      setError(errorMessage);
+      setSchedulerData(null);
     } finally {
       setRefreshing(false);
       setLoading(false);
     }
   };
 
-  const schedulerAction = async (action: string, method: 'GET' | 'POST' = 'GET', body?: any) => {
+  const updateTaskStatus = async (taskId: string, status: 'running' | 'completed' | 'failed', errorMessage?: string) => {
     try {
-      setLoading(true);
-      const url = action.startsWith('run_task') ? '/api/scheduler' : `/api/scheduler?action=${action}`;
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      setTimeout(fetchSchedulerStatus, 1000); // Refresh after action
+      console.log(`🔄 Updating task ${taskId} status to ${status}`);
+      
+      const updateData: any = {
+        status,
+        updated_at: new Date().toISOString()
+      };
+
+      if (status === 'running') {
+        updateData.last_run = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('scheduled_tasks')
+        .update(updateData)
+        .eq('id', taskId);
+
+      if (error) {
+        console.error('❌ Update Task Error:', error);
+        throw error;
+      }
+
+      // บันทึก log
+      if (status === 'completed' || status === 'failed') {
+        const task = schedulerData?.tasks.find(t => t.id === taskId);
+        if (task) {
+          const { error: logError } = await supabase
+            .from('task_logs')
+            .insert({
+              task_id: taskId,
+              task_name: task.name,
+              task_type: task.type,
+              status: status === 'completed' ? 'completed' : 'failed',
+              error_message: errorMessage || null,
+              execution_time: new Date().toISOString()
+            });
+
+          if (logError) {
+            console.error('❌ Log Insert Error:', logError);
+          }
+        }
+      }
+
+      console.log('✅ Task status updated successfully');
+      
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
+      console.error('💥 Update Task Status Error:', err);
+      throw err;
+    }
+  };
+
+  const runTask = async (task: ScheduledTask) => {
+    try {
+      console.log(`🎯 Running task: ${task.name}`);
+      setError(null);
+      
+      // อัปเดตสถานะเป็น running
+      await updateTaskStatus(task.id, 'running');
+      
+      // รีเฟรชข้อมูล
+      await fetchSchedulerData();
+      
+      // จำลองการรัน task (ในความเป็นจริงควรเรียก API ที่เหมาะสม)
+      let success = false;
+      let errorMessage = '';
+      
+      try {
+        if (task.type === 'scrape') {
+          // เรียก import API
+          const response = await fetch(`/api/import-lottery-results`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.NEXT_PUBLIC_INTERNAL_API_KEY || ''
+            },
+            body: JSON.stringify({
+              drawing_time: task.drawing_time,
+              lottery_sub_type_id: task.lottery_sub_type_id,
+              action: 'scrape_and_import'
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+          }
+          
+          success = true;
+        } else if (task.type === 'send') {
+          // เรียก send API
+          const response = await fetch(`/api/send-lottery-results`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.NEXT_PUBLIC_INTERNAL_API_KEY || ''
+            },
+            body: JSON.stringify({
+              drawing_time: task.drawing_time,
+              lottery_sub_type_id: task.lottery_sub_type_id,
+              draw_date: new Date().toISOString().split('T')[0]
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+          }
+          
+          success = true;
+        } else {
+          // cleanup task
+          success = true;
+        }
+      } catch (taskError) {
+        console.error('❌ Task Execution Error:', taskError);
+        errorMessage = taskError instanceof Error ? taskError.message : 'Unknown error';
+        success = false;
+      }
+      
+      // อัปเดตสถานะสุดท้าย
+      await updateTaskStatus(task.id, success ? 'completed' : 'failed', errorMessage);
+      
+      // รีเฟรชข้อมูล
+      setTimeout(fetchSchedulerData, 1000);
+      
+    } catch (err) {
+      console.error('💥 Run Task Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'การรัน Task ไม่สำเร็จ';
+      setError(errorMessage);
+      
+      // อัปเดตสถานะเป็น failed
+      try {
+        await updateTaskStatus(task.id, 'failed', errorMessage);
+        setTimeout(fetchSchedulerData, 1000);
+      } catch (updateError) {
+        console.error('💥 Update Failed Status Error:', updateError);
+      }
     }
   };
 
   // --- Effects ---
   useEffect(() => {
-    fetchSchedulerStatus();
-    const interval = setInterval(fetchSchedulerStatus, 30000); // Auto-refresh
+    fetchSchedulerData();
+    const interval = setInterval(fetchSchedulerData, 30000); // Auto-refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
   // --- Data Processing & Memoization ---
   const summaryCounts = useMemo(() => {
     const counts = { all: 0, pending: 0, running: 0, completed: 0, failed: 0 };
-    if (!schedulerStatus?.tasks) return counts;
-    schedulerStatus.tasks.forEach(task => {
+    if (!schedulerData?.tasks) return counts;
+    schedulerData.tasks.forEach(task => {
       counts.all++;
       if (counts[task.status as StatusFilter] !== undefined) {
         counts[task.status as StatusFilter]++;
       }
     });
     return counts;
-  }, [schedulerStatus?.tasks]);
+  }, [schedulerData?.tasks]);
 
   const groupedAndFilteredTasks = useMemo(() => {
-    if (!schedulerStatus?.tasks) return {};
+    if (!schedulerData?.tasks) return {};
     
-    const filtered = schedulerStatus.tasks.filter(task => {
+    const filtered = schedulerData.tasks.filter(task => {
       const statusMatch = statusFilter === 'all' || task.status === statusFilter;
       const searchMatch = searchTerm === '' || task.name.toLowerCase().includes(searchTerm.toLowerCase());
       return statusMatch && searchMatch;
@@ -174,10 +329,9 @@ export default function TaskManagerPage() {
       acc[key].statusCounts[task.status]++;
       return acc;
     }, {} as Record<string, { tasks: ScheduledTask[]; lotteryNames: Set<string>; statusCounts: Record<string, number> }>);
-  }, [schedulerStatus?.tasks, statusFilter, searchTerm]);
+  }, [schedulerData?.tasks, statusFilter, searchTerm]);
 
-
-  if (loading && !schedulerStatus) {
+  if (loading && !schedulerData) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-slate-900">
         <RefreshCw className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
@@ -192,10 +346,19 @@ export default function TaskManagerPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-50">Scheduler Dashboard</h1>
-            <p className="text-gray-500 dark:text-gray-400">จัดการและตรวจสอบระบบ Scheduler อัตโนมัติ</p>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-50">Task Manager</h1>
+            <p className="text-gray-500 dark:text-gray-400">จัดการและตรวจสอบ Scheduled Tasks จาก Supabase</p>
+            {/* Debug Info */}
+            <div className="mt-2 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+              <span>Tasks: {schedulerData?.tasks?.length || 0}</span>
+              <span>•</span>
+              <span>Logs: {schedulerData?.recentLogs?.length || 0}</span>
+              <span>•</span>
+              <span>Source: Supabase Direct</span>
+              {refreshing && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
+            </div>
           </div>
-          <Button onClick={fetchSchedulerStatus} disabled={refreshing} variant="outline" className="mt-4 md:mt-0">
+          <Button onClick={fetchSchedulerData} disabled={refreshing} variant="outline" className="mt-4 md:mt-0">
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             รีเฟรช
           </Button>
@@ -204,39 +367,40 @@ export default function TaskManagerPage() {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>เกิดข้อผิดพลาด: {error}</AlertDescription>
+            <AlertDescription>
+              <div className="flex flex-col gap-2">
+                <span className="font-semibold">เกิดข้อผิดพลาด:</span>
+                <span className="text-sm bg-red-50 dark:bg-red-900/30 p-2 rounded border font-mono">
+                  {error}
+                </span>
+                <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  💡 เปิด Browser Console (F12) เพื่อดูรายละเอียดเพิ่มเติม
+                </div>
+              </div>
+            </AlertDescription>
           </Alert>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* --- Left Column --- */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Control Card */}
+            {/* Info Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full mr-2 animate-pulse ${schedulerStatus?.status === 'running' ? 'bg-green-500' : 'bg-red-500'}`} />
-                  สถานะ: {schedulerStatus?.status === 'running' ? 'กำลังทำงาน' : 'หยุดทำงาน'}
+                  <div className="w-3 h-3 rounded-full mr-2 bg-blue-500" />
+                  Supabase Direct Connection
                 </CardTitle>
+                <CardDescription>
+                  ข้อมูลจาก scheduled_tasks และ task_logs โดยตรง
+                </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col space-y-2">
-                {schedulerStatus?.status === 'running' ? (
-                  <>
-                    <Button onClick={() => schedulerAction('stop')} disabled={loading} variant="destructive">
-                      <Square className="w-4 h-4 mr-2" /> หยุด Scheduler
-                    </Button>
-                    <Button onClick={() => schedulerAction('process')} disabled={refreshing} variant="outline">
-                      <Play className="w-4 h-4 mr-2" /> รัน Tasks ที่ค้างทันที
-                    </Button>
-                    <Button onClick={() => schedulerAction('update_schedules', 'POST')} disabled={refreshing} variant="outline">
-                      <RefreshCw className="w-4 h-4 mr-2" /> อัปเดต Schedules จาก DB
-                    </Button>
-                  </>
-                ) : (
-                  <Button onClick={() => schedulerAction('init')} disabled={loading}>
-                    <Play className="w-4 h-4 mr-2" /> เริ่ม Scheduler
-                  </Button>
-                )}
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div>• ไม่ใช้ /api/scheduler</div>
+                  <div>• เชื่อมต่อ Supabase โดยตรง</div>
+                  <div>• อัปเดตแบบ Real-time</div>
+                </div>
               </CardContent>
             </Card>
             
@@ -260,7 +424,7 @@ export default function TaskManagerPage() {
             <Tabs defaultValue="tasks">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="tasks">Scheduled Tasks ({summaryCounts.all})</TabsTrigger>
-                <TabsTrigger value="logs">Recent Logs ({schedulerStatus?.recentLogs?.length || 0})</TabsTrigger>
+                <TabsTrigger value="logs">Recent Logs ({schedulerData?.recentLogs?.length || 0})</TabsTrigger>
               </TabsList>
               
               {/* Tasks Tab */}
@@ -323,7 +487,12 @@ export default function TaskManagerPage() {
                                     <TableCell>{getStatusBadge(task.status)}</TableCell>
                                     <TableCell>{formatDateTime(task.next_run)}</TableCell>
                                     <TableCell>
-                                      <Button size="sm" variant="ghost" onClick={() => schedulerAction('run_task', 'POST', { taskId: task.id })} disabled={loading || task.status === 'running'}>
+                                      <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={() => runTask(task)} 
+                                        disabled={loading || task.status === 'running'}
+                                      >
                                         <Play className="w-3 h-3 mr-1" /> รัน
                                       </Button>
                                     </TableCell>
@@ -350,20 +519,22 @@ export default function TaskManagerPage() {
                 <Card>
                    <CardHeader><CardTitle>Recent Logs</CardTitle></CardHeader>
                    <CardContent>
-                    {schedulerStatus?.recentLogs && schedulerStatus.recentLogs.length > 0 ? (
+                    {schedulerData?.recentLogs && schedulerData.recentLogs.length > 0 ? (
                       <Table>
                          <TableHeader>
                            <TableRow>
                               <TableHead>Task</TableHead>
+                              <TableHead>ประเภท</TableHead>
                               <TableHead>สถานะ</TableHead>
                               <TableHead>เวลาที่รัน</TableHead>
                               <TableHead>ข้อผิดพลาด</TableHead>
                            </TableRow>
                          </TableHeader>
                          <TableBody>
-                           {schedulerStatus.recentLogs.map(log => (
+                           {schedulerData.recentLogs.map(log => (
                               <TableRow key={log.id}>
                                 <TableCell className="font-medium">{log.task_name}</TableCell>
+                                <TableCell>{getTaskTypeBadge(log.task_type)}</TableCell>
                                 <TableCell>{getStatusBadge(log.status)}</TableCell>
                                 <TableCell>{formatDateTime(log.execution_time)}</TableCell>
                                 <TableCell className="text-red-600 dark:text-red-500 text-xs max-w-xs truncate">{log.error_message || '-'}</TableCell>
