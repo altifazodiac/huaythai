@@ -205,7 +205,7 @@ export default function TaskManagerPage() {
     try {
       console.log(`🎯 Instructing task to run: ${task.name}`);
       setError(null);
-
+      
       // เริ่ม task ใน background ผ่าน server action
       const result = await startTask(
         task.id,
@@ -220,7 +220,7 @@ export default function TaskManagerPage() {
       setTimeout(() => {
         fetchSchedulerData();
       }, 2000);
-
+      
     } catch (err) {
       console.error('💥 Start Task Error:', err);
       const errorMessage = err instanceof Error ? err.message : 'การเริ่ม Task ไม่สำเร็จ';

@@ -1,6 +1,6 @@
 'use server';
 
-import { startTaskInBackground } from './background-task-runner';
+import { runTaskInBackground } from './background-task-runner';
 
 export async function startTask(
   taskId: string,
@@ -8,17 +8,18 @@ export async function startTask(
   drawingTime?: string,
   lotterySubTypeId?: number
 ) {
-  // ใช้ setTimeout เพื่อให้ Server Action return ทันที
-  // และรัน task ที่ใช้เวลานานใน background
+  // Use setTimeout to return from the Server Action immediately
+  // and run the long-running task in the background.
   setTimeout(() => {
     console.log(`[Server Action] Starting ${taskType} task in background via setTimeout...`);
-    startTaskInBackground(taskId, taskType, drawingTime, lotterySubTypeId)
+    // Correctly call the function that performs the work.
+    runTaskInBackground(taskId, taskType, drawingTime, lotterySubTypeId)
       .catch(error => {
         console.error(`[Server Action] Error executing background task for ${taskId}:`, error);
       });
   }, 0);
 
-  // Return ทันที
+  // Return immediately
   return {
     success: true,
     message: `Task ${taskType} instructed to start in background.`,
