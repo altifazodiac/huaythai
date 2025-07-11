@@ -130,7 +130,7 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
       context = await browserManager.getBrowserContext();
       page = await context.newPage();
       
-      await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
+      await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 120000 });
       
       // รอให้ข้อมูลโหลดเสร็จ
       await page.waitForTimeout(3000);
