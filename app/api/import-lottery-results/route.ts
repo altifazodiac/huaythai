@@ -252,21 +252,25 @@ async function importLotteryResults(drawDate: string, drawingTime?: string, lott
 // ฟังก์ชันสำหรับสร้าง notification toast
 async function createLotteryImportToast(scrapedData: LotteryResult[]) {
   try {
-    const toastData = {
-      type: scrapedData.length > 0 ? 'success' : 'info',
-      message: scrapedData.length > 0 
-        ? `นำเข้าข้อมูลหวย ${scrapedData.length} รายการสำเร็จ`
-        : 'ไม่พบข้อมูลหวยใหม่ในขณะนี้',
-      details: scrapedData.length > 0 
-        ? `หวยที่นำเข้า: ${scrapedData.map(d => d.lottery_name).join(', ')}`
-        : 'อาจเป็นเพราะยังไม่ถึงเวลาออกผล',
-      timestamp: new Date().toISOString(),
-      draw_date: scrapedData[0]?.draw_date || new Date().toISOString().split('T')[0]
-    };
+    const currentTime = new Date();
+    const lotteryNames = scrapedData.map(item => item.lottery_name);
+    const message = scrapedData.length > 0 
+      ? `นำเข้าข้อมูลหวย ${scrapedData.length} รายการสำเร็จ`
+      : 'ไม่พบข้อมูลหวยใหม่ในขณะนี้';
     
-    await supabase
-      .from('lottery_notifications')
-      .insert(toastData);
+    const { error } = await supabase
+      .from('lottery_import_notifications')
+      .insert({
+        notification_time: currentTime.toISOString(),
+        lottery_names: lotteryNames,
+        total_results: scrapedData.length,
+        message: message,
+        notification_type: scrapedData.length > 0 ? 'import_success' : 'import_error'
+      });
+    
+    if (error) {
+      console.error('Error creating toast notification:', error);
+    }
     
   } catch (error) {
     console.error('Error creating toast notification:', error);

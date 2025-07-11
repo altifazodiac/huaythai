@@ -166,21 +166,25 @@ async function sendToLine(message: string): Promise<boolean> {
 // ฟังก์ชันสำหรับสร้าง notification toast
 async function createLotteryToast(results: LotteryResult[], success: boolean) {
   try {
-    const toastData = {
-      type: success ? 'success' : 'error',
-      message: success 
-        ? `ส่งผลหวย ${results.length} รายการไปยัง LINE สำเร็จ`
-        : `ไม่สามารถส่งผลหวยไปยัง LINE ได้`,
-      details: success
-        ? `หวยที่ส่ง: ${results.map(r => r.lottery_sub_type.sub_type_name).join(', ')}`
-        : 'กรุณาตรวจสอบการตั้งค่า LINE Bot',
-      timestamp: new Date().toISOString(),
-      draw_date: results[0]?.draw_date || new Date().toISOString().split('T')[0]
-    };
+    const currentTime = new Date();
+    const lotteryNames = results.map(r => r.lottery_sub_type?.sub_type_name || 'Unknown');
+    const message = success 
+      ? `ส่งผลหวย ${results.length} รายการไปยัง LINE สำเร็จ`
+      : `ไม่สามารถส่งผลหวยไปยัง LINE ได้`;
     
-    await supabase
-      .from('lottery_notifications')
-      .insert(toastData);
+    const { error } = await supabase
+      .from('lottery_send_notifications')
+      .insert({
+        notification_time: currentTime.toISOString(),
+        lottery_names: lotteryNames,
+        total_results: results.length,
+        message: message,
+        notification_type: success ? 'send_success' : 'send_error'
+      });
+    
+    if (error) {
+      console.error('Error creating toast notification:', error);
+    }
     
   } catch (error) {
     console.error('Error creating toast notification:', error);

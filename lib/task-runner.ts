@@ -389,16 +389,20 @@ export async function importLotteryResults(drawDate: string, drawingTime?: strin
 // ฟังก์ชันสำหรับสร้าง notification toast
 export async function createLotteryImportToast(scrapedData: LotteryResult[]) {
   try {
-    const message = `✅ เก็บข้อมูลผลหวยสำเร็จ: ${scrapedData.length} รายการ`;
+    const currentTime = new Date();
+    const lotteryNames = scrapedData.map(item => item.lottery_name);
+    const message = scrapedData.length > 0 
+      ? `✅ เก็บข้อมูลผลหวยสำเร็จ: ${scrapedData.length} รายการ`
+      : `ℹ️ ไม่มีผลหวยใหม่ที่ต้องดึงมา`;
     
     const { error } = await supabase
-      .from('lottery_notifications')
+      .from('lottery_import_notifications')
       .insert({
-        title: 'Import Lottery Results',
+        notification_time: currentTime.toISOString(),
+        lottery_names: lotteryNames,
+        total_results: scrapedData.length,
         message: message,
-        type: 'import',
-        data: { scraped_count: scrapedData.length },
-        created_at: new Date().toISOString()
+        notification_type: scrapedData.length > 0 ? 'import_success' : 'import_error'
       });
     
     if (error) {
