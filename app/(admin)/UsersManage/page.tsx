@@ -141,57 +141,18 @@ export default function UsersManagePage() {
     e.preventDefault();
     
     try {
-      // Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: createForm.email,
-        password: createForm.password,
-        email_confirm: true
+      const response = await fetch('/api/admin-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createForm),
       });
 
-      if (authError) throw authError;
+      const result = await response.json();
 
-      if (!authData.user) throw new Error("ไม่สามารถสร้างผู้ใช้ได้");
-
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email: createForm.email,
-          name: createForm.name,
-          phone: createForm.phone,
-          line_id: createForm.line_id,
-          branch: createForm.branch,
-          credit_balance: createForm.credit_balance
-        });
-
-      if (profileError) throw profileError;
-
-      // Set user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: createForm.role
-        });
-
-      if (roleError) throw roleError;
-
-      // Log initial credit transaction if credit > 0
-      if (createForm.credit_balance > 0) {
-        const { error: transactionError } = await supabase
-          .from('credit_transactions')
-          .insert({
-            user_id: authData.user.id,
-            amount: createForm.credit_balance,
-            transaction_type: 'initial_credit',
-            description: `เครดิตเริ่มต้นจากการสร้างบัญชีโดย Admin`
-          });
-
-        if (transactionError) {
-          console.warn("Warning: Could not log initial credit transaction:", transactionError.message);
-          // Continue anyway as user is created successfully
-        }
+      if (!response.ok) {
+        throw new Error(result.error || 'Something went wrong');
       }
 
       toast.success("สร้างผู้ใช้สำเร็จ");

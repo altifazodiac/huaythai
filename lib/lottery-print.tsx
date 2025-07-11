@@ -175,7 +175,7 @@ const createGroups = (ticketItems: TicketDisplayItem[], preferredOrderMap: Recor
   return groups;
 };
 // Function to calculate countdown text
-function getCountdownTextForPrint(drawDateStr: string, closeTimeStr: string | undefined): string {
+export function getCountdownTextForPrint(drawDateStr: string, closeTimeStr: string | undefined): string {
   if (!closeTimeStr || !drawDateStr) return "N/A";
 
   const now = new Date(); // Current local time

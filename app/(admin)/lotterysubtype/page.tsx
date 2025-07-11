@@ -536,7 +536,9 @@ export default function LotterySubTypePage() {
   };
 
   const handlePayoutChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setPayoutForm({ ...payoutForm, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    console.log("Payout Form Change:", { name, value, editPayoutId });
+    setPayoutForm({ ...payoutForm, [name]: value });
   };
 
   const handlePayoutSubmit = async (e: React.FormEvent) => {
@@ -550,48 +552,80 @@ export default function LotterySubTypePage() {
 
     setPayoutLoading(true);
 
-    if (editPayoutId) {
-      // For UPDATE operation
-      const { error } = await supabase
-        .from("lottery_sub_number")
-        .update({
-          digit_number: Number(payoutForm.digit_number),
-          type_number: payoutForm.type_number,
-          price_paid: Number(payoutForm.price_paid),
-        })
-        .eq("id", editPayoutId);
+    try {
+      const updateData = {
+        digit_number: Number(payoutForm.digit_number),
+        type_number: payoutForm.type_number,
+        price_paid: Number(payoutForm.price_paid),
+      };
 
-      if (error) {
-        toast.error(error.message || "เกิดข้อผิดพลาดในการอัปเดต");
-      } else {
+      console.log("Payout Submit Data:", { editPayoutId, updateData, payoutSubTypeId });
+
+      if (editPayoutId) {
+        // For UPDATE operation
+        const { data, error } = await supabase
+          .from("lottery_sub_number")
+          .update(updateData)
+          .eq("id", editPayoutId)
+          .select();
+
+        console.log("Update Payout Response:", { data, error });
+
+        if (error) {
+          console.error("Update Payout Error:", error);
+          toast.error(error.message || "เกิดข้อผิดพลาดในการอัปเดต");
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          toast.error("ไม่พบข้อมูลที่ต้องการอัปเดต");
+          return;
+        }
+
+        console.log("Update Payout Success:", data);
         toast.success("แก้ไขอัตราจ่ายสำเร็จ");
-      }
-    } else {
-      // For INSERT operation
-      const { error } = await supabase.from("lottery_sub_number").insert([
-        {
-          lottery_sub_type_id: payoutSubTypeId,
-          digit_number: Number(payoutForm.digit_number),
-          type_number: payoutForm.type_number,
-          price_paid: Number(payoutForm.price_paid),
-        },
-      ]);
-      if (error) {
-        toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึก");
       } else {
+        // For INSERT operation
+        const insertData = {
+          lottery_sub_type_id: payoutSubTypeId,
+          ...updateData,
+        };
+
+        console.log("Insert Payout Data:", insertData);
+
+        const { data, error } = await supabase
+          .from("lottery_sub_number")
+          .insert([insertData])
+          .select();
+
+        console.log("Insert Payout Response:", { data, error });
+
+        if (error) {
+          console.error("Insert Payout Error:", error);
+          toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึก");
+          return;
+        }
+
+        console.log("Insert Payout Success:", data);
         toast.success("บันทึกอัตราจ่ายสำเร็จ");
       }
+      
+      setPayoutForm({});
+      setEditPayoutId(null);
+      await fetchPayouts(payoutSubTypeId);
+    } catch (error) {
+      console.error("Unexpected Payout Submit Error:", error);
+      toast.error("เกิดข้อผิดพลาดที่ไม่คาดคิด");
+    } finally {
+      setPayoutLoading(false);
     }
-    
-    setPayoutLoading(false);
-    setPayoutForm({});
-    setEditPayoutId(null);
-    await fetchPayouts(payoutSubTypeId);
   };
 
   const handleEditPayout = (payout: LotterySubNumber) => {
+    console.log("Edit Payout:", payout);
     setPayoutForm({ ...payout });
     setEditPayoutId(payout.id);
+    console.log("Edit Payout ID set to:", payout.id);
   };
 
   const handleDeletePayout = async (id: number) => {
@@ -1195,6 +1229,14 @@ export default function LotterySubTypePage() {
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto px-8 py-6">
+            {/* Debug Information */}
+            <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+              <div>Debug Info:</div>
+              <div>Edit ID: {editPayoutId || 'null'}</div>
+              <div>Form Data: {JSON.stringify(payoutForm, null, 2)}</div>
+              <div>SubType ID: {payoutSubTypeId}</div>
+            </div>
+            
             <form onSubmit={handlePayoutSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>

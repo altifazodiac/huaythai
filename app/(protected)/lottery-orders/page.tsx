@@ -1092,6 +1092,7 @@ const LotteryOrderPage = () => {
         p_bill_name: billName,
         p_bill_number: billNumber,
         p_draw_date: selectedDraw.date.toISOString().split('T')[0],
+        p_draw_time: selectedDraw.schedule.drawing_time, // เพิ่มค่านี้
         p_close_time: selectedDraw.schedule.close_time,
         p_total_amount: totalPayment,
         p_ticket_items: itemsToInsert,
@@ -1113,8 +1114,8 @@ const LotteryOrderPage = () => {
       setSelectedOrderIds(new Set());
       setOrderPrices({});
   
-      // Optional: redirect or show a success message
-      // router.push('/dashboard');
+      // Redirect to preview page
+      router.push(`/order-preview/${billNumber}`);
   
     } catch (error: any) {
       toast.error('เกิดข้อผิดพลาดในการบันทึก', {
@@ -1329,7 +1330,7 @@ const LotteryOrderPage = () => {
                                       <span className="text-muted-foreground text-[14px] md:text-sm w-6 text-center">{index + 1}.</span>
                                       <div className="flex items-center">
                                           {order.numbers.split('').map((num, i) => (
-                                          <span key={i} className="text-[14px] w-6 h-6 bg-gray-100 flex items-center justify-center rounded-md mr-0.5">{num}</span>
+                                          <span key={i} className="text-[14px] w-6 h-6 bg-gray-100 dark:bg-red-500 flex items-center justify-center rounded-md mr-0.5">{num}</span>
                                           ))}
                                             {!showRightPanel && (
                                           <>
