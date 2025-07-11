@@ -490,17 +490,36 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
   // ส่วนของการบันทึกข้อมูลจะทำงานเฉพาะเมื่อมีข้อมูลที่ scrape มาได้
   if (scrapedData.length > 0) {
     console.log(`[Task] Saving ${scrapedData.length} results to lottery_api_results`);
-    
+
+    // แปลงข้อมูลให้ตรงกับ schema ของ lottery_api_results โดยเพิ่ม field 'results'
+    const dataToUpsert = scrapedData.map(item => {
+      const prizeKeys: (keyof LotteryResult)[] = [
+        'first_prize', 'second_prize', 'third_prize', 'fourth_prize',
+        'fifth_prize', 'sixth_prize', 'seventh_prize', 'eighth_prize',
+        'ninth_prize', 'tenth_prize'
+      ];
+
+      // สร้าง array ของรางวัลทั้งหมดที่มีค่า (ไม่ใช่ null หรือ undefined)
+      const resultsArray = prizeKeys
+        .map(key => item[key])
+        .filter(prize => prize != null) as string[]; // `!= null` checks for both null and undefined
+
+      return {
+        ...item,
+        results: resultsArray,
+      };
+    });
+
     const { error: upsertError } = await supabase
       .from('lottery_api_results')
-      .upsert(scrapedData, {
+      .upsert(dataToUpsert, { // ใช้ข้อมูลที่แปลงแล้ว
         onConflict: 'lottery_name, draw_date, draw_time'
       });
-    
+
     if (upsertError) {
       throw new Error(`Error saving scraped data: ${upsertError.message}`);
     }
-    
+
     await createLotteryImportToast(scrapedData);
   }
   
