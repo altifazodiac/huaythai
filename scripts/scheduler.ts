@@ -24,7 +24,7 @@ class TaskScheduler {
   private isRunning = false;
   private checkInterval: NodeJS.Timeout | null = null;
   private readonly API_KEY = process.env.INTERNAL_API_KEY || 'internal';
-  private readonly BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  private readonly BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
   constructor() {
     console.log('🚀 TaskScheduler initialized');
