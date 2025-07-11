@@ -542,30 +542,48 @@ export default function LotterySubTypePage() {
   const handlePayoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payoutSubTypeId) return;
-    setPayoutLoading(true);
-    const formData = {
-      ...payoutForm,
-      lottery_sub_type_id: payoutSubTypeId,
-      digit_number: Number(payoutForm.digit_number),
-      price_paid: Number(payoutForm.price_paid),
-    };
-    if (!formData.digit_number || !formData.type_number || !formData.price_paid) {
+
+    if (!payoutForm.digit_number || !payoutForm.type_number || !payoutForm.price_paid) {
       toast.error("กรุณากรอกข้อมูลให้ครบถ้วน");
-      setPayoutLoading(false);
       return;
     }
+
+    setPayoutLoading(true);
+
     if (editPayoutId) {
-      await supabase.from("lottery_sub_number").update(formData).eq("id", editPayoutId);
-      toast.success("แก้ไขอัตราจ่ายสำเร็จ");
+      // For UPDATE operation
+      const { error } = await supabase
+        .from("lottery_sub_number")
+        .update({
+          digit_number: Number(payoutForm.digit_number),
+          type_number: payoutForm.type_number,
+          price_paid: Number(payoutForm.price_paid),
+        })
+        .eq("id", editPayoutId);
+
+      if (error) {
+        toast.error(error.message || "เกิดข้อผิดพลาดในการอัปเดต");
+      } else {
+        toast.success("แก้ไขอัตราจ่ายสำเร็จ");
+      }
     } else {
-      const { error } = await supabase.from("lottery_sub_number").insert([formData]);
+      // For INSERT operation
+      const { error } = await supabase.from("lottery_sub_number").insert([
+        {
+          lottery_sub_type_id: payoutSubTypeId,
+          digit_number: Number(payoutForm.digit_number),
+          type_number: payoutForm.type_number,
+          price_paid: Number(payoutForm.price_paid),
+        },
+      ]);
       if (error) {
         toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึก");
-        setPayoutLoading(false);
-        return;
+      } else {
+        toast.success("บันทึกอัตราจ่ายสำเร็จ");
       }
-      toast.success("บันทึกอัตราจ่ายสำเร็จ");
     }
+    
+    setPayoutLoading(false);
     setPayoutForm({});
     setEditPayoutId(null);
     await fetchPayouts(payoutSubTypeId);
