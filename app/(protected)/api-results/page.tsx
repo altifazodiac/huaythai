@@ -80,41 +80,82 @@ export default function LotteryResultsPage() {
   const [results, setResults] = useState<any[]>([]);
   const [allAliases, setAllAliases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
+    
     const fetchData = async () => {
-      // 1. ดึง alias + sub_type
-      const { data: aliases, error: aliasError } = await supabase
-        .from("lottery_name_aliases")
-        .select("alias_name, lottery_sub_type_id, lottery_sub_types(country, country_origin)");
-      // 2. ดึง schedule
-      const { data: schedules, error: scheduleError } = await supabase
-        .from("drawing_schedules")
-        .select("lottery_sub_type_id, drawing_time");
-      // 3. ดึงผลรางวัลวันนี้
-      const todayStr = format(new Date(), "yyyy-MM-dd");
-      const { data: apiResults, error: apiError } = await supabase
-        .from("lottery_api_results")
-        .select("id, created_at, draw_date, country, lottery_name, results, source_url, draw_time")
-        .eq("draw_date", todayStr);
+      try {
+        console.log('🔍 Starting data fetch...');
+        
+        // 1. ดึง alias + sub_type
+        console.log('📋 Fetching lottery aliases...');
+        const { data: aliases, error: aliasError } = await supabase
+          .from("lottery_name_aliases")
+          .select("alias_name, lottery_sub_type_id, lottery_sub_types(country, country_origin)");
+        
+        if (aliasError) {
+          console.error('❌ Alias Error:', aliasError);
+          throw new Error(`ไม่สามารถดึงข้อมูลชื่อหวยได้: ${aliasError.message}`);
+        }
+        console.log('✅ Aliases fetched:', aliases?.length || 0, 'items');
 
-      if (aliasError || apiError || scheduleError) {
+        // 2. ดึง schedule
+        console.log('⏰ Fetching drawing schedules...');
+        const { data: schedules, error: scheduleError } = await supabase
+          .from("drawing_schedules")
+          .select("lottery_sub_type_id, drawing_time");
+        
+        if (scheduleError) {
+          console.error('❌ Schedule Error:', scheduleError);
+          throw new Error(`ไม่สามารถดึงข้อมูลตารางออกรางวัลได้: ${scheduleError.message}`);
+        }
+        console.log('✅ Schedules fetched:', schedules?.length || 0, 'items');
+
+        // 3. ดึงผลรางวัลวันนี้
+        const todayStr = format(new Date(), "yyyy-MM-dd");
+        console.log('🎯 Fetching lottery results for date:', todayStr);
+        
+        const { data: apiResults, error: apiError } = await supabase
+          .from("lottery_api_results")
+          .select("id, created_at, draw_date, country, lottery_name, results, source_url, draw_time")
+          .eq("draw_date", todayStr);
+
+        if (apiError) {
+          console.error('❌ API Results Error:', apiError);
+          throw new Error(`ไม่สามารถดึงข้อมูลผลรางวัลได้: ${apiError.message}`);
+        }
+        console.log('✅ API Results fetched:', apiResults?.length || 0, 'items');
+
+        // 4. รวมข้อมูล schedule เข้า alias
+        const aliasesWithTime = (aliases || []).map(alias => {
+          const schedule = (schedules || []).find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
+          return { ...alias, drawing_time: schedule?.drawing_time || null };
+        });
+        
+        console.log('🔄 Merged aliases with schedules:', aliasesWithTime.length, 'items');
+        
+        setAllAliases(aliasesWithTime);
+        setResults(apiResults || []);
+        setError(null);
+        console.log('✅ Data fetch completed successfully');
+        
+      } catch (err) {
+        console.error('💥 Fetch Error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการดึงข้อมูล';
+        setError(errorMessage);
+        setResults([]);
+        setAllAliases([]);
+      } finally {
         setLoading(false);
-        return;
       }
-      // 4. รวมข้อมูล schedule เข้า alias
-      const aliasesWithTime = (aliases || []).map(alias => {
-        const schedule = (schedules || []).find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
-        return { ...alias, drawing_time: schedule?.drawing_time || null };
-      });
-      setAllAliases(aliasesWithTime);
-      setResults(apiResults || []);
-      setLoading(false);
     };
+    
     fetchData();
   }, []);
 
@@ -184,6 +225,13 @@ export default function LotteryResultsPage() {
                         </Breadcrumb>
                     </div>
                     <div className="ml-auto flex items-center gap-2">
+                      {/* Debug Info */}
+                      <div className="hidden md:flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
+                        <span>ข้อมูล: {allAliases.length} รายการ</span>
+                        <span>•</span>
+                        <span>ผลรางวัล: {results.length} รายการ</span>
+                        {loading && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
+                      </div>
                       <div className="relative">
                           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-red-700 dark:text-red-400" />
                           <Input
@@ -209,6 +257,29 @@ export default function LotteryResultsPage() {
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
                         <Loader2 className="animate-spin w-10 h-10 text-red-600 dark:text-red-400" />
+                    </div>
+                ) : error ? (
+                    <div className="flex flex-col justify-center items-center h-64 text-center animate-fade-in">
+                        <div className="bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg p-6 max-w-md">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                                    <span className="text-white font-bold">!</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">เกิดข้อผิดพลาด</h3>
+                                    <p className="text-sm text-red-600 dark:text-red-400">ไม่สามารถโหลดข้อมูลได้</p>
+                                </div>
+                            </div>
+                            <p className="text-sm text-red-700 dark:text-red-300 mb-4 text-left bg-red-50 dark:bg-red-900/30 p-3 rounded border">
+                                {error}
+                            </p>
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+                            >
+                                ลองใหม่
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <>
