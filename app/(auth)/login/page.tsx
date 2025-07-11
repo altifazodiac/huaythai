@@ -63,7 +63,7 @@ const LoginPage = () => {
     return true;
   };
 
-  const formatPhoneNumber = (phoneInput: string) => {
+  function formatPhoneNumber(phoneInput: string): string {
     // ลบ space และ dash ออก
     let cleanPhone = phoneInput.replace(/[-\s]/g, '');
     
@@ -77,7 +77,7 @@ const LoginPage = () => {
     }
     
     return cleanPhone;
-  };
+  }
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
