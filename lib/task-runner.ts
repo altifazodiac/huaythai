@@ -87,7 +87,7 @@ export async function scrapeAndParseResults(targetUrl: string, context: any, tar
       console.log(`[Scraper] DEBUG: All scraped lottery names:`, scrapedData.map((item: LotteryResult) => item.lottery_name));
     }
     
-    // กรองเฉพาะ lottery ที่ต้องการ (ถ้าระบุ)
+    // กรองเฉพาะ lottery ที่ต้องการ (ถ้าระบุ__)
     if (targetLotteryNames && targetLotteryNames.length > 0) {
       console.log(`[Scraper] DEBUG: Target lottery names:`, targetLotteryNames);
       
