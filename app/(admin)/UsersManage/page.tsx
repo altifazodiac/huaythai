@@ -182,6 +182,7 @@ export default function UsersManagePage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(requestData),
       });
 
