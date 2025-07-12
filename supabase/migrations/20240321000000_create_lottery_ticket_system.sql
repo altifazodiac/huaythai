@@ -55,6 +55,7 @@ CREATE TABLE public.lottery_draws (
 );
 
 -- Create lottery_results table
+DROP TABLE IF EXISTS public.lottery_results CASCADE;
 CREATE TABLE public.lottery_results (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     draw_id UUID REFERENCES public.lottery_draws(id) NOT NULL,
