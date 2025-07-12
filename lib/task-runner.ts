@@ -139,13 +139,6 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
       }
       await page.waitForTimeout(3000); // รอ JS render เพิ่มเติม
       
-      // --- START DEBUG: Log page content ---
-      const pageContent = await page.content();
-      console.log('--- START DEBUG PAGE CONTENT ---');
-      console.log(pageContent);
-      console.log('--- END DEBUG PAGE CONTENT ---');
-      // --- END DEBUG ---
-
       // ดึงข้อมูลจากหน้าเว็บ
       const scrapedData = await page.evaluate(() => {
         const results: LotteryResult[] = [];
@@ -323,6 +316,14 @@ export async function importLotteryResults(drawDate: string, drawingTime?: strin
   
   // ประมวลผลข้อมูล
   const upsertRows: any[] = [];
+  const prizeMapping: Record<string, string> = {
+    first_prize: 'three_digits_top',
+    second_prize: 'two_digits_bottom',
+  };
+
+  const isValidNumber = (value: any) => {
+    return value != null && /^\d+$/.test(String(value).trim());
+  };
   
   for (const apiResult of apiResults) {
     const alias = aliases.find(a => a.alias_name === apiResult.lottery_name);
@@ -357,14 +358,35 @@ export async function importLotteryResults(drawDate: string, drawingTime?: strin
       console.warn(`[Import] No sub type found for: ${alias.lottery_sub_type_id}`);
       continue;
     }
+
+    const resultsPayload: { [key: string]: string } = {};
+
+    for (const [apiField, dbField] of Object.entries(prizeMapping)) {
+      const value = (apiResult as any)[apiField];
+      if (isValidNumber(value)) {
+        resultsPayload[dbField] = String(value).trim();
+      }
+    }
     
+    // สร้าง winning_number และ two_digits_bottom สำหรับการแสดงผลหลัก
+    const winning_number = isValidNumber(apiResult.first_prize) ? String(apiResult.first_prize).trim() : null;
+    const two_digits_bottom = isValidNumber(apiResult.second_prize) ? String(apiResult.second_prize).trim() : null;
+    
+    // ต้องมีอย่างน้อย first_prize ถึงจะบันทึก
+    if (!winning_number) {
+        console.warn(`[Import] Skipping ${apiResult.lottery_name} due to invalid or missing 'first_prize'. Value: ${apiResult.first_prize}`);
+        continue;
+    }
+
     // สร้าง upsert row
     const row = {
       lottery_type_id: subType.lottery_type_id,
       lottery_sub_type_id: alias.lottery_sub_type_id,
       schedule_id: schedule.schedule_id,
       draw_date: drawDate,
-      result_data: apiResult,
+      winning_number: winning_number,
+      two_digits_bottom: two_digits_bottom,
+      results: resultsPayload, // JSON object for other prizes
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
