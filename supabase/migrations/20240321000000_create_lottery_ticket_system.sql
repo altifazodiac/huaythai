@@ -2,6 +2,9 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create enum types for status fields
+DROP TYPE IF EXISTS public.ticket_status CASCADE;
+DROP TYPE IF EXISTS public.draw_status CASCADE;
+DROP TYPE IF EXISTS public.winning_status CASCADE;
 CREATE TYPE ticket_status AS ENUM ('pending', 'confirmed', 'cancelled');
 CREATE TYPE draw_status AS ENUM ('pending', 'completed', 'cancelled');
 CREATE TYPE winning_status AS ENUM ('pending', 'paid', 'cancelled');
