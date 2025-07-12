@@ -31,7 +31,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { PrinterIcon, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { PrinterIcon, Trash2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useRouter } from "next/navigation";
@@ -89,6 +89,7 @@ interface LotteryTicket {
   status: string;
   created_at: string;
   payout_amount: number;
+  deleted_at?: string | null;
   lottery_ticket_items: LotteryTicketItem[];
 }
 
@@ -107,7 +108,8 @@ const fetchTickets = async (
   role: string,
   filters: { billNumber: string; drawDate: string; status: string; username: string },
   page: number,
-  pageSize: number
+  pageSize: number,
+  showDeleted: boolean = false
 ) => {
   let query = supabase
     .from("lottery_tickets_with_user_details")
@@ -130,9 +132,15 @@ const fetchTickets = async (
       )
     `
     )
-    .is("deleted_at", null)
     .range((page - 1) * pageSize, page * pageSize - 1)
     .order("created_at", { ascending: false });
+
+  // Filter based on deleted status
+  if (showDeleted) {
+    query = query.not("deleted_at", "is", null);
+  } else {
+    query = query.is("deleted_at", null);
+  }
 
   if (role !== "admin") {
     query = query.eq("user_id", user.id);
@@ -159,7 +167,9 @@ const fetchTickets = async (
 const createColumns = (
   onPrintClick: (billNumber: string) => Promise<void>,
   setDeletingTicket: (ticket: LotteryTicket | null) => void,
-  setDeleteDialogOpen: (open: boolean) => void
+  setDeleteDialogOpen: (open: boolean) => void,
+  onRestoreClick: (ticket: LotteryTicket) => Promise<void>,
+  showDeleted: boolean
 ): ColumnDef<LotteryTicket>[] => [
   {
     accessorKey: "bill_number",
@@ -173,19 +183,29 @@ const createColumns = (
       </Button>
     ),
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <div className="font-medium">{row.original.bill_number}</div>
+      <div className={`font-medium ${row.original.deleted_at ? "text-gray-400 line-through" : ""}`}>
+        {row.original.bill_number}
+        {row.original.deleted_at && <span className="ml-2 text-xs text-red-500">(ลบแล้ว)</span>}
+      </div>
     ),
   },
   {
     accessorKey: "sub_type_name",
     header: "ประเภทหวย",
-    cell: ({ row }: { row: Row<LotteryTicket> }) =>
-      row.original.lottery_ticket_items[0]?.lottery_sub_types?.sub_type_name || "-",
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        {row.original.lottery_ticket_items[0]?.lottery_sub_types?.sub_type_name || "-"}
+      </span>
+    ),
   },
   {
-    accessorKey: "username",
-    header: "ผู้ใช้",
-    cell: ({ row }: { row: Row<LotteryTicket> }) => row.original.username || "-",
+    accessorKey: "bill_name",
+    header: "ชื่อบิล",
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        {row.original.bill_name || "-"}
+      </span>
+    ),
     enableHiding: true,
   },
   {
@@ -199,8 +219,11 @@ const createColumns = (
         {column.getIsSorted() === "asc" ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
       </Button>
     ),
-    cell: ({ row }: { row: Row<LotteryTicket> }) =>
-      `${format(new Date(row.original.draw_date), "d MMM yyyy", { locale: th })} ${row.original.draw_time}`,
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        {`${format(new Date(row.original.draw_date), "d MMM yyyy", { locale: th })} ${row.original.draw_time}`}
+      </span>
+    ),
   },
   {
     accessorKey: "created_at",
@@ -213,18 +236,34 @@ const createColumns = (
         {column.getIsSorted() === "asc" ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
       </Button>
     ),
-    cell: ({ row }: { row: Row<LotteryTicket> }) =>
-      format(new Date(row.original.created_at), "d MMM yyyy HH:mm", { locale: th }),
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <div className={row.original.deleted_at ? "text-gray-400" : ""}>
+        <div>{format(new Date(row.original.created_at), "d MMM yyyy HH:mm", { locale: th })}</div>
+        {row.original.deleted_at && (
+          <div className="text-xs text-red-500">
+            ลบเมื่อ: {format(new Date(row.original.deleted_at), "d MMM yyyy HH:mm", { locale: th })}
+          </div>
+        )}
+      </div>
+    ),
   },
   {
     accessorKey: "total_amount",
     header: "ยอดรวม (฿)",
-    cell: ({ row }: { row: Row<LotteryTicket> }) => (row.original.total_amount ?? 0).toLocaleString(),
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        {(row.original.total_amount ?? 0).toLocaleString()}
+      </span>
+    ),
   },
   {
     accessorKey: "payout_amount",
     header: "เงินรางวัล (฿)",
-    cell: ({ row }: { row: Row<LotteryTicket> }) => (row.original.payout_amount ?? 0).toLocaleString(),
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        {(row.original.payout_amount ?? 0).toLocaleString()}
+      </span>
+    ),
   },
   {
     accessorKey: "status",
@@ -232,9 +271,9 @@ const createColumns = (
     cell: ({ row }: { row: Row<LotteryTicket> }) => {
       const status = row.original.status;
       const statusStyles: Record<string, string> = {
-        confirmed: "text-green-600",
-        pending: "text-yellow-600",
-        cancelled: "text-red-600",
+        confirmed: row.original.deleted_at ? "text-gray-400" : "text-green-600",
+        pending: row.original.deleted_at ? "text-gray-400" : "text-yellow-600",
+        cancelled: row.original.deleted_at ? "text-gray-400" : "text-red-600",
       };
       const statusText: Record<string, string> = {
         confirmed: "ยืนยันแล้ว",
@@ -249,25 +288,39 @@ const createColumns = (
     header: "การดำเนินการ",
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
       <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPrintClick(row.original.bill_number)}
-        >
-          <PrinterIcon className="mr-1 h-4 w-4" />
-          พิมพ์
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => {
-            setDeletingTicket(row.original);
-            setDeleteDialogOpen(true);
-          }}
-        >
-          <Trash2 className="mr-1 h-4 w-4" />
-          ลบ
-        </Button>
+        {!row.original.deleted_at ? (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPrintClick(row.original.bill_number)}
+            >
+              <PrinterIcon className="mr-1 h-4 w-4" />
+              พิมพ์
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                setDeletingTicket(row.original);
+                setDeleteDialogOpen(true);
+              }}
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+              ลบ
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onRestoreClick(row.original)}
+            className="text-green-600 border-green-600 hover:bg-green-50"
+          >
+            <RotateCcw className="mr-1 h-4 w-4" />
+            กู้คืน
+          </Button>
+        )}
       </div>
     ),
   },
@@ -291,6 +344,7 @@ export default function LotteryPurchasePage() {
   const [deletingTicket, setDeletingTicket] = useState<LotteryTicket | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [showDeleted, setShowDeleted] = useState(false);
 
   // Fetch user data
   React.useEffect(() => {
@@ -320,9 +374,9 @@ export default function LotteryPurchasePage() {
   }, [user, supabase]);
 
   // React Query for fetching tickets
-  const { data: tickets = [], isLoading } = useQuery<LotteryTicket[]>({
-    queryKey: ["lottery_tickets", user?.id, role, filters, page, pageSize],
-    queryFn: () => fetchTickets(supabase, user, role, filters, page, pageSize),
+  const { data: tickets = [], isLoading, refetch } = useQuery<LotteryTicket[]>({
+    queryKey: ["lottery_tickets", user?.id, role, filters, page, pageSize, showDeleted],
+    queryFn: () => fetchTickets(supabase, user, role, filters, page, pageSize, showDeleted),
     enabled: !!user,
   });
 
@@ -350,7 +404,9 @@ export default function LotteryPurchasePage() {
         .from("lottery_tickets")
         .update({ deleted_at: new Date().toISOString() })
         .eq("id", deletingTicket.id);
+      
       if (error) throw error;
+      
       await supabase
         .from("delete_history")
         .insert({
@@ -359,12 +415,37 @@ export default function LotteryPurchasePage() {
           reason: deleteReason,
           deleted_at: new Date().toISOString(),
         });
+        
       toast.success("ลบรายการสำเร็จ (จะถูกลบถาวรใน 30 วัน)");
       setDeleteDialogOpen(false);
       setDeletingTicket(null);
       setDeleteReason("");
+      refetch(); // Refresh the data
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการลบ: " + error.message);
+    }
+  };
+
+  // Restore function
+  const handleRestoreTicket = async (ticket: LotteryTicket) => {
+    try {
+      const { error } = await supabase
+        .from("lottery_tickets")
+        .update({ deleted_at: null })
+        .eq("id", ticket.id);
+      
+      if (error) throw error;
+      
+      // Also remove from delete_history
+      await supabase
+        .from("delete_history")
+        .delete()
+        .eq("ticket_id", ticket.id);
+        
+      toast.success("กู้คืนรายการสำเร็จ");
+      refetch(); // Refresh the data
+    } catch (error: any) {
+      toast.error("เกิดข้อผิดพลาดในการกู้คืน: " + error.message);
     }
   };
 
@@ -425,7 +506,7 @@ export default function LotteryPurchasePage() {
   // TanStack Table
   const table = useReactTable({
     data: tickets,
-    columns: createColumns(onPrintClick, setDeletingTicket, setDeleteDialogOpen),
+    columns: createColumns(onPrintClick, setDeletingTicket, setDeleteDialogOpen, handleRestoreTicket, showDeleted),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     initialState: {
@@ -459,7 +540,7 @@ export default function LotteryPurchasePage() {
             {/* Filter Section */}
             <Card className="mb-4">
               <CardContent className="pt-4">
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-4 items-center">
                   <Input
                     placeholder="ค้นหาเลขบิล"
                     value={filters.billNumber}
@@ -500,6 +581,42 @@ export default function LotteryPurchasePage() {
                   >
                     ล้างตัวกรอง
                   </Button>
+                  
+                  {/* Toggle show deleted button */}
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Button
+                      variant={showDeleted ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setShowDeleted(!showDeleted);
+                        setPage(1); // Reset to first page when toggling
+                      }}
+                      className={showDeleted ? "bg-red-500 hover:bg-red-600" : ""}
+                    >
+                      {showDeleted ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                      {showDeleted ? "ซ่อนรายการที่ลบ" : "แสดงรายการที่ลบ"}
+                    </Button>
+                    {showDeleted && (
+                      <span className="text-sm text-red-600 font-medium">
+                        ({tickets.length} รายการที่ลบ)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Status indicator */}
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <div className={`w-3 h-3 rounded-full ${showDeleted ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                      <span>
+                        {showDeleted 
+                          ? "กำลังแสดงรายการที่ลบแล้ว (ข้อมูลจะถูกลบถาวรใน 30 วัน)" 
+                          : "กำลังแสดงรายการปกติ"
+                        }
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
