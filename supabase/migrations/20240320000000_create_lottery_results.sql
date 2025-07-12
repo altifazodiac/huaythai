@@ -10,17 +10,17 @@ CREATE TABLE public.lottery_results (
 CREATE TABLE public.lottery_result_numbers (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     lottery_result_id UUID NOT NULL REFERENCES public.lottery_results(id) ON DELETE CASCADE,
-    ticket_sub_type_id UUID NOT NULL REFERENCES public.ticket_sub_types(id),
+    lottery_sub_type_id INTEGER NOT NULL REFERENCES public.lottery_sub_types(lottery_sub_type_id),
     numbers TEXT[] NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(lottery_result_id, ticket_sub_type_id)
+    UNIQUE(lottery_result_id, lottery_sub_type_id)
 );
 
 -- Create index for faster lookups
 CREATE INDEX idx_lottery_results_draw_date ON public.lottery_results(draw_date);
 CREATE INDEX idx_lottery_result_numbers_lottery_result_id ON public.lottery_result_numbers(lottery_result_id);
-CREATE INDEX idx_lottery_result_numbers_ticket_sub_type_id ON public.lottery_result_numbers(ticket_sub_type_id);
+CREATE INDEX idx_lottery_result_numbers_lottery_sub_type_id ON public.lottery_result_numbers(lottery_sub_type_id);
 
 -- Add RLS policies
 ALTER TABLE public.lottery_results ENABLE ROW LEVEL SECURITY;
@@ -64,4 +64,4 @@ CREATE TRIGGER set_updated_at_lottery_results
 CREATE TRIGGER set_updated_at_lottery_result_numbers
     BEFORE UPDATE ON public.lottery_result_numbers
     FOR EACH ROW
-    EXECUTE FUNCTION public.handle_updated_at(); 
+    EXECUTE FUNCTION public.handle_updated_at();
