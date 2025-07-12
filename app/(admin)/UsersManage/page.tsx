@@ -177,11 +177,21 @@ export default function UsersManagePage() {
         phone: formattedPhone
       };
 
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authorization header if session exists
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const response = await fetch('/api/admin-users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify(requestData),
       });
@@ -222,55 +232,41 @@ export default function UsersManagePage() {
     }
 
     try {
-      // Check if credit balance changed
-      const creditChanged = selectedUser.credit_balance !== editForm.credit_balance;
-      const creditDifference = editForm.credit_balance - selectedUser.credit_balance;
-
       const formattedPhone = editForm.phone ? formatPhoneNumber(editForm.phone) : editForm.phone;
 
-      // Update profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authorization header if session exists
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`/api/admin-users?id=${selectedUser.id}`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'update_user',
           name: editForm.name,
           phone: formattedPhone,
           email: editForm.email,
           line_id: editForm.line_id,
           branch: editForm.branch,
-          credit_balance: editForm.credit_balance
-        })
-        .eq('id', selectedUser.id);
-
-      if (profileError) throw profileError;
-
-      // Log credit adjustment if credit changed
-      if (creditChanged && creditDifference !== 0) {
-        const { error: transactionError } = await supabase
-          .from('credit_transactions')
-          .insert({
-            user_id: selectedUser.id,
-            amount: Math.abs(creditDifference),
-            transaction_type: creditDifference > 0 ? 'admin_topup' : 'admin_deduction',
-            description: creditDifference > 0 
-              ? `Admin เติมเครดิต ${Math.abs(creditDifference).toLocaleString()} บาท`
-              : `Admin หักเครดิต ${Math.abs(creditDifference).toLocaleString()} บาท`
-          });
-
-        if (transactionError) {
-          console.warn("Warning: Could not log credit adjustment transaction:", transactionError.message);
-          // Continue anyway as profile is updated successfully
-        }
-      }
-
-      // Update user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: selectedUser.id,
+          credit_balance: editForm.credit_balance,
           role: editForm.role
-        });
+        }),
+      });
 
-      if (roleError) throw roleError;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Something went wrong');
+      }
 
       toast.success("อัปเดตข้อมูลผู้ใช้สำเร็จ");
       setShowEditDialog(false);
@@ -285,28 +281,28 @@ export default function UsersManagePage() {
     if (!selectedUser) return;
 
     try {
-      // Delete user role first
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('user_id', selectedUser.id);
-
-      if (roleError) throw roleError;
-
-      // Delete profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', selectedUser.id);
-
-      if (profileError) throw profileError;
-
-      // Delete from auth (admin function)
-      const { error: authError } = await supabase.auth.admin.deleteUser(selectedUser.id);
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (authError) {
-        console.warn("Warning: Could not delete from auth:", authError.message);
-        // Continue anyway as profile is deleted
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authorization header if session exists
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`/api/admin-users?id=${selectedUser.id}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Something went wrong');
       }
 
       toast.success("ลบผู้ใช้สำเร็จ");
@@ -320,15 +316,32 @@ export default function UsersManagePage() {
 
   const handleResetPassword = async (user: UserProfile) => {
     try {
-      const newPassword = Math.random().toString(36).slice(-8);
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
       
-      const { error } = await supabase.auth.admin.updateUserById(user.id, {
-        password: newPassword
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authorization header if session exists
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch(`/api/admin-users?id=${user.id}`, {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ action: 'reset_password' }),
       });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      toast.success(`รีเซ็ตรหัสผ่านสำเร็จ รหัสผ่านใหม่: ${newPassword}`);
+      if (!response.ok) {
+        throw new Error(result.error || 'Something went wrong');
+      }
+
+      toast.success(`รีเซ็ตรหัสผ่านสำเร็จ รหัสผ่านใหม่: ${result.newPassword}`);
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน: " + error.message);
     }
