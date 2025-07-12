@@ -167,55 +167,8 @@ CREATE POLICY "Users can create their own ticket items"
         AND lottery_tickets.user_id = auth.uid()
     ));
 
--- Create policies for lottery_draws
-CREATE POLICY "Anyone can view draws"
-    ON public.lottery_draws
-    FOR SELECT
-    USING (true);
-
-CREATE POLICY "Only authenticated users can create draws"
-    ON public.lottery_draws
-    FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Only authenticated users can update draws"
-    ON public.lottery_draws
-    FOR UPDATE
-    USING (auth.role() = 'authenticated');
-
--- Create policies for lottery_results
-CREATE POLICY "Anyone can view results"
-    ON public.lottery_results
-    FOR SELECT
-    USING (true);
-
-CREATE POLICY "Only authenticated users can create results"
-    ON public.lottery_results
-    FOR INSERT
-    WITH CHECK (auth.role() = 'authenticated');
-
-CREATE POLICY "Only authenticated users can update results"
-    ON public.lottery_results
-    FOR UPDATE
-    USING (auth.role() = 'authenticated');
-
--- Create policies for lottery_winnings
-CREATE POLICY "Users can view their own winnings"
-    ON public.lottery_winnings
-    FOR SELECT
-    USING (EXISTS (
-        SELECT 1 FROM public.lottery_ticket_items
-        JOIN public.lottery_tickets ON lottery_tickets.id = lottery_ticket_items.ticket_id
-        WHERE lottery_ticket_items.id = lottery_winnings.ticket_item_id
-        AND lottery_tickets.user_id = auth.uid()
-    ));
-
-CREATE POLICY "Only authenticated users can update winnings"
-    ON public.lottery_winnings
-    FOR UPDATE
-    USING (auth.role() = 'authenticated');
-
 -- Create function to calculate total amount for a ticket
+DROP FUNCTION IF EXISTS public.calculate_ticket_total(UUID);
 CREATE OR REPLACE FUNCTION public.calculate_ticket_total(ticket_id UUID)
 RETURNS DECIMAL(10,2) AS $$
 BEGIN
