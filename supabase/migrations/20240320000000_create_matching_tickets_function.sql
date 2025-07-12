@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS public.get_matching_tickets(text);
+
 -- Create a function to get matching tickets
 CREATE OR REPLACE FUNCTION get_matching_tickets(p_ticket_set_number text)
 RETURNS TABLE (
