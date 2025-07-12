@@ -88,6 +88,19 @@ export async function middleware(request: NextRequest) {
     user = null;
   }
   
+  // กำหนด public routes ที่ไม่ต้องตรวจสอบ authentication
+  const publicRoutes = [
+    '/login',
+    '/register', 
+    '/api', // ← API routes เป็น public
+    '/_next',
+    '/favicon.ico',
+    '/robots.txt'
+  ]
+  
+  // ตรวจสอบว่าเป็น public route หรือไม่
+  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
+  
   // กำหนด protected routes
   const protectedRoutes = ['/homepage', '/lottery-ticket', '/lottery-orders', '/profile']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
@@ -97,6 +110,12 @@ export async function middleware(request: NextRequest) {
     console.log('🚫 Protected route -> redirecting to login');
     const loginUrl = new URL('/login', request.url)
     return NextResponse.redirect(loginUrl)
+  }
+  
+  // ถ้าเป็น public route ให้ผ่านไปได้เลย
+  if (isPublicRoute) {
+    console.log('✅ Public route -> allowing access');
+    return response
   }
   
   // ถ้าเป็นหน้า login หรือ auth routes แต่มี user แล้ว ให้ redirect ไป homepage
