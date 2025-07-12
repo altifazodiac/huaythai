@@ -1,3 +1,22 @@
+-- Create drawing_schedules table
+CREATE TABLE IF NOT EXISTS public.drawing_schedules (
+  schedule_id serial NOT NULL,
+  lottery_type_id integer NOT NULL,
+  draw_time time without time zone NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone ('utc'::text, now()),
+  lottery_sub_type_id integer NULL,
+  frequency_unit character varying(20) NULL,
+  frequency_value integer NULL,
+  day_of_week character varying(50) NULL,
+  open_time time without time zone NULL,
+  close_time time without time zone NULL,
+  updated_at timestamp with time zone NULL DEFAULT now(),
+  CONSTRAINT drawing_schedules_pkey PRIMARY KEY (schedule_id),
+  CONSTRAINT drawing_schedules_lottery_sub_type_id_fkey FOREIGN KEY (lottery_sub_type_id) REFERENCES lottery_sub_types (lottery_sub_type_id),
+  CONSTRAINT drawing_schedules_lottery_type_id_fkey FOREIGN KEY (lottery_type_id) REFERENCES lottery_types (lottery_type_id)
+) TABLESPACE pg_default;
+
 -- Create scheduled_tasks table
 CREATE TABLE IF NOT EXISTS public.scheduled_tasks (
     id TEXT PRIMARY KEY,

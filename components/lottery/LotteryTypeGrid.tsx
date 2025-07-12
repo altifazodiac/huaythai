@@ -91,23 +91,41 @@ function isOpenNow(schedule: any): boolean {
   }
 }
 
-function dayOfWeekTH(days: string) {
+function dayOfWeekTH(days: string | null | undefined) {
   if (!days) return "";
   const arr = days.split(",").map(d => d.trim());
+  
+  // Check for common patterns first
   if (arr.length === 5 && arr[0] === "Monday" && arr[4] === "Friday") return "จันทร์-ศุกร์";
-  if (arr.length === 7) return "ทุกวัน";
+  if (arr.length === 7 && arr.includes("Monday") && arr.includes("Sunday")) return "ทุกวัน";
+  
   const map: Record<string, string> = {
     Monday: "จันทร์", Tuesday: "อังคาร", Wednesday: "พุธ",
     Thursday: "พฤหัส", Friday: "ศุกร์", Saturday: "เสาร์", Sunday: "อาทิตย์"
   };
+  
   return arr.map(d => map[d] || d).join(", ");
 }
 
-function dayOfWeekToEn(day: string): string {
-  if (day && day.includes("ของเดือน")) {
+function dayOfWeekToEn(day: string | null | undefined): string {
+  if (!day) {
+    return "";
+  }
+  
+  if (day.includes("ของเดือน")) {
     return day;
   }
 
+  // Check if the input is already in English format
+  const englishDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayArray = day.split(",").map(d => d.trim());
+  const isAlreadyEnglish = dayArray.every(d => englishDays.includes(d));
+  
+  if (isAlreadyEnglish) {
+    return day; // Already in English format, return as-is
+  }
+
+  // Handle Thai format (for backward compatibility)
   const map: Record<string, string> = {
     "จันทร์": "Monday",
     "อังคาร": "Tuesday",
@@ -317,7 +335,7 @@ export default function LotteryTypeGrid({
                       ? { ...schedule, day_of_week: dayOfWeekToEn(schedule.day_of_week) }
                       : undefined;
                     const scheduleWithDays = scheduleEn
-                      ? { ...scheduleEn, days: parseThaiDayOfWeek(schedule.day_of_week) }
+                      ? { ...scheduleEn, days: parseThaiDayOfWeek(scheduleEn.day_of_week) }
                       : undefined;
                     const isCurrentlyOpen = isOpenNow(scheduleEn);
                     const isLoading = loadingCardId === sub.lottery_sub_type_id;

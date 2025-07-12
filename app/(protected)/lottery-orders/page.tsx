@@ -1087,7 +1087,7 @@ const LotteryOrderPage = () => {
         amount: orderPrices[order.id]?.amount || '0',
       }));
   
-      const { error } = await supabase.rpc('handle_confirm_order', {
+      const { error } = await supabase.rpc('handle_lottery_order', {
         p_user_id: user.id,
         p_bill_name: billName,
         p_bill_number: billNumber,
