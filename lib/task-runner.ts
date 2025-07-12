@@ -139,6 +139,13 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
       }
       await page.waitForTimeout(3000); // รอ JS render เพิ่มเติม
       
+      // --- START DEBUG: Log page content ---
+      const pageContent = await page.content();
+      console.log('--- START DEBUG PAGE CONTENT ---');
+      console.log(pageContent);
+      console.log('--- END DEBUG PAGE CONTENT ---');
+      // --- END DEBUG ---
+
       // ดึงข้อมูลจากหน้าเว็บ
       const scrapedData = await page.evaluate(() => {
         const results: LotteryResult[] = [];
