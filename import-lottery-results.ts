@@ -286,7 +286,7 @@ async function automateBatchImportLotteryResults(drawDate: string) {
     
     const unaliasedNames = new Set<string>();
 
-    const { data: schedules, error: scheduleError } = await supabase.from('drawing_schedules').select('schedule_id, lottery_sub_type_id, drawing_time');
+    const { data: schedules, error: scheduleError } = await supabase.from('drawing_schedules').select('schedule_id, lottery_sub_type_id, draw_time');
     if (scheduleError) throw scheduleError;
     const { data: subTypes, error: subTypeError } = await supabase.from('lottery_sub_types').select('lottery_sub_type_id, lottery_type_id');
     if (subTypeError) throw subTypeError;
@@ -306,7 +306,7 @@ async function automateBatchImportLotteryResults(drawDate: string) {
             normalizedScrapedTime += ':00';
         }
 
-        const schedule = schedules.find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id && s.drawing_time === normalizedScrapedTime);
+        const schedule = schedules.find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id && s.draw_time === normalizedScrapedTime);
         
         if (!schedule) { 
             console.warn(`[Import][Warning] No matching schedule found for: "${apiResult.lottery_name}" at time "${apiResult.draw_time}" (normalized to "${normalizedScrapedTime}") (sub_type_id: ${alias.lottery_sub_type_id}). Skipping.`);
@@ -388,9 +388,9 @@ async function main() {
 
         const { data: scheduledDraws, error: scheduleError } = await supabase
             .from('drawing_schedules')
-            .select('lottery_sub_type_id, drawing_time')
-            .gte('drawing_time', windowStartTime)
-            .lte('drawing_time', currentTime);
+            .select('lottery_sub_type_id, draw_time')
+            .gte('draw_time', windowStartTime)
+            .lte('draw_time', currentTime);
 
         if (scheduleError) throw new Error(`Error fetching schedules: ${scheduleError.message}`);
 
@@ -399,17 +399,17 @@ async function main() {
             return;
         }
 
-        console.log(`Found ${scheduledDraws.length} scheduled draws:`, scheduledDraws.map(s => `ID ${s.lottery_sub_type_id} at ${s.drawing_time}`).join('; '));
+        console.log(`Found ${scheduledDraws.length} scheduled draws:`, scheduledDraws.map(s => `ID ${s.lottery_sub_type_id} at ${s.draw_time}`).join('; '));
         
         const { data: nextDraw, error: nextDrawError } = await supabase
             .from('drawing_schedules')
-            .select('drawing_time')
-            .gt('drawing_time', currentTime)
-            .order('drawing_time', { ascending: true })
+            .select('draw_time')
+            .gt('draw_time', currentTime)
+            .order('draw_time', { ascending: true })
             .limit(1)
             .single();
 
-        const nextDrawTime = nextDraw?.drawing_time;
+        const nextDrawTime = nextDraw?.draw_time;
         if (nextDrawTime) {
             console.log(`[Info] Next scheduled draw is at: ${nextDrawTime}`);
         } else {
@@ -486,7 +486,7 @@ async function main() {
             await createLotteryImportToast(scrapedData);
         } else {
             console.log('\nNo new data was ultimately scraped for the targeted lotteries after all attempts.');
-            const expectedLotteries = scheduledDraws.map(d => `ID ${d.lottery_sub_type_id} at ${d.drawing_time}`);
+            const expectedLotteries = scheduledDraws.map(d => `ID ${d.lottery_sub_type_id} at ${d.draw_time}`);
             console.warn(`Warning: The script was triggered for scheduled lotteries, but no results were found on the website after multiple attempts. This might be due to a publication delay. Expected: ${expectedLotteries.join(', ')}`);
             await createLotteryImportToast([]);
         }

@@ -27,7 +27,7 @@ async function debugAliasesAndSchedules() {
   console.log('\n--- 2. Checking schedules for sub_type_id = 29 ---');
   const { data: schedules, error: scheduleError } = await supabase
     .from('drawing_schedules')
-    .select('schedule_id, lottery_sub_type_id, drawing_time')
+    .select('schedule_id, lottery_sub_type_id, draw_time')
     .eq('lottery_sub_type_id', 29);
   
   if (scheduleError) {
@@ -41,8 +41,8 @@ async function debugAliasesAndSchedules() {
   console.log('\n--- 3. Checking schedules for time 08:30:00 ---');
   const { data: schedules830, error: schedule830Error } = await supabase
     .from('drawing_schedules')
-    .select('schedule_id, lottery_sub_type_id, drawing_time')
-    .eq('drawing_time', '08:30:00');
+    .select('schedule_id, lottery_sub_type_id, draw_time')
+    .eq('draw_time', '08:30:00');
   
   if (schedule830Error) {
     console.error('Error fetching schedules for 08:30:00:', schedule830Error);
@@ -55,8 +55,8 @@ async function debugAliasesAndSchedules() {
   console.log('\n--- 4. Checking schedules for time 22:30:00 ---');
   const { data: schedules2230, error: schedule2230Error } = await supabase
     .from('drawing_schedules')
-    .select('schedule_id, lottery_sub_type_id, drawing_time')
-    .eq('drawing_time', '22:30:00');
+    .select('schedule_id, lottery_sub_type_id, draw_time')
+    .eq('draw_time', '22:30:00');
   
   if (schedule2230Error) {
     console.error('Error fetching schedules for 22:30:00:', schedule2230Error);
@@ -89,7 +89,7 @@ async function debugAliasesAndSchedules() {
     
     const matchingSchedule = schedules.find(s => s.lottery_sub_type_id === hanoyExtraAlias.lottery_sub_type_id);
     if (matchingSchedule) {
-      console.log(`✅ Found schedule: sub_type_id ${hanoyExtraAlias.lottery_sub_type_id} -> time: ${matchingSchedule.drawing_time}`);
+      console.log(`✅ Found schedule: sub_type_id ${hanoyExtraAlias.lottery_sub_type_id} -> time: ${matchingSchedule.draw_time}`);
     } else {
       console.log(`❌ No schedule found for sub_type_id: ${hanoyExtraAlias.lottery_sub_type_id}`);
     }

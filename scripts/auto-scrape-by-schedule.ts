@@ -20,11 +20,11 @@ async function main() {
 
   for (const schedule of schedules) {
     // Trigger /api/scrape
-    console.log(`Triggering scrape for drawing_time ${schedule.drawing_time}`);
+    console.log(`Triggering scrape for draw_time ${schedule.draw_time}`);
     await fetch('https://www.xn--789-2llyfg0ajkp0jrf.com/api/scrape');
 
     // Trigger /api/import-lottery-results หลัง scrape เสร็จ
-    console.log(`Triggering import-lottery-results for drawing_time ${schedule.drawing_time}`);
+    console.log(`Triggering import-lottery-results for draw_time ${schedule.draw_time}`);
     await fetch('https://www.xn--789-2llyfg0ajkp0jrf.com/api/import-lottery-results');
 
     // อัปเดต last_run, status

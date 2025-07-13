@@ -12,7 +12,7 @@ interface ScheduledTask {
   name: string;
   type: 'scrape' | 'send' | 'cleanup';
   scheduled_time: string;
-  drawing_time: string;
+  draw_time: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   last_run?: string;
   next_run: string;
@@ -172,7 +172,7 @@ class TaskScheduler {
           'x-api-key': this.API_KEY
         },
         body: JSON.stringify({
-          drawing_time: task.drawing_time,
+          draw_time: task.draw_time,
           lottery_sub_type_id: task.lottery_sub_type_id,
           action: 'scrape_and_import'
         })
@@ -202,7 +202,7 @@ class TaskScheduler {
           'x-api-key': this.API_KEY
         },
         body: JSON.stringify({
-          drawing_time: task.drawing_time,
+          draw_time: task.draw_time,
           lottery_sub_type_id: task.lottery_sub_type_id
         })
       });

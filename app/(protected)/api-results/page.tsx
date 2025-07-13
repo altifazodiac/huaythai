@@ -109,7 +109,7 @@ export default function LotteryResultsPage() {
         console.log('⏰ Fetching drawing schedules...');
         const { data: schedules, error: scheduleError } = await supabase
           .from("drawing_schedules")
-          .select("lottery_sub_type_id, drawing_time");
+          .select("lottery_sub_type_id, draw_time");
         
         if (scheduleError) {
           console.error('❌ Schedule Error:', scheduleError);
@@ -135,7 +135,7 @@ export default function LotteryResultsPage() {
         // 4. รวมข้อมูล schedule เข้า alias
         const aliasesWithTime = (aliases || []).map(alias => {
           const schedule = (schedules || []).find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
-          return { ...alias, drawing_time: schedule?.drawing_time || null };
+          return { ...alias, draw_time: schedule?.draw_time || null };
         });
         
         console.log('🔄 Merged aliases with schedules:', aliasesWithTime.length, 'items');
@@ -172,7 +172,7 @@ export default function LotteryResultsPage() {
       country: alias.lottery_sub_types?.country || "OTHER",
       lottery_name: alias.alias_name,
       results: ["3 ตัวบน: xxx", "2 ตัวล่าง: xx"],
-      draw_time: alias.drawing_time || null,
+      draw_time: alias.draw_time || null,
       source_url: null,
       created_at: null,
       isPlaceholder: true,

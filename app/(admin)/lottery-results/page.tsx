@@ -43,7 +43,7 @@ interface ScheduleSubType {
 
 interface Schedule {
   schedule_id: number;
-  drawing_time: string;
+  draw_time: string;
   frequency_unit: 'day' | 'week';
   day_of_week?: string[]; // Assuming it's an array of strings like ["Monday", "Tuesday"]
   lottery_sub_types: ScheduleSubType[]; // Changed to an array of ScheduleSubType
@@ -171,7 +171,7 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
               {subTypeName}
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              รอบ: {sch.drawing_time}
+              รอบ: {sch.draw_time}
               {sch.day_of_week && getDayOfWeekTH(sch.day_of_week) && (
                 <span> วัน{getDayOfWeekTH(sch.day_of_week)}</span>
               )}
@@ -285,14 +285,14 @@ export default function LotteryResultsPage() {
         const nowTime = format(new Date(), "HH:mm");
         const selectedDayOfWeek = format(new Date(selectedDate), 'EEEE');
 
-        const { data: fetchedSchedulesData, error: schedulesError } = await supabase.from('drawing_schedules').select('schedule_id, drawing_time, frequency_unit, day_of_week, lottery_sub_types(lottery_sub_type_id, sub_type_name, lottery_type_id)').eq('is_active', true);
+        const { data: fetchedSchedulesData, error: schedulesError } = await supabase.from('drawing_schedules').select('schedule_id, draw_time, frequency_unit, day_of_week, lottery_sub_types(lottery_sub_type_id, sub_type_name, lottery_type_id)').eq('is_active', true);
         if (schedulesError) { console.error("Error fetching schedules:", schedulesError.message); setGroupedSchedules({}); return null; }
         if (!fetchedSchedulesData || fetchedSchedulesData.length === 0) { setGroupedSchedules({}); return null; }
 
       const fetchedSchedules = fetchedSchedulesData as any[];
       const filteredSchedules: Schedule[] = fetchedSchedules.filter((sch: any) => {
-        if (!sch.drawing_time || !sch.lottery_sub_types || sch.lottery_sub_types.length === 0) return false;
-            const timeCondition = isViewingToday ? nowTime >= sch.drawing_time : true;
+        if (!sch.draw_time || !sch.lottery_sub_types || sch.lottery_sub_types.length === 0) return false;
+            const timeCondition = isViewingToday ? nowTime >= sch.draw_time : true;
             if (sch.frequency_unit === 'day') return timeCondition;
             if (sch.frequency_unit === 'week' && Array.isArray(sch.day_of_week) && sch.day_of_week.includes(selectedDayOfWeek)) return timeCondition;
         return false;
@@ -436,7 +436,7 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
               lottery_sub_type_id: subTypeData.lottery_sub_type_id,
               schedule_id: sch.schedule_id,
               draw_date: selectedDate,
-              draw_time: sch.drawing_time,
+              draw_time: sch.draw_time,
               prize_code: prize_code,
               winning_number: String(winning_number),
           };
@@ -546,7 +546,7 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {group.schedules
                 .slice() // copy to avoid mutating state
-                .sort((a, b) => a.drawing_time.localeCompare(b.drawing_time))
+                .sort((a, b) => a.draw_time.localeCompare(b.draw_time))
                 .map(sch => {
                   const subTypeId = sch.lottery_sub_types[0]?.lottery_sub_type_id;
                 return (

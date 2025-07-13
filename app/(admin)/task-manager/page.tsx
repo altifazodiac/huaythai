@@ -19,7 +19,7 @@ interface ScheduledTask {
   name: string;
   type: 'scrape' | 'send' | 'cleanup';
   scheduled_time: string;
-  drawing_time: string;
+  draw_time: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   last_run?: string;
   next_run: string;
@@ -228,7 +228,7 @@ export default function TaskManagerPage() {
       const result = await startTask(
         task.id,
         task.type,
-        task.drawing_time,
+        task.draw_time,
         task.lottery_sub_type_id
       );
       
@@ -276,7 +276,7 @@ export default function TaskManagerPage() {
     });
 
     return filtered.reduce((acc, task) => {
-      const key = task.drawing_time;
+      const key = task.draw_time;
       if (!acc[key]) {
         acc[key] = { tasks: [], lotteryNames: new Set(), statusCounts: { pending: 0, running: 0, completed: 0, failed: 0 } };
       }

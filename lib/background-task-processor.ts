@@ -12,7 +12,7 @@ interface TaskRecord {
   id: number;
   task_id: string;
   task_type: 'scrape' | 'send' | 'cleanup';
-  drawing_time?: string;
+  draw_time?: string;
   lottery_sub_type_id?: number;
   status: string;
   created_at: string;
@@ -108,14 +108,14 @@ class BackgroundTaskProcessor {
     try {
       switch (task.task_type) {
         case 'scrape':
-          const scrapeResult = await runScrapeTask(task.drawing_time, task.lottery_sub_type_id);
+          const scrapeResult = await runScrapeTask(task.draw_time, task.lottery_sub_type_id);
           return {
             scrapedCount: scrapeResult.scrapedCount,
             importedCount: scrapeResult.importedCount
           };
 
         case 'send':
-          const sendResult = await runSendTask(task.drawing_time, task.lottery_sub_type_id);
+          const sendResult = await runSendTask(task.draw_time, task.lottery_sub_type_id);
           return {
             sentCount: sendResult.sentCount
           };

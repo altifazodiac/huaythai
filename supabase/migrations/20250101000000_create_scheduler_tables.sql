@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.scheduled_tasks (
     name TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('scrape', 'send', 'cleanup')),
     scheduled_time TIME NOT NULL,
-    drawing_time TIME NOT NULL,
+    draw_time TIME NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
     last_run TIMESTAMP WITH TIME ZONE,
     next_run TIMESTAMP WITH TIME ZONE NOT NULL,

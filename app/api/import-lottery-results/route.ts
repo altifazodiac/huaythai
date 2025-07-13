@@ -150,7 +150,7 @@ async function importLotteryResults(drawDate: string, drawingTime?: string, lott
   
   const { data: schedules, error: scheduleError } = await supabase
     .from('drawing_schedules')
-    .select('schedule_id, lottery_sub_type_id, drawing_time');
+    .select('schedule_id, lottery_sub_type_id, draw_time');
   
   if (scheduleError) {
     console.error('[Import] Error fetching schedules:', scheduleError);
@@ -189,7 +189,7 @@ async function importLotteryResults(drawDate: string, drawingTime?: string, lott
     
     const schedule = schedules.find(s => 
       s.lottery_sub_type_id === alias.lottery_sub_type_id && 
-      s.drawing_time === normalizedScrapedTime
+      s.draw_time === normalizedScrapedTime
     );
     
     if (!schedule) {
@@ -281,7 +281,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const drawDate = searchParams.get('draw_date') || new Date().toISOString().split('T')[0];
-    const drawingTime = searchParams.get('drawing_time');
+    const drawingTime = searchParams.get('draw_time');
     const lotterySubTypeId = searchParams.get('lottery_sub_type_id');
     
     // Import ข้อมูลจาก lottery_api_results
@@ -295,7 +295,7 @@ export async function GET(request: NextRequest) {
       message: `Import completed successfully`,
       imported_count: importedCount,
       draw_date: drawDate,
-      drawing_time: drawingTime,
+      draw_time: drawingTime,
       lottery_sub_type_id: lotterySubTypeId
     });
     
@@ -316,14 +316,14 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { drawing_time, lottery_sub_type_id, action = 'scrape_and_import' } = body;
+    const { draw_time, lottery_sub_type_id, action = 'scrape_and_import' } = body;
     
     const timeZone = 'Asia/Bangkok';
     const now = new Date();
     const drawDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const currentTime = formatInTimeZone(now, timeZone, 'HH:mm:ss');
     
-    console.log(`[API] Starting ${action} for drawing_time: ${drawing_time}, sub_type_id: ${lottery_sub_type_id}`);
+    console.log(`[API] Starting ${action} for draw_time: ${draw_time}, sub_type_id: ${lottery_sub_type_id}`);
     
     if (action === 'scrape_and_import') {
       // ขั้นตอนที่ 1: Scrape ข้อมูลจากเว็บไซต์
@@ -348,12 +348,12 @@ export async function POST(request: NextRequest) {
           targetLotteryNames = aliases
             .filter(a => a.lottery_sub_type_id === lottery_sub_type_id)
             .map(a => a.alias_name);
-        } else if (drawing_time) {
-          // ถ้าไม่มี sub_type_id ให้ใช้ drawing_time หา
+        } else if (draw_time) {
+          // ถ้าไม่มี sub_type_id ให้ใช้ draw_time หา
           const { data: schedules } = await supabase
             .from('drawing_schedules')
             .select('lottery_sub_type_id')
-            .eq('drawing_time', drawing_time);
+            .eq('draw_time', draw_time);
           
           if (schedules && schedules.length > 0) {
             const subTypeIds = schedules.map(s => s.lottery_sub_type_id);
@@ -432,7 +432,7 @@ export async function POST(request: NextRequest) {
       // ขั้นตอนที่ 3: Import ข้อมูลไปยัง lottery_results
       const importedCount = await importLotteryResults(
         drawDate,
-        drawing_time,
+        draw_time,
         lottery_sub_type_id
       );
       
@@ -440,7 +440,7 @@ export async function POST(request: NextRequest) {
         message: 'Scrape and import completed successfully',
         scraped_count: scrapedData.length,
         imported_count: importedCount,
-        drawing_time,
+        draw_time,
         lottery_sub_type_id
       });
       
@@ -448,14 +448,14 @@ export async function POST(request: NextRequest) {
       // เฉพาะ import ข้อมูลจาก lottery_api_results
       const importedCount = await importLotteryResults(
         drawDate,
-        drawing_time,
+        draw_time,
         lottery_sub_type_id
       );
       
       return NextResponse.json({
         message: 'Import completed successfully',
         imported_count: importedCount,
-        drawing_time,
+        draw_time,
         lottery_sub_type_id
       });
       

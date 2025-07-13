@@ -14,7 +14,7 @@ export async function startTask(
     const { data, error } = await supabase.rpc('enqueue_task', {
       p_task_id: taskId,
       p_task_type: taskType,
-      p_drawing_time: drawingTime,
+      p_draw_time: drawingTime,
       p_lottery_sub_type_id: lotterySubTypeId
     });
 

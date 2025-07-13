@@ -9,7 +9,7 @@ import { toZonedTime } from "date-fns-tz";
 interface LotterySubType {
   lottery_sub_type_id: number; // Or string, ensure consistency with your DB schema
   sub_type_name: string;
-  multiplication_factor: number;
+  payout_rate: number;
 }
 
 interface LotterySubNumber {
@@ -82,7 +82,7 @@ interface TicketPrintProps {
 interface TicketSubType {
   id: string;
   type_name: string;
-  multiplication_factor: number;
+  payout_rate: number;
 }
 
 // Copied and adapted createGroups function from page.tsx
@@ -483,7 +483,6 @@ export async function fetchTicketPurchase({ id, bill_number, supabase }: { id?: 
       draw_date,
       draw_time,
       close_time,
-      deleted_at,
       lottery_ticket_items!inner (
         id,
         ticket_id,
@@ -493,12 +492,12 @@ export async function fetchTicketPurchase({ id, bill_number, supabase }: { id?: 
         amount,
         created_at,
         updated_at,
-        lottery_sub_types!inner (
+        lottery_sub_types!lottery_ticket_items_lottery_sub_type_id_fkey_new (
           lottery_sub_type_id,
           sub_type_name,
-          multiplication_factor
+          payout_rate
         ),
-        lottery_sub_number!inner (
+        lottery_sub_number!lottery_ticket_items_lottery_sub_number_id_fkey_new (
           id,
           lottery_sub_type_id,
           digit_number,
@@ -529,7 +528,7 @@ export async function fetchTicketPurchase({ id, bill_number, supabase }: { id?: 
     lottery_sub_types: {
       lottery_sub_type_id: item.lottery_sub_types.lottery_sub_type_id,
       sub_type_name: item.lottery_sub_types.sub_type_name,
-      multiplication_factor: item.lottery_sub_types.multiplication_factor,
+      payout_rate: item.lottery_sub_types.payout_rate,
     },
     lottery_sub_number: {
       id: item.lottery_sub_number.id,
@@ -551,7 +550,7 @@ export async function fetchTicketPurchase({ id, bill_number, supabase }: { id?: 
     draw_date: ticket.draw_date,
     draw_time: ticket.draw_time,
     close_time: ticket.close_time, // <<<< ใช้ close_time จาก ticket โดยตรง
-    deleted_at: ticket.deleted_at,
+    deleted_at: null, // ตาราง lottery_tickets ไม่มีคอลัมน์ deleted_at
     items: richItems,
   };
 }

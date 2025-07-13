@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS public.task_queue (
     id BIGSERIAL PRIMARY KEY,
     task_id TEXT NOT NULL,
     task_type TEXT NOT NULL,
-    drawing_time TIME,
+    draw_time TIME,
     lottery_sub_type_id INTEGER,
     status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_task_queue_created_at ON public.task_queue(create
 CREATE OR REPLACE FUNCTION public.enqueue_task(
     p_task_id TEXT,
     p_task_type TEXT,
-    p_drawing_time TIME DEFAULT NULL,
+    p_draw_time TIME DEFAULT NULL,
     p_lottery_sub_type_id INTEGER DEFAULT NULL
 )
 RETURNS jsonb AS $$
@@ -28,8 +28,8 @@ DECLARE
     job_id BIGINT;
 BEGIN
     -- Insert the task into the queue
-    INSERT INTO public.task_queue (task_id, task_type, drawing_time, lottery_sub_type_id)
-    VALUES (p_task_id, p_task_type, p_drawing_time, p_lottery_sub_type_id)
+    INSERT INTO public.task_queue (task_id, task_type, draw_time, lottery_sub_type_id)
+    VALUES (p_task_id, p_task_type, p_draw_time, p_lottery_sub_type_id)
     RETURNING id INTO job_id;
 
     -- Update the scheduled_task status to 'queued' or similar

@@ -19,7 +19,7 @@ import Image from 'next/image';
 interface LotterySubType {
   lottery_sub_type_id: number;
   sub_type_name: string;
-  multiplication_factor: number;
+  payout_rate: number;
 }
 
 interface LotterySubNumber {
@@ -483,7 +483,11 @@ export default function OrderPreviewPage() {
                 <div className="font-semibold">{formattedPurchaseDateTime}</div>
               </div>
             </div>
-            
+            {/* เพิ่มแสดงเวลาปิดรับแบบตรงๆ */}
+            <div className="mt-2 text-center">
+              <div className="text-sm text-muted-foreground">เวลาปิดรับ</div>
+              <div className="font-semibold">{purchase.close_time || 'ไม่ระบุ'}</div>
+            </div>
             {purchase.ticket_set_name && (
               <div className="mt-4 text-center">
                 <div className="text-sm text-muted-foreground">ชื่อผู้ซื้อ</div>

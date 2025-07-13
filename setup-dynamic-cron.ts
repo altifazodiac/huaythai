@@ -9,7 +9,7 @@ const supabase = createClient(
 );
 
 interface DrawingTime {
-    drawing_time: string;
+    draw_time: string;
 }
 
 async function setupDynamicCron() {
@@ -19,8 +19,8 @@ async function setupDynamicCron() {
         // 1. ดึงเวลาทั้งหมดจาก drawing_schedules
         const { data: drawingTimes, error } = await supabase
             .from('drawing_schedules')
-            .select('drawing_time')
-            .not('drawing_time', 'is', null);
+            .select('draw_time')
+            .not('draw_time', 'is', null);
 
         if (error) {
             throw new Error(`Failed to fetch drawing times: ${error.message}`);
@@ -32,7 +32,7 @@ async function setupDynamicCron() {
         }
 
         // 2. คัดกรองเวลาที่ซ้ำออก และเรียงลำดับ
-        const uniqueTimes = [...new Set(drawingTimes.map(dt => dt.drawing_time))]
+        const uniqueTimes = [...new Set(drawingTimes.map(dt => dt.draw_time))]
             .filter(time => time && time.trim() !== '')
             .sort();
 

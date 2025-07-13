@@ -3,7 +3,7 @@
 ## ภาพรวมของระบบ
 
 ระบบ Dynamic Cron นี้จะ:
-1. ดึงเวลาจาก `drawing_schedules.drawing_time` ในฐานข้อมูล
+1. ดึงเวลาจาก `drawing_schedules.draw_time` ในฐานข้อมูล
 2. คัดกรองเวลาที่ซ้ำออก
 3. สร้าง Cron Jobs อัตโนมัติ โดยเพิ่ม delay ตามที่กำหนด:
    - **Scraping**: เวลาหวยออก + 1 นาที
@@ -183,7 +183,7 @@ cd /root/huaylotto && bun -e "
 import { createClient } from '@supabase/supabase-js';
 import 'dotenv/config';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-const { data, error } = await supabase.from('drawing_schedules').select('drawing_time').limit(1);
+const { data, error } = await supabase.from('drawing_schedules').select('draw_time').limit(1);
 console.log('Data:', data, 'Error:', error);
 "
 ```

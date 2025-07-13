@@ -298,7 +298,7 @@ export async function importLotteryResults(drawDate: string, drawingTime?: strin
   
   const { data: schedules, error: scheduleError } = await supabase
     .from('drawing_schedules')
-    .select('schedule_id, lottery_sub_type_id, drawing_time');
+    .select('schedule_id, lottery_sub_type_id, draw_time');
   
   if (scheduleError) {
     console.error('[Import] Error fetching schedules:', scheduleError);
@@ -345,7 +345,7 @@ export async function importLotteryResults(drawDate: string, drawingTime?: strin
     
     const schedule = schedules.find(s => 
       s.lottery_sub_type_id === alias.lottery_sub_type_id && 
-      s.drawing_time === normalizedScrapedTime
+      s.draw_time === normalizedScrapedTime
     );
     
     if (!schedule) {
@@ -449,7 +449,7 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
   const now = new Date();
   const drawDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
   
-  console.log(`[Task] Starting SMART POLLING scrape task for drawing_time: ${drawingTime}, sub_type_id: ${lotterySubTypeId}`);
+  console.log(`[Task] Starting SMART POLLING scrape task for draw_time: ${drawingTime}, sub_type_id: ${lotterySubTypeId}`);
   
   const POLLING_TIMEOUT = 5 * 60 * 1000; // 5 นาที
   const POLLING_INTERVAL_SUCCESS = 15 * 1000; // 15 วินาที
@@ -470,7 +470,7 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
     if (lotterySubTypeId) {
       targetLotteryNames = aliases.filter(a => a.lottery_sub_type_id === lotterySubTypeId).map(a => a.alias_name);
     } else if (drawingTime) {
-      const { data: schedules } = await supabase.from('drawing_schedules').select('lottery_sub_type_id').eq('drawing_time', drawingTime);
+      const { data: schedules } = await supabase.from('drawing_schedules').select('lottery_sub_type_id').eq('draw_time', drawingTime);
       if (schedules && schedules.length > 0) {
         const subTypeIds = schedules.map(s => s.lottery_sub_type_id);
         targetLotteryNames = aliases.filter(a => subTypeIds.includes(a.lottery_sub_type_id)).map(a => a.alias_name);
@@ -570,7 +570,7 @@ export async function runScrapeTask(drawingTime?: string, lotterySubTypeId?: num
 
 // ฟังก์ชันสำหรับส่งผลหวย
 export async function runSendTask(drawingTime?: string, lotterySubTypeId?: number): Promise<{ sentCount: number }> {
-  console.log(`[Task] Starting send task for drawing_time: ${drawingTime}, sub_type_id: ${lotterySubTypeId}`);
+  console.log(`[Task] Starting send task for draw_time: ${drawingTime}, sub_type_id: ${lotterySubTypeId}`);
   
   // TODO: เพิ่มการส่งผลหวยผ่าน Line หรือ notification อื่น ๆ
   // ตอนนี้ return mock data

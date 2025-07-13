@@ -68,7 +68,7 @@ root@metrabyte:~/huaylotto# pm2 logs lottery-background-processor --lines 30
 3|lottery- | [BrowserManager] Browser cleaned up
 
 3|lottery-background-processor  | [12/7/2568 20:45:17] [TaskProcessor] Processing task: scrape_87_37800.000000 (scrape)
-3|lottery-background-processor  | [Task] Starting SMART POLLING scrape task for drawing_time: 10:30:00, sub_type_id: 15
+3|lottery-background-processor  | [Task] Starting SMART POLLING scrape task for draw_time: 10:30:00, sub_type_id: 15
 3|lottery-background-processor  | [Task] Target lottery names: หวยลาวTV
 3|lottery-background-processor  | [Task] Polling attempt... (Elapsed: 0s)
 3|lottery-background-processor  | [Scraper] Starting scrape for URL: https://xn--t3cjebmjd5a.com/
@@ -1280,7 +1280,7 @@ root@metrabyte:~/huaylotto# pm2 logs lottery-background-processor --lines 30
 3|lottery-background-processor  | [12/7/2568 20:45:23] [TaskProcessor] Task scrape_87_37800.000000 failed
 3|lottery-background-processor  | [12/7/2568 20:45:23] [TaskProcessor] - Error: Unknown error
 3|lottery-background-processor  | [12/7/2568 20:45:33] [TaskProcessor] Processing task: scrape_42_1030:00 (scrape)
-3|lottery-background-processor  | [Task] Starting SMART POLLING scrape task for drawing_time: 10:30:00, sub_type_id: 56
+3|lottery-background-processor  | [Task] Starting SMART POLLING scrape task for draw_time: 10:30:00, sub_type_id: 56
 3|lottery-background-processor  | [Task] Target lottery names: หุ้นจีนเช้า
 3|lottery-background-processor  | [Task] Polling attempt... (Elapsed: 0s)
 3|lottery-background-processor  | [Scraper] Starting scrape for URL: https://xn--t3cjebmjd5a.com/
@@ -2490,7 +2490,7 @@ root@metrabyte:~/huaylotto# pm2 logs lottery-background-processor --lines 30
 3|lottery-background-processor  | [12/7/2568 20:45:39] [TaskProcessor] Task scrape_42_1030:00 failed
 3|lottery-background-processor  | [12/7/2568 20:45:39] [TaskProcessor] - Error: Unknown error
 3|lottery-background-processor  | [12/7/2568 20:45:44] [TaskProcessor] Processing task: scrape_87_37800.000000 (scrape)
-3|lottery-background-processor  | [Task] Starting SMART POLLING scrape task for drawing_time: 10:30:00, sub_type_id: 15
+3|lottery-background-processor  | [Task] Starting SMART POLLING scrape task for draw_time: 10:30:00, sub_type_id: 15
 3|lottery-background-processor  | [Task] Target lottery names: หวยลาวTV
 3|lottery-background-processor  | [Task] Polling attempt... (Elapsed: 0s)
 3|lottery-background-processor  | [Scraper] Starting scrape for URL: https://xn--t3cjebmjd5a.com/

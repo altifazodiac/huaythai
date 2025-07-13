@@ -336,7 +336,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const drawDate = searchParams.get('draw_date') || new Date().toISOString().split('T')[0];
-    const drawingTime = searchParams.get('drawing_time');
+    const drawingTime = searchParams.get('draw_time');
     const lotterySubTypeId = searchParams.get('lottery_sub_type_id');
     
     console.log(`[API] GET request - drawDate: ${drawDate}, drawingTime: ${drawingTime}, subTypeId: ${lotterySubTypeId}`);
@@ -352,7 +352,7 @@ export async function GET(request: NextRequest) {
       sent: result.sent,
       count: result.count,
       draw_date: drawDate,
-      drawing_time: drawingTime,
+      draw_time: drawingTime,
       lottery_sub_type_id: lotterySubTypeId
     });
     
@@ -373,17 +373,17 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { drawing_time, lottery_sub_type_id, draw_date } = body;
+    const { draw_time, lottery_sub_type_id, draw_date } = body;
     
     const timeZone = 'Asia/Bangkok';
     const now = new Date();
     const targetDrawDate = draw_date || formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     
-    console.log(`[API] POST request - drawDate: ${targetDrawDate}, drawingTime: ${drawing_time}, subTypeId: ${lottery_sub_type_id}`);
+    console.log(`[API] POST request - drawDate: ${targetDrawDate}, drawingTime: ${draw_time}, subTypeId: ${lottery_sub_type_id}`);
     
     const result = await sendLotteryResults(
       targetDrawDate,
-      drawing_time,
+      draw_time,
       lottery_sub_type_id
     );
     
@@ -399,7 +399,7 @@ export async function POST(request: NextRequest) {
         winning_number: r.winning_number
       })),
       draw_date: targetDrawDate,
-      drawing_time,
+      draw_time,
       lottery_sub_type_id
     });
     

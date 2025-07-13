@@ -63,7 +63,7 @@ interface BillSummary {
   total_amount: number;
   total_payout: number;
   net_profit_loss: number;
-  total_numbers: number;
+  numbers_count: number;
   status: string;
 }
 
@@ -211,38 +211,6 @@ const LotterySummaryPage: React.FC = () => {
     setSearchTerm('');
   };
 
-  // Data fetching functions
-  const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
-    const { data, error } = await supabase.rpc('get_daily_lottery_summary');
-    if (error) throw error;
-    return data || [];
-  };
-
-  const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promise<LotteryTypeSummary[]> => {
-    const { data, error } = await supabase.rpc('get_lottery_type_summary', {
-      p_draw_date: drawDate || null
-    });
-    if (error) throw error;
-    return data || [];
-  };
-
-  const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?: number): Promise<BillSummary[]> => {
-    const { data, error } = await supabase.rpc('get_bill_summary', {
-      p_draw_date: drawDate || null,
-      p_lottery_type_id: lotteryTypeId || null
-    });
-    if (error) throw error;
-    return data || [];
-  };
-
-  const fetchNumberDetails = async (supabase: any, billNumber?: string): Promise<NumberDetail[]> => {
-    const { data, error } = await supabase.rpc('get_number_details', {
-      p_bill_number: billNumber || null
-    });
-    if (error) throw error;
-    return data || [];
-  };
-
   const renderDailySummaryTab = () => (
     <div className="space-y-4">
       <Card>
@@ -266,29 +234,36 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dailySummary.map((item, index) => (
-                  <TableRow 
-                    key={index}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedDate(item.draw_date);
-                      setActiveTab('types');
-                    }}
-                  >
-                    <TableCell className="font-medium">
-                      {formatDate(item.draw_date)}
-                    </TableCell>
-                    <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
-                    <TableCell className={`text-right font-semibold ${
-                      Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(Number(item.net_profit_loss))}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                <AnimatePresence>
+                  {dailySummary.map((item, index) => (
+                    <motion.tr 
+                      key={item.draw_date}
+                      layout
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
+                      onClick={() => {
+                        setSelectedDate(item.draw_date);
+                        setActiveTab('types');
+                      }}
+                    >
+                      <TableCell className="font-medium">
+                        {formatDate(item.draw_date)}
+                      </TableCell>
+                      <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
+                      <TableCell className={`text-right font-semibold ${
+                        Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {formatCurrency(Number(item.net_profit_loss))}
+                      </TableCell>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </TableBody>
             </Table>
           </div>
@@ -326,28 +301,35 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lotteryTypeSummary.map((item, index) => (
-                  <TableRow 
-                    key={index}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedLotteryType(item.lottery_sub_type_id);
-                      setActiveTab('bills');
-                    }}
-                  >
-                    <TableCell className="font-medium">{item.sub_type_name}</TableCell>
-                    <TableCell>{item.country_origin}</TableCell>
-                    <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
-                    <TableCell className={`text-right font-semibold ${
-                      Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(Number(item.net_profit_loss))}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                <AnimatePresence>
+                  {lotteryTypeSummary.map((item, index) => (
+                    <motion.tr 
+                      key={item.lottery_sub_type_id}
+                      layout
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
+                      onClick={() => {
+                        setSelectedLotteryType(item.lottery_sub_type_id);
+                        setActiveTab('bills');
+                      }}
+                    >
+                      <TableCell className="font-medium">{item.sub_type_name}</TableCell>
+                      <TableCell>{item.country_origin}</TableCell>
+                      <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
+                      <TableCell className={`text-right font-semibold ${
+                        Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {formatCurrency(Number(item.net_profit_loss))}
+                      </TableCell>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </TableBody>
             </Table>
           </div>
@@ -387,29 +369,36 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {billSummary.map((item, index) => (
-                  <TableRow 
-                    key={index}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedBillNumber(item.bill_number);
-                      setActiveTab('numbers');
-                    }}
-                  >
-                    <TableCell className="font-medium">{item.bill_number}</TableCell>
-                    <TableCell>{formatDate(item.draw_date)}</TableCell>
-                    <TableCell>{item.user_name || 'ไม่ระบุ'}</TableCell>
-                    <TableCell>{item.sub_type_name} ({item.country_origin})</TableCell>
-                    <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.total_amount))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
-                    <TableCell className={`text-right font-semibold ${
-                      Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {formatCurrency(Number(item.net_profit_loss))}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                <AnimatePresence>
+                  {billSummary.map((item, index) => (
+                    <motion.tr 
+                      key={item.bill_number}
+                      layout
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
+                      onClick={() => {
+                        setSelectedBillNumber(item.bill_number);
+                        setActiveTab('numbers');
+                      }}
+                    >
+                      <TableCell className="font-medium">{item.bill_number}</TableCell>
+                      <TableCell>{formatDate(item.draw_date)}</TableCell>
+                      <TableCell>{item.user_name || 'ไม่ระบุ'}</TableCell>
+                      <TableCell>{item.sub_type_name} ({item.country_origin})</TableCell>
+                      <TableCell className="text-right">{item.numbers_count.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.total_amount))}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
+                      <TableCell className={`text-right font-semibold ${
+                        Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {formatCurrency(Number(item.net_profit_loss))}
+                      </TableCell>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </TableBody>
             </Table>
           </div>
@@ -450,32 +439,42 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {numberDetails.map((item, index) => (
-                  <TableRow key={index} className={item.is_winning ? 'bg-green-50' : ''}>
-                    <TableCell className="font-medium">{item.bill_number}</TableCell>
-                    <TableCell>{item.lottery_type_name}</TableCell>
-                    <TableCell className="text-center">{item.digit_number}</TableCell>
-                    <TableCell>{item.type_number}</TableCell>
-                    <TableCell className="font-mono">{item.numbers.join(', ')}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(item.amount))}</TableCell>
-                    <TableCell className="text-right">{item.price_paid}x</TableCell>
-                    <TableCell className="text-center">
-                      {item.is_winning ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          ถูก
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                          ไม่ถูก
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {item.is_winning ? formatCurrency(Number(item.payout_amount)) : '-'}
-                    </TableCell>
-                    <TableCell className="font-mono">{item.winning_numbers || '-'}</TableCell>
-                  </TableRow>
-                ))}
+                <AnimatePresence>
+                  {numberDetails.map((item, index) => (
+                    <motion.tr 
+                      key={item.id} 
+                      layout
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                      className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${item.is_winning ? 'bg-green-100 dark:bg-green-900/50' : ''}`}
+                    >
+                      <TableCell className="font-medium">{item.bill_number}</TableCell>
+                      <TableCell>{item.lottery_type_name}</TableCell>
+                      <TableCell className="text-center">{item.digit_number}</TableCell>
+                      <TableCell>{item.type_number}</TableCell>
+                      <TableCell className="font-mono">{item.numbers.join(', ')}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(Number(item.amount))}</TableCell>
+                      <TableCell className="text-right">{item.price_paid}x</TableCell>
+                      <TableCell className="text-center">
+                        {item.is_winning ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ถูก
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            ไม่ถูก
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {item.is_winning ? formatCurrency(Number(item.payout_amount)) : '-'}
+                      </TableCell>
+                      <TableCell className="font-mono">{item.winning_numbers || '-'}</TableCell>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </TableBody>
             </Table>
           </div>
@@ -509,60 +508,78 @@ const LotterySummaryPage: React.FC = () => {
           <div className="min-h-screen bg-gradient-to-br from-background to-muted text-foreground p-2 md:p-4 transition-colors duration-500">
             <div className="container mx-auto">
               <header className="mb-6 text-center">
-                <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-500 to-red-500 dark:from-red-600 dark:via-red-400 dark:to-red-400">
+                <motion.h1 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-red-500 to-red-500 dark:from-red-600 dark:via-red-400 dark:to-red-400"
+                >
                   วิเคราะห์ยอดขายหวย
-                </h1>
-                <p className="text-sm text-muted-foreground mt-2">สรุปและวิเคราะห์ข้อมูลการขายหวยแบบละเอียด</p>
+                </motion.h1>
+                <motion.p 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="text-sm text-muted-foreground mt-2"
+                >
+                  สรุปและวิเคราะห์ข้อมูลการขายหวยแบบละเอียด
+                </motion.p>
               </header>
 
               {/* Filter Controls */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Filter className="h-5 w-5" />
-                    ตัวกรองข้อมูล
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">วันที่</label>
-                      <Input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="w-full"
-                      />
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Filter className="h-5 w-5" />
+                      ตัวกรองข้อมูล
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">วันที่</label>
+                        <Input
+                          type="date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">ประเภทหวย ID</label>
+                        <Input
+                          type="number"
+                          value={selectedLotteryType || ''}
+                          onChange={(e) => setSelectedLotteryType(e.target.value ? Number(e.target.value) : null)}
+                          placeholder="เลือกประเภทหวย"
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">เลขที่บิล</label>
+                        <Input
+                          type="text"
+                          value={selectedBillNumber}
+                          onChange={(e) => setSelectedBillNumber(e.target.value)}
+                          placeholder="ใส่เลขที่บิล"
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button onClick={clearFilters} variant="outline" className="w-full">
+                          <X className="h-4 w-4 mr-2" />
+                          ล้างตัวกรอง
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">ประเภทหวย ID</label>
-                      <Input
-                        type="number"
-                        value={selectedLotteryType || ''}
-                        onChange={(e) => setSelectedLotteryType(e.target.value ? Number(e.target.value) : null)}
-                        placeholder="เลือกประเภทหวย"
-                        className="w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">เลขที่บิล</label>
-                      <Input
-                        type="text"
-                        value={selectedBillNumber}
-                        onChange={(e) => setSelectedBillNumber(e.target.value)}
-                        placeholder="ใส่เลขที่บิล"
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <Button onClick={clearFilters} variant="outline" className="w-full">
-                        <X className="h-4 w-4 mr-2" />
-                        ล้างตัวกรอง
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </motion.div>
 
               {/* Loading State */}
               {isLoading && (
@@ -577,11 +594,16 @@ const LotterySummaryPage: React.FC = () => {
 
               {/* Error State */}
               {error && (
-                <Card>
-                  <CardContent className="text-center py-8">
-                    <p className="text-destructive text-lg">{error}</p>
-                  </CardContent>
-                </Card>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                >
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <p className="text-destructive text-lg">{error}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               )}
 
               {/* Main Content - Tabbed Interface */}
@@ -606,21 +628,22 @@ const LotterySummaryPage: React.FC = () => {
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="daily" className="mt-6">
-                    {renderDailySummaryTab()}
-                  </TabsContent>
-
-                  <TabsContent value="types" className="mt-6">
-                    {renderLotteryTypesTab()}
-                  </TabsContent>
-
-                  <TabsContent value="bills" className="mt-6">
-                    {renderBillsTab()}
-                  </TabsContent>
-
-                  <TabsContent value="numbers" className="mt-6">
-                    {renderNumbersTab()}
-                  </TabsContent>
+                  <div className="mt-6">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={activeTab}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                      >
+                        {activeTab === "daily" && renderDailySummaryTab()}
+                        {activeTab === "types" && renderLotteryTypesTab()}
+                        {activeTab === "bills" && renderBillsTab()}
+                        {activeTab === "numbers" && renderNumbersTab()}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
                 </Tabs>
               )}
 

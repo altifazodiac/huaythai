@@ -13,7 +13,7 @@ interface ScheduledTask {
   name: string;
   type: 'scrape' | 'send' | 'cleanup';
   scheduled_time: string;
-  drawing_time: string;
+  draw_time: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   last_run?: string;
   next_run: string;
@@ -23,7 +23,7 @@ interface ScheduledTask {
 
 interface DrawingSchedule {
   schedule_id: number;
-  drawing_time: string;
+  draw_time: string;
   lottery_sub_type_id: number;
   created_at: string;
 }
@@ -62,8 +62,8 @@ class TaskScheduler {
     const { data: drawingSchedules, error } = await supabase
       .from('drawing_schedules')
       .select('*')
-      .not('drawing_time', 'is', null)
-      .order('drawing_time');
+      .not('draw_time', 'is', null)
+      .order('draw_time');
 
     if (error) {
       console.error('Error fetching drawing schedules:', error);
@@ -85,7 +85,7 @@ class TaskScheduler {
     const tasksToCreate: any[] = [];
 
     for (const schedule of drawingSchedules) {
-      const drawingTime = schedule.drawing_time;
+      const drawingTime = schedule.draw_time;
       const [hour, minute] = drawingTime.split(':').map(Number);
       
       // คำนวณเวลาสำหรับ scrape (หลังจากเวลาออกหวย 1 นาที)
@@ -111,7 +111,7 @@ class TaskScheduler {
         name: `Scrape lottery results for ${drawingTime}`,
         type: 'scrape',
         scheduled_time: scrapeTimeStr,
-        drawing_time: drawingTime,
+        draw_time: drawingTime,
         status: 'pending',
         next_run: todayScrapeNext > currentTime ? todayScrapeNext : tomorrowScrapeNext,
         schedule_id: schedule.schedule_id,
@@ -124,7 +124,7 @@ class TaskScheduler {
         name: `Send lottery results for ${drawingTime}`,
         type: 'send',
         scheduled_time: sendTimeStr,
-        drawing_time: drawingTime,
+        draw_time: drawingTime,
         status: 'pending',
         next_run: todaySendNext > currentTime ? todaySendNext : tomorrowSendNext,
         schedule_id: schedule.schedule_id,
@@ -139,7 +139,7 @@ class TaskScheduler {
       name: 'Daily cleanup task',
       type: 'cleanup',
       scheduled_time: '00:30:00',
-      drawing_time: '00:00:00',
+      draw_time: '00:00:00',
       status: 'pending',
       next_run: cleanupNext
     });
@@ -224,7 +224,7 @@ class TaskScheduler {
   }
 
   private async processScrapeTask(task: any): Promise<boolean> {
-    console.log(`🔍 Processing scrape task for ${task.drawing_time}`);
+    console.log(`🔍 Processing scrape task for ${task.draw_time}`);
     
     // เรียก import-lottery-results logic
     const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/import-lottery-results`, {
@@ -234,7 +234,7 @@ class TaskScheduler {
         'x-api-key': process.env.INTERNAL_API_KEY || 'internal'
       },
       body: JSON.stringify({
-        drawing_time: task.drawing_time,
+        draw_time: task.draw_time,
         lottery_sub_type_id: task.lottery_sub_type_id
       })
     });
@@ -243,7 +243,7 @@ class TaskScheduler {
   }
 
   private async processSendTask(task: any): Promise<boolean> {
-    console.log(`📤 Processing send task for ${task.drawing_time}`);
+    console.log(`📤 Processing send task for ${task.draw_time}`);
     
     // เรียก send-lottery-results logic
     const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/send-lottery-results`, {
@@ -253,7 +253,7 @@ class TaskScheduler {
         'x-api-key': process.env.INTERNAL_API_KEY || 'internal'
       },
       body: JSON.stringify({
-        drawing_time: task.drawing_time,
+        draw_time: task.draw_time,
         lottery_sub_type_id: task.lottery_sub_type_id
       })
     });

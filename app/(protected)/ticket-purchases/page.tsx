@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -538,213 +539,244 @@ export default function LotteryPurchasePage() {
           </header>
           <div className="p-4 max-w-7xl mx-auto">
             {/* Filter Section */}
-            <Card className="mb-4">
-              <CardContent className="pt-4">
-                <div className="flex flex-wrap gap-4 items-center">
-                  <Input
-                    placeholder="ค้นหาเลขบิล"
-                    value={filters.billNumber}
-                    onChange={(e) => setFilters({ ...filters, billNumber: e.target.value })}
-                    className="w-40"
-                  />
-                  <Input
-                    type="date"
-                    value={filters.drawDate}
-                    onChange={(e) => setFilters({ ...filters, drawDate: e.target.value })}
-                    className="w-40"
-                  />
-                  <Select
-                    value={filters.status}
-                    onValueChange={(value) => setFilters({ ...filters, status: value })}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="สถานะ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">ทั้งหมด</SelectItem>
-                      <SelectItem value="confirmed">ยืนยันแล้ว</SelectItem>
-                      <SelectItem value="pending">รอดำเนินการ</SelectItem>
-                      <SelectItem value="cancelled">ยกเลิก</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {role === "admin" && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <Card className="mb-4">
+                <CardContent className="pt-4">
+                  <div className="flex flex-wrap gap-4 items-center">
                     <Input
-                      placeholder="ค้นหาชื่อผู้ใช้"
-                      value={filters.username}
-                      onChange={(e) => setFilters({ ...filters, username: e.target.value })}
+                      placeholder="ค้นหาเลขบิล"
+                      value={filters.billNumber}
+                      onChange={(e) => setFilters({ ...filters, billNumber: e.target.value })}
                       className="w-40"
                     />
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={() => setFilters({ billNumber: "", drawDate: "", status: "all", username: "" })}
-                  >
-                    ล้างตัวกรอง
-                  </Button>
-                  
-                  {/* Toggle show deleted button */}
-                  <div className="flex items-center gap-2 ml-auto">
-                    <Button
-                      variant={showDeleted ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setShowDeleted(!showDeleted);
-                        setPage(1); // Reset to first page when toggling
-                      }}
-                      className={showDeleted ? "bg-red-500 hover:bg-red-600" : ""}
+                    <Input
+                      type="date"
+                      value={filters.drawDate}
+                      onChange={(e) => setFilters({ ...filters, drawDate: e.target.value })}
+                      className="w-40"
+                    />
+                    <Select
+                      value={filters.status}
+                      onValueChange={(value) => setFilters({ ...filters, status: value })}
                     >
-                      {showDeleted ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                      {showDeleted ? "ซ่อนรายการที่ลบ" : "แสดงรายการที่ลบ"}
-                    </Button>
-                    {showDeleted && (
-                      <span className="text-sm text-red-600 font-medium">
-                        ({tickets.length} รายการที่ลบ)
-                      </span>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="สถานะ" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">ทั้งหมด</SelectItem>
+                        <SelectItem value="confirmed">ยืนยันแล้ว</SelectItem>
+                        <SelectItem value="pending">รอดำเนินการ</SelectItem>
+                        <SelectItem value="cancelled">ยกเลิก</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {role === "admin" && (
+                      <Input
+                        placeholder="ค้นหาชื่อผู้ใช้"
+                        value={filters.username}
+                        onChange={(e) => setFilters({ ...filters, username: e.target.value })}
+                        className="w-40"
+                      />
                     )}
-                  </div>
-                </div>
-                
-                {/* Status indicator */}
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <div className={`w-3 h-3 rounded-full ${showDeleted ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                      <span>
-                        {showDeleted 
-                          ? "กำลังแสดงรายการที่ลบแล้ว (ข้อมูลจะถูกลบถาวรใน 30 วัน)" 
-                          : "กำลังแสดงรายการปกติ"
-                        }
-                      </span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setFilters({ billNumber: "", drawDate: "", status: "all", username: "" })}
+                    >
+                      ล้างตัวกรอง
+                    </Button>
+                    
+                    {/* Toggle show deleted button */}
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Button
+                        variant={showDeleted ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setShowDeleted(!showDeleted);
+                          setPage(1); // Reset to first page when toggling
+                        }}
+                        className={showDeleted ? "bg-red-500 hover:bg-red-600" : ""}
+                      >
+                        {showDeleted ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                        {showDeleted ? "ซ่อนรายการที่ลบ" : "แสดงรายการที่ลบ"}
+                      </Button>
+                      {showDeleted && (
+                        <span className="text-sm text-red-600 font-medium">
+                          ({tickets.length} รายการที่ลบ)
+                        </span>
+                      )}
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  
+                  {/* Status indicator */}
+                  <div className="mt-2 pt-2 border-t border-gray-200">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <div className={`w-3 h-3 rounded-full ${showDeleted ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                        <span>
+                          {showDeleted 
+                            ? "กำลังแสดงรายการที่ลบแล้ว (ข้อมูลจะถูกลบถาวรใน 30 วัน)" 
+                            : "กำลังแสดงรายการปกติ"
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             {/* Table */}
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id}>
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows?.length ? (
-                      table.getRowModel().rows.map((row) => (
-                        <React.Fragment key={row.id}>
-                          <TableRow
-                            data-state={row.getIsSelected() && "selected"}
-                            onClick={() => {
-                              setExpandedRows((prev) => {
-                                const newSet = new Set(prev);
-                                if (newSet.has(row.original.id)) {
-                                  newSet.delete(row.original.id);
-                                } else {
-                                  newSet.add(row.original.id);
-                                }
-                                return newSet;
-                              });
-                            }}
-                            className="cursor-pointer"
-                          >
-                            {row.getVisibleCells().map((cell) => (
-                              <TableCell key={cell.id}>
-                                {flexRender(
-                                  cell.column.columnDef.cell,
-                                  cell.getContext()
-                                )}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                          {expandedRows.has(row.original.id) && (
-                            <TableRow>
-                              <TableCell
-                                colSpan={table.getAllColumns().length}
-                                className="p-2"
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      {table.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id}>
+                          {headerGroup.headers.map((header) => (
+                            <TableHead key={header.id}>
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(
+                                    header.column.columnDef.header,
+                                    header.getContext()
+                                  )}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableHeader>
+                    <TableBody>
+                      <AnimatePresence>
+                        {table.getRowModel().rows?.length ? (
+                          table.getRowModel().rows.map((row) => (
+                            <React.Fragment key={row.id}>
+                              <motion.tr
+                                layout
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.3 }}
+                                data-state={row.getIsSelected() && "selected"}
+                                onClick={() => {
+                                  setExpandedRows((prev) => {
+                                    const newSet = new Set(prev);
+                                    if (newSet.has(row.original.id)) {
+                                      newSet.delete(row.original.id);
+                                    } else {
+                                      newSet.add(row.original.id);
+                                    }
+                                    return newSet;
+                                  });
+                                }}
+                                className="cursor-pointer"
                               >
-                                <div className="p-4 bg-card rounded-md">
-                                  <h4 className="text-sm font-semibold mb-2">
-                                    รายละเอียดการแทง
-                                  </h4>
-                                  {Array.from(
-                                    createGroups(row.original.lottery_ticket_items).values()
-                                  ).map((group, idx) => (
-                                    <div key={idx} className="flex gap-4 mb-2">
-                                      <div className="w-24">
-                                        <div className="text-xs">
-                                          {group.digit_number} ตัว
-                                        </div>
-                                        <div className="text-xs text-primary">
-                                          {group.typeLabels.join(" x ")}
-                                        </div>
-                                        <div className="text-xs">
-                                          {group.typeLabels
-                                            .map(
-                                              (label: string) =>
-                                                group.amounts[label] || 0
-                                            )
-                                            .join(" x ")}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          รวม{" "}
-                                          {group.typeLabels
-                                            .reduce(
-                                              (sum: number, label: string) =>
-                                                sum +
-                                                (group.amounts[label] || 0) *
-                                                  group.numbers.length,
-                                              0
-                                            )
-                                            .toLocaleString()}{" "}
-                                          ฿
-                                        </div>
-                                      </div>
-                                      <div className="flex-1">
-                                        <div className="text-xs bg-background p-2 rounded border border-border">
-                                          {group.numbers
-                                            .map((num) =>
-                                              typeof num === "string"
-                                                ? num.replace(/[\[\]"]+/g, "") // ลบ [, ], "
-                                                : num
-                                            )
-                                            .join("  ")}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </React.Fragment>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={table.getAllColumns().length}
-                          className="h-24 text-center"
-                        >
-                          ไม่พบข้อมูล
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                                {row.getVisibleCells().map((cell) => (
+                                  <TableCell key={cell.id}>
+                                    {flexRender(
+                                      cell.column.columnDef.cell,
+                                      cell.getContext()
+                                    )}
+                                  </TableCell>
+                                ))}
+                              </motion.tr>
+                              <AnimatePresence>
+                                {expandedRows.has(row.original.id) && (
+                                  <motion.tr
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                  >
+                                    <TableCell
+                                      colSpan={table.getAllColumns().length}
+                                      className="p-0 border-0"
+                                    >
+                                      <motion.div 
+                                        className="p-4 bg-muted/50"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3, delay: 0.1 }}
+                                      >
+                                        <h4 className="text-sm font-semibold mb-2">
+                                          รายละเอียดการแทง
+                                        </h4>
+                                        {Array.from(
+                                          createGroups(row.original.lottery_ticket_items).values()
+                                        ).map((group, idx) => (
+                                          <div key={idx} className="flex gap-4 mb-2">
+                                            <div className="w-24">
+                                              <div className="text-xs">
+                                                {group.digit_number} ตัว
+                                              </div>
+                                              <div className="text-xs text-primary">
+                                                {group.typeLabels.join(" x ")}
+                                              </div>
+                                              <div className="text-xs">
+                                                {group.typeLabels
+                                                  .map(
+                                                    (label: string) =>
+                                                      group.amounts[label] || 0
+                                                  )
+                                                  .join(" x ")}
+                                              </div>
+                                              <div className="text-xs text-muted-foreground">
+                                                รวม{" "}
+                                                {group.typeLabels
+                                                  .reduce(
+                                                    (sum: number, label: string) =>
+                                                      sum +
+                                                      (group.amounts[label] || 0) *
+                                                        group.numbers.length,
+                                                    0
+                                                  )
+                                                  .toLocaleString()}{" "}
+                                                ฿
+                                              </div>
+                                            </div>
+                                            <div className="flex-1">
+                                              <div className="text-xs bg-background p-2 rounded border border-border">
+                                                {group.numbers
+                                                  .map((num) =>
+                                                    typeof num === "string"
+                                                      ? num.replace(/[\[\]"]+/g, "") // ลบ [, ], "
+                                                      : num
+                                                  )
+                                                  .join("  ")}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </motion.div>
+                                    </TableCell>
+                                  </motion.tr>
+                                )}
+                              </AnimatePresence>
+                            </React.Fragment>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={table.getAllColumns().length}
+                              className="h-24 text-center"
+                            >
+                              ไม่พบข้อมูล
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </AnimatePresence>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             {/* Pagination */}
             <div className="flex justify-between items-center mt-4">
@@ -786,32 +818,36 @@ export default function LotteryPurchasePage() {
             </div>
 
             {/* Delete Dialog */}
-            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>ยืนยันการลบรายการ</DialogTitle>
-                </DialogHeader>
-                <div className="text-sm mb-2">
-                  คุณต้องการลบรายการบิลเลขที่ <span className="font-bold">{deletingTicket?.bill_number}</span> หรือไม่?
-                  <br />
-                  (ข้อมูลจะถูกเก็บไว้อีก 30 วันก่อนลบถาวร)
-                </div>
-                <Input
-                  placeholder="เหตุผลในการลบ (ไม่บังคับ)"
-                  value={deleteReason}
-                  onChange={(e) => setDeleteReason(e.target.value)}
-                  className="mb-2"
-                />
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-                    ยกเลิก
-                  </Button>
-                  <Button variant="destructive" onClick={handleDeleteTicket}>
-                    ยืนยันลบ
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <AnimatePresence>
+              {deleteDialogOpen && (
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>ยืนยันการลบรายการ</DialogTitle>
+                    </DialogHeader>
+                    <div className="text-sm mb-2">
+                      คุณต้องการลบรายการบิลเลขที่ <span className="font-bold">{deletingTicket?.bill_number}</span> หรือไม่?
+                      <br />
+                      (ข้อมูลจะถูกเก็บไว้อีก 30 วันก่อนลบถาวร)
+                    </div>
+                    <Input
+                      placeholder="เหตุผลในการลบ (ไม่บังคับ)"
+                      value={deleteReason}
+                      onChange={(e) => setDeleteReason(e.target.value)}
+                      className="mb-2"
+                    />
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                        ยกเลิก
+                      </Button>
+                      <Button variant="destructive" onClick={handleDeleteTicket}>
+                        ยืนยันลบ
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </AnimatePresence>
           </div>
         </SidebarInset>
       </SidebarProvider>

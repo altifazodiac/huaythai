@@ -51,7 +51,7 @@ interface DrawingSchedule {
   lottery_sub_type_id: number;
   frequency_unit: string;
   frequency_value: number;
-  drawing_time: string;
+  draw_time: string;
   day_of_week: string;
   is_active: boolean;
   open_time: string;
@@ -1092,7 +1092,7 @@ const LotteryOrderPage = () => {
         p_bill_name: billName,
         p_bill_number: billNumber,
         p_draw_date: selectedDraw.date.toISOString().split('T')[0],
-        p_draw_time: selectedDraw.schedule.drawing_time, // เพิ่มค่านี้
+        p_draw_time: selectedDraw.schedule.draw_time, // เพิ่มค่านี้
         p_close_time: selectedDraw.schedule.close_time,
         p_total_amount: totalPayment,
         p_ticket_items: itemsToInsert,
@@ -1177,7 +1177,11 @@ const LotteryOrderPage = () => {
                     <span>งวด: {format(selectedDraw.date, 'd MMM yy', { locale: th })}</span>
                   </div>
                   <div className="text-xs opacity-90">
-                    เวลาปิดรับ: {selectedDraw.schedule.drawing_time}
+                    เวลาหวยออก: {selectedDraw.schedule.draw_time}
+                  </div>
+                  {/* เพิ่มแสดงเวลาปิดรับแบบตรงๆ */}
+                  <div className="text-xs opacity-90">
+                    เวลาปิดรับ: {selectedDraw.schedule.close_time || 'ไม่ระบุ'}
                   </div>
                 </div>
               )}

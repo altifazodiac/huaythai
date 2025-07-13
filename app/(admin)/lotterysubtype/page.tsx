@@ -31,6 +31,14 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Loader2, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 // import { AppSidebar } from "@/components/app-sidebar";
@@ -50,6 +58,7 @@ import {
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { useRef } from "react";
+import GovernmentLotteryAnalyzer from "@/components/lottery/GovernmentLotteryAnalyzer";
 
 interface LotteryType {
   lottery_type_id: number;
@@ -71,7 +80,7 @@ interface DrawingSchedule {
   lottery_sub_type_id: number;
   frequency_unit: string;
   frequency_value: number;
-  drawing_time: string;
+  draw_time: string;
   day_of_week: string;
   is_active: boolean;
   created_at?: string;
@@ -105,7 +114,7 @@ const COLUMN_CONFIG = [
   { key: "lottery_type_id", label: "ประเภทหวย" },
   { key: "sub_type_name", label: "ชื่อชนิดย่อย" },
   { key: "country_origin", label: "ประเทศ" },
-  { key: "reference_source", label: "อ้างอิง" },
+ 
   { key: "notes", label: "หมายเหตุ" },
   { key: "is_active", label: "สถานะ" },
   { key: "actions", label: "จัดการ" },
@@ -160,6 +169,9 @@ export default function LotterySubTypePage() {
   const tableRef = useRef<HTMLTableElement>(null);
   // Debounced search
   const [searchTerm, setSearchTerm] = useState("");
+  // Government Lottery Number Cap System
+  const [govLotteryAnalyzerOpen, setGovLotteryAnalyzerOpen] = useState(false);
+  const [govLotterySubTypeId, setGovLotterySubTypeId] = useState<number | null>(null);
   // เพิ่มตรงนี้
   const [showColumns, setShowColumns] = useState<Record<string, boolean>>({
     index: true,
@@ -171,6 +183,16 @@ export default function LotterySubTypePage() {
     is_active: true,
     actions: true,
   });
+
+  const daysOfWeek = [
+    { eng: "Monday", th: "จันทร์" },
+    { eng: "Tuesday", th: "อังคาร" },
+    { eng: "Wednesday", th: "พุธ" },
+    { eng: "Thursday", th: "พฤหัสบดี" },
+    { eng: "Friday", th: "ศุกร์" },
+    { eng: "Saturday", th: "เสาร์" },
+    { eng: "Sunday", th: "อาทิตย์" },
+  ];
 
   // Debounce search input
   useEffect(() => {
@@ -553,60 +575,44 @@ export default function LotterySubTypePage() {
     setPayoutLoading(true);
 
     try {
-      const updateData = {
+      const commonData = {
         digit_number: Number(payoutForm.digit_number),
         type_number: payoutForm.type_number,
         price_paid: Number(payoutForm.price_paid),
       };
 
-      console.log("Payout Submit Data:", { editPayoutId, updateData, payoutSubTypeId });
-
       if (editPayoutId) {
         // For UPDATE operation
+        const updateData = { ...commonData, lottery_sub_type_id: payoutSubTypeId };
         const { data, error } = await supabase
           .from("lottery_sub_number")
           .update(updateData)
           .eq("id", editPayoutId)
           .select();
 
-        console.log("Update Payout Response:", { data, error });
-
         if (error) {
-          console.error("Update Payout Error:", error);
           toast.error(error.message || "เกิดข้อผิดพลาดในการอัปเดต");
           return;
         }
 
         if (!data || data.length === 0) {
-          toast.error("ไม่พบข้อมูลที่ต้องการอัปเดต");
+          toast.error("ไม่สามารถอัปเดตข้อมูลได้ อาจไม่มีข้อมูลที่ตรงกันหรือไม่มีสิทธิ์แก้ไข");
           return;
         }
 
-        console.log("Update Payout Success:", data);
         toast.success("แก้ไขอัตราจ่ายสำเร็จ");
       } else {
         // For INSERT operation
-        const insertData = {
-          lottery_sub_type_id: payoutSubTypeId,
-          ...updateData,
-        };
-
-        console.log("Insert Payout Data:", insertData);
-
+        const insertData = { ...commonData, lottery_sub_type_id: payoutSubTypeId };
         const { data, error } = await supabase
           .from("lottery_sub_number")
           .insert([insertData])
           .select();
 
-        console.log("Insert Payout Response:", { data, error });
-
         if (error) {
-          console.error("Insert Payout Error:", error);
           toast.error(error.message || "เกิดข้อผิดพลาดในการบันทึก");
           return;
         }
-
-        console.log("Insert Payout Success:", data);
         toast.success("บันทึกอัตราจ่ายสำเร็จ");
       }
       
@@ -634,6 +640,22 @@ export default function LotterySubTypePage() {
     await supabase.from("lottery_sub_number").delete().eq("id", id);
     toast.success("ลบอัตราจ่ายสำเร็จ");
     await fetchPayouts(payoutSubTypeId);
+  };
+
+  // Government Lottery Analyzer
+  const openGovLotteryAnalyzer = async (lottery_sub_type_id: number) => {
+    setGovLotterySubTypeId(lottery_sub_type_id);
+    setGovLotteryAnalyzerOpen(true);
+  };
+
+  const closeGovLotteryAnalyzer = () => {
+    setGovLotteryAnalyzerOpen(false);
+    setGovLotterySubTypeId(null);
+  };
+
+  // Helper function to check if it's Government Lottery
+  const isGovernmentLottery = (lottery_sub_type_id: number): boolean => {
+    return lottery_sub_type_id === 1; // หรือใช้ subtype name check
   };
 
   // Memoized TableRow Component
@@ -692,17 +714,19 @@ export default function LotterySubTypePage() {
           <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
             แก้ไข
           </Button>
-          <Button size="sm" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
-            ลบ
-          </Button>
+          
           <Button size="sm" variant="outline" onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>
             ตารางเวลา
+          </Button>
+          
+          <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
+            อัตรา
           </Button>
           <Button size="sm" variant="outline" onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>
             สัตว์
           </Button>
-          <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
-            อัตรา
+          <Button size="sm" className="bg-red-500" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
+            ลบ
           </Button>
         </div>
       </TableCell>
@@ -825,7 +849,7 @@ export default function LotterySubTypePage() {
 
         <div className="mb-4 flex gap-2 items-center">
           <Input
-            placeholder="ค้นหาชื่อ, ประเทศ, อ้างอิง, หมายเหตุ หรือประเภทหวย"
+            placeholder="ค้นหาชื่อ, ประเทศ, หมายเหตุ หรือประเภทหวย"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="max-w-xs"
@@ -875,8 +899,7 @@ export default function LotterySubTypePage() {
                           col.key === "index" ? () => { setSortKey("lottery_sub_type_id"); setSortAsc(sortKey !== "lottery_sub_type_id" ? true : !sortAsc); } :
                           col.key === "lottery_type_id" ? () => { setSortKey("lottery_type_id"); setSortAsc(sortKey !== "lottery_type_id" ? true : !sortAsc); } :
                           col.key === "sub_type_name" ? () => { setSortKey("sub_type_name"); setSortAsc(sortKey !== "sub_type_name" ? true : !sortAsc); } :
-                          col.key === "country_origin" ? () => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); } :
-                          col.key === "reference_source" ? () => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); } :
+                          col.key === "country_origin" ? () => { setSortKey("country_origin"); setSortAsc(sortKey !== "country_origin" ? true : !sortAsc); } :  col.key === "reference_source" ? () => { setSortKey("reference_source"); setSortAsc(sortKey !== "reference_source" ? true : !sortAsc); } :
                           col.key === "notes" ? () => { setSortKey("notes"); setSortAsc(sortKey !== "notes" ? true : !sortAsc); } :
                           col.key === "is_active" ? () => { setSortKey("is_active"); setSortAsc(sortKey !== "is_active" ? true : !sortAsc); } : undefined
                         }
@@ -902,7 +925,7 @@ export default function LotterySubTypePage() {
                         {col.key === "lottery_type_id" && sortKey === "lottery_type_id" && (sortAsc ? " ▲" : " ▼")}
                         {col.key === "sub_type_name" && sortKey === "sub_type_name" && (sortAsc ? " ▲" : " ▼")}
                         {col.key === "country_origin" && sortKey === "country_origin" && (sortAsc ? " ▲" : " ▼")}
-                        {col.key === "reference_source" && sortKey === "reference_source" && (sortAsc ? " ▲" : " ▼")}
+                        
                         {col.key === "notes" && sortKey === "notes" && (sortAsc ? " ▲" : " ▼")}
                         {col.key === "is_active" && sortKey === "is_active" && (sortAsc ? " ▲" : " ▼")}
                       </TableHead>
@@ -944,9 +967,7 @@ export default function LotterySubTypePage() {
                         {showColumns.country_origin && (
                           <TableCell style={{ width: colWidths[3], minWidth: 60 }}>{item.country_origin}</TableCell>
                         )}
-                        {showColumns.reference_source && (
-                          <TableCell style={{ width: colWidths[4], minWidth: 60 }}>{item.reference_source}</TableCell>
-                        )}
+                         
                         {showColumns.notes && (
                           <TableCell style={{ width: colWidths[5], minWidth: 60 }}>{item.notes}</TableCell>
                         )}
@@ -970,18 +991,26 @@ export default function LotterySubTypePage() {
                               <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
                               แก้ไข
                             </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
-                              ลบ
-                            </Button>
+                              
                               <Button size="sm" variant="outline" onClick={() => openScheduleDialog(item.lottery_sub_type_id)}>
                                 ตารางเวลา
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>
-                                สัตว์
-                              </Button>
+                            
                               <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
                                 อัตรา
                               </Button>
+                              {isGovernmentLottery(item.lottery_sub_type_id) ? (
+                                <Button size="sm" variant="outline" onClick={() => openGovLotteryAnalyzer(item.lottery_sub_type_id)} className="bg-red-50 text-red-700 hover:bg-red-100">
+                                  เลขอั้น
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>
+                                  สัตว์
+                                </Button>
+                              )}
+                              <Button size="sm" className="bg-red-400 text-white" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
+                              ลบ
+                            </Button>
                           </div>
                         </TableCell>
                         )}
@@ -1042,8 +1071,8 @@ export default function LotterySubTypePage() {
                 <label className="text-sm font-medium">เวลาออก</label>
                 <input
                   type="time"
-                  name="drawing_time"
-                  value={scheduleForm.drawing_time || ""}
+                  name="draw_time"
+                  value={scheduleForm.draw_time || ""}
                   onChange={handleScheduleChange}
                   required
                   className="w-full border rounded px-2 py-1"
@@ -1051,14 +1080,38 @@ export default function LotterySubTypePage() {
               </div>
               <div>
                 <label className="text-sm font-medium">วันในสัปดาห์</label>
-                <input
-                  type="text"
-                  name="day_of_week"
-                  value={scheduleForm.day_of_week || ""}
-                  onChange={handleScheduleChange}
-                  className="w-full border rounded px-2 py-1"
-                  placeholder="เช่น Monday, Tuesday"
-                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal">
+                      <span>{scheduleForm.day_of_week || "เลือกวัน"}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56">
+                    <DropdownMenuLabel>วันในสัปดาห์</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {daysOfWeek.map((day) => (
+                      <DropdownMenuCheckboxItem
+                        key={day.eng}
+                        checked={scheduleForm.day_of_week?.includes(day.th)}
+                        onCheckedChange={() => {
+                          const currentDays = scheduleForm.day_of_week?.split(", ").filter(Boolean) || [];
+                          let newDays;
+                          if (currentDays.includes(day.th)) {
+                            newDays = currentDays.filter((d) => d !== day.th);
+                          } else {
+                            newDays = [...currentDays, day.th];
+                          }
+                          setScheduleForm((prev) => ({
+                           ...prev,
+                            day_of_week: newDays.join(", "),
+                          }));
+                        }}
+                      >
+                        {day.th}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div>
                 <label className="text-sm font-medium">เวลาเปิดรับ</label>
@@ -1118,7 +1171,7 @@ export default function LotterySubTypePage() {
                   <TableRow key={sch.schedule_id}>
                     <TableCell>{sch.frequency_unit}</TableCell>
                     <TableCell>{sch.frequency_value}</TableCell>
-                    <TableCell>{sch.drawing_time}</TableCell>
+                    <TableCell>{sch.draw_time}</TableCell>
                     <TableCell>{sch.day_of_week}</TableCell>
                     <TableCell>{sch.is_active ? "ใช่" : "ไม่ใช่"}</TableCell>
                     <TableCell>
@@ -1229,13 +1282,7 @@ export default function LotterySubTypePage() {
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto px-8 py-6">
-            {/* Debug Information */}
-            <div className="mb-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-              <div>Debug Info:</div>
-              <div>Edit ID: {editPayoutId || 'null'}</div>
-              <div>Form Data: {JSON.stringify(payoutForm, null, 2)}</div>
-              <div>SubType ID: {payoutSubTypeId}</div>
-            </div>
+            
             
             <form onSubmit={handlePayoutSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1332,6 +1379,24 @@ export default function LotterySubTypePage() {
           </div>
         </DrawerContent>
       </Drawer>
+     
+      {/* Government Lottery Analyzer Dialog */}
+      <Dialog open={govLotteryAnalyzerOpen} onOpenChange={setGovLotteryAnalyzerOpen}>
+        <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>ระบบเลขอั้นหวยรัฐบาล</DialogTitle>
+            <DialogDescription>
+              วิเคราะห์ความเสี่ยงและแสดงเลขอั้นที่ควรหารครึ่งหรือปิดรับตามยอดขายจริง
+            </DialogDescription>
+          </DialogHeader>
+          {govLotterySubTypeId && (
+            <GovernmentLotteryAnalyzer
+              lottery_sub_type_id={govLotterySubTypeId}
+              onClose={closeGovLotteryAnalyzer}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -1376,7 +1441,7 @@ function DrawingScheduleCollapse({ lottery_sub_type_id, supabase }: { lottery_su
           <TableRow key={sch.schedule_id}>
             <TableCell>{sch.frequency_unit}</TableCell>
             <TableCell>{sch.frequency_value}</TableCell>
-            <TableCell>{sch.drawing_time}</TableCell>
+            <TableCell>{sch.draw_time}</TableCell>
             <TableCell>{sch.day_of_week}</TableCell>
             <TableCell>{sch.open_time}</TableCell>
             <TableCell>{sch.close_time}</TableCell>

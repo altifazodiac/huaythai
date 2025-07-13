@@ -275,7 +275,7 @@ Body:
 
 Query Parameters:
 - `draw_date`: วันที่ดึงข้อมูล (YYYY-MM-DD)
-- `drawing_time`: เวลาที่ออกหวย (HH:mm:ss)
+- `draw_time`: เวลาที่ออกหวย (HH:mm:ss)
 - `lottery_sub_type_id`: ID ของประเภทหวย
 
 **POST /api/import-lottery-results**
@@ -286,7 +286,7 @@ Headers:
 Body:
 ```json
 {
-  "drawing_time": "09:30:00",
+  "draw_time": "09:30:00",
   "lottery_sub_type_id": 123,
   "action": "scrape_and_import" | "import_only"
 }
@@ -298,7 +298,7 @@ Body:
 
 Query Parameters:
 - `draw_date`: วันที่ส่งข้อมูล (YYYY-MM-DD)
-- `drawing_time`: เวลาที่ออกหวย (HH:mm:ss)
+- `draw_time`: เวลาที่ออกหวย (HH:mm:ss)
 - `lottery_sub_type_id`: ID ของประเภทหวย
 
 **POST /api/send-lottery-results**
@@ -309,7 +309,7 @@ Headers:
 Body:
 ```json
 {
-  "drawing_time": "09:30:00",
+  "draw_time": "09:30:00",
   "lottery_sub_type_id": 123,
   "draw_date": "2024-01-01"
 }
@@ -327,7 +327,7 @@ CREATE TABLE scheduled_tasks (
     name TEXT NOT NULL,
     type TEXT CHECK (type IN ('scrape', 'send', 'cleanup')),
     scheduled_time TIME NOT NULL,
-    drawing_time TIME NOT NULL,
+    draw_time TIME NOT NULL,
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
     last_run TIMESTAMP WITH TIME ZONE,
     next_run TIMESTAMP WITH TIME ZONE NOT NULL,

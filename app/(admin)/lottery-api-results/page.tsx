@@ -58,7 +58,7 @@ export default async function LotteryResultsPage() {
   // 2. ดึง schedule
   const { data: schedules } = await supabase
     .from('drawing_schedules')
-    .select('lottery_sub_type_id, drawing_time, day_of_week');
+    .select('lottery_sub_type_id, draw_time, day_of_week');
   // 3. ดึงผลรางวัลวันนี้
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const { data: apiResults } = await supabase
@@ -69,7 +69,7 @@ export default async function LotteryResultsPage() {
   // 4. รวมข้อมูล schedule เข้า alias
   const aliasesWithTime = (aliases || []).map(alias => {
     const schedule = (schedules || []).find(s => s.lottery_sub_type_id === alias.lottery_sub_type_id);
-    return { ...alias, drawing_time: schedule?.drawing_time || null, day_of_week: schedule?.day_of_week || null };
+    return { ...alias, draw_time: schedule?.draw_time || null, day_of_week: schedule?.day_of_week || null };
   });
 
   // 5. Merge alias + api + placeholder
@@ -84,7 +84,7 @@ export default async function LotteryResultsPage() {
       country: alias.lottery_sub_types?.country || 'OTHER',
       lottery_name: alias.alias_name,
       results: ['3 ตัวบน: xxx', '2 ตัวล่าง: xx'],
-      draw_time: alias.drawing_time || null,
+      draw_time: alias.draw_time || null,
       day_of_week: alias.day_of_week || null,
       source_url: null,
       created_at: null,
