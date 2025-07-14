@@ -383,60 +383,26 @@ async function main() {
     try {
         const timeZone = 'Asia/Bangkok';
         const now = new Date();
-        console.log('🚀 Starting the TARGETED scrape and import process...');
+        console.log('🚀 Starting the FULL scrape and import process (no time restriction)...');
         console.log(`⏰ Started at: ${now.toLocaleString('th-TH', { timeZone })}`);
         
-        // --- Determine Target Lotteries based on Schedule ---
-        console.log('\n[Step 1/4] Determining Target Lotteries...');
-        const currentTime = formatInTimeZone(now, timeZone, 'HH:mm:ss');
-        const windowStartTime = formatInTimeZone(subMinutes(now, 10), timeZone, 'HH:mm:ss');
+        // --- Skip Schedule Check and Target All Lotteries ---
+        console.log('\n[Step 1/4] Targeting ALL available lotteries (no schedule restriction)...');
         
-        console.log(`Checking for scheduled draws between ${windowStartTime} and ${currentTime}`);
-
-        const { data: scheduledDraws, error: scheduleError } = await supabase
-            .from('drawing_schedules')
-            .select('lottery_sub_type_id, draw_time')
-            .gte('draw_time', windowStartTime)
-            .lte('draw_time', currentTime);
-
-        if (scheduleError) throw new Error(`Error fetching schedules: ${scheduleError.message}`);
-
-        if (!scheduledDraws || scheduledDraws.length === 0) {
-            console.log('No lotteries scheduled to draw in the current time window. Exiting gracefully.');
-            return;
-        }
-
-        console.log(`Found ${scheduledDraws.length} scheduled draws:`, scheduledDraws.map(s => `ID ${s.lottery_sub_type_id} at ${s.draw_time}`).join('; '));
-        
-        const { data: nextDraw, error: nextDrawError } = await supabase
-            .from('drawing_schedules')
-            .select('draw_time')
-            .gt('draw_time', currentTime)
-            .order('draw_time', { ascending: true })
-            .limit(1)
-            .single();
-
-        const nextDrawTime = nextDraw?.draw_time;
-        if (nextDrawTime) {
-            console.log(`[Info] Next scheduled draw is at: ${nextDrawTime}`);
-        } else {
-            console.log('[Info] No subsequent draws found for today.');
-        }
-
-        const scheduledSubTypeIds = scheduledDraws.map(s => s.lottery_sub_type_id);
+        // ดึงข้อมูล aliases ทั้งหมดจาก lottery_name_aliases เพื่อใช้เป็น targetLotteryNames
         const { data: aliases, error: aliasError } = await supabase
             .from('lottery_name_aliases')
-            .select('alias_name')
-            .in('lottery_sub_type_id', scheduledSubTypeIds);
+            .select('alias_name');
 
         if (aliasError) throw new Error(`Error fetching aliases: ${aliasError.message}`);
         
         if (!aliases || aliases.length === 0) {
-            console.warn(`Warning: Found scheduled draws but no corresponding aliases. Check sub_type_ids: ${scheduledSubTypeIds.join(', ')}`);
+            console.warn('No lottery aliases found in lottery_name_aliases table. Exiting.');
             return;
         }
 
         const targetLotteryNames = aliases.map(a => a.alias_name);
+        console.log(`Found ${targetLotteryNames.length} lotteries to target: ${targetLotteryNames.join(', ')}`);
 
         // --- Scraping Phase with Retry Logic ---
         console.log('\n[Step 2/4] Scraping Phase (with up to 20 retries)...');
@@ -445,7 +411,9 @@ async function main() {
             args: ['--disable-gpu', '--no-sandbox'],
             timeout: 360000 
         });
-        const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' });
+        const context = await browser.newContext({ 
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' 
+        });
         
         const targetUrl = 'https://xn--t3cjebmjd5a.com/';
         
@@ -454,12 +422,12 @@ async function main() {
         const retryInterval = 60000; // 60 seconds
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            console.log(`\n[Attempt ${attempt}/${maxRetries}] Scraping for: ${targetLotteryNames.join(', ')}`);
+            console.log(`\n[Attempt ${attempt}/${maxRetries}] Scraping for all lotteries: ${targetLotteryNames.join(', ')}`);
             
             scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
 
             if (scrapedData.length > 0) {
-                console.log(`✅ Success! Found results on attempt ${attempt}.`);
+                console.log(`✅ Success! Found ${scrapedData.length} results on attempt ${attempt}.`);
                 break; 
             }
             
@@ -470,17 +438,9 @@ async function main() {
                 break;
             }
 
-            const nowForCheck = new Date();
-            const currentTimeForCheck = formatInTimeZone(nowForCheck, timeZone, 'HH:mm:ss');
-            if (nextDrawTime && currentTimeForCheck >= nextDrawTime) {
-                console.warn(`[STOP] Current time (${currentTimeForCheck}) has passed the next scheduled draw time (${nextDrawTime}). Stopping retries for the current target.`);
-                break;
-            }
-
             console.log(`Waiting for ${retryInterval / 1000} seconds before retrying...`);
             await new Promise(resolve => setTimeout(resolve, retryInterval));
         }
-
 
         if (scrapedData.length > 0) {
             console.log(`\n[Step 3/4] Upserting ${scrapedData.length} results to temporary table...`);
@@ -493,12 +453,11 @@ async function main() {
             await createLotteryImportToast(scrapedData);
         } else {
             console.log('\nNo new data was ultimately scraped for the targeted lotteries after all attempts.');
-            const expectedLotteries = scheduledDraws.map(d => `ID ${d.lottery_sub_type_id} at ${d.draw_time}`);
-            console.warn(`Warning: The script was triggered for scheduled lotteries, but no results were found on the website after multiple attempts. This might be due to a publication delay. Expected: ${expectedLotteries.join(', ')}`);
+            console.warn('Warning: No results found on the website after multiple attempts. This might be due to a publication delay.');
             await createLotteryImportToast([]);
         }
 
-        // --- Processing & Importing for all scraped dates (which are now targeted) ---
+        // --- Processing & Importing for all scraped dates ---
         if (scrapedData.length > 0) {
             const uniqueDates = [...new Set(scrapedData.map(item => item.draw_date))];
             console.log(`\n[Step 4/4] Processing and Importing to final 'lottery_results' table for dates: ${uniqueDates.join(', ')}...`);
@@ -516,7 +475,6 @@ async function main() {
         console.error('\n❌ A critical error occurred during the main process:', error);
         console.error(`⏰ Failed at: ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`);
         
-        // Create a toast notification for the error
         await createLotteryImportErrorToast(error instanceof Error ? error.message : 'Unknown error');
         
         process.exit(1);

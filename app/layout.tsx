@@ -23,8 +23,8 @@ const kanit = Kanit({
 });
 
 export const metadata: Metadata = {
-  title: "หวยไลโอ",
-  description: "หวยไลโอ",
+  title: "สิงโตทองคำ 77",
+  description: "สิงโตทองคำ 77",
 };
 
 export default function RootLayout({
