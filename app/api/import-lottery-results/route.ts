@@ -27,6 +27,12 @@ interface LotteryResult {
   [key: string]: string | undefined;
 }
 
+function toThaiDateString(date: Date) {
+  const tzOffset = 7 * 60 * 60 * 1000;
+  const tzDate = new Date(date.getTime() + tzOffset);
+  return tzDate.toISOString().split('T')[0];
+}
+
 // ตรวจสอบ API key สำหรับ internal calls
 function validateApiKey(request: NextRequest): boolean {
   const apiKey = request.headers.get('x-api-key');
@@ -65,7 +71,7 @@ async function scrapeAndParseResults(targetUrl: string, context: any, targetLott
             const first_prize = cells[2]?.textContent?.trim();
             
             if (lottery_name && draw_time && first_prize && first_prize !== 'รอผล') {
-              const today = new Date().toISOString().split('T')[0];
+              const today = toThaiDateString(new Date());
               
               results.push({
                 lottery_name,
@@ -280,7 +286,7 @@ async function createLotteryImportToast(scrapedData: LotteryResult[]) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const drawDate = searchParams.get('draw_date') || new Date().toISOString().split('T')[0];
+    const drawDate = searchParams.get('draw_date') || toThaiDateString(new Date());
     const drawingTime = searchParams.get('draw_time');
     const lotterySubTypeId = searchParams.get('lottery_sub_type_id');
     
@@ -320,7 +326,7 @@ export async function POST(request: NextRequest) {
     
     const timeZone = 'Asia/Bangkok';
     const now = new Date();
-    const drawDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+    const drawDate = toThaiDateString(now);
     const currentTime = formatInTimeZone(now, timeZone, 'HH:mm:ss');
     
     console.log(`[API] Starting ${action} for draw_time: ${draw_time}, sub_type_id: ${lottery_sub_type_id}`);

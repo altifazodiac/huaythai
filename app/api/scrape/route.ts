@@ -47,15 +47,21 @@ async function autoScroll(page: Page): Promise<void> {
   });
 }
 
+function toThaiDateString(date: Date) {
+  const tzOffset = 7 * 60 * 60 * 1000;
+  const tzDate = new Date(date.getTime() + tzOffset);
+  return tzDate.toISOString().split('T')[0];
+}
+
 function convertDate(dateStr: string): string {
     const months: Record<string, string> = { 'มกราคม': '01', 'กุมภาพันธ์': '02', 'มีนาคม': '03', 'เมษายน': '04', 'พฤษภาคม': '05', 'มิถุนายน': '06', 'กรกฎาคม': '07', 'สิงหาคม': '08', 'กันยายน': '09', 'ตุลาคม': '10', 'พฤศจิกายน': '11', 'ธันวาคม': '12' };
     const parts = dateStr.trim().split(' ');
-    if (parts.length < 3) return new Date().toISOString().split('T')[0];
+    if (parts.length < 3) return toThaiDateString(new Date());
     const day = parts[parts.length - 3].padStart(2, '0');
     const monthName = parts[parts.length - 2];
     const year = parts[parts.length - 1];
     const month = months[monthName];
-    if (!day || !month || !year) return new Date().toISOString().split('T')[0];
+    if (!day || !month || !year) return toThaiDateString(new Date());
     return `${year}-${month}-${day}`;
 }
 

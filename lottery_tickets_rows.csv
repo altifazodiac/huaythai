@@ -1,0 +1,2 @@
+id,user_id,purchase_date,draw_date,total_amount,status,created_at,updated_at,bill_number,bill_name,draw_time,close_time,deleted_at
+4d6c9466-abf8-4cfd-8da0-0eac6b23a031,08c481f1-657a-446c-9428-152b1bade691,2025-07-13 21:50:32.270277+07,2025-07-14,40.00,pending,2025-07-14 04:50:32.270277+07,2025-07-13 21:50:32.270277+07,367943,,10:30:00,10:15:00,

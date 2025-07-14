@@ -7,6 +7,7 @@ import { Toaster } from 'sonner'
 
 import { LoadingProvider } from "@/components/LoadingProvider";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
+import { NumberCapProvider } from "@/lib/contexts/NumberCapContext";
 import ReactQueryProvider from '@/components/ReactQueryProvider';
 import { ThemeProvider } from "@/components/theme-provider";
 import AppLayoutClient from "@/components/AppLayoutClient";
@@ -43,21 +44,23 @@ export default function RootLayout({
       >
         <ReactQueryProvider>
           <AuthProvider>
-            <LoadingProvider>
-              <ThemeProvider
-                attribute="class"
-                defaultTheme="dark"
-                enableSystem
-                disableTransitionOnChange
-              >
-                  <Toaster position="top-right" />
-                  <LotteryNotificationToast />
-                  <SchedulerInitializer />
-                  <AppLayoutClient>
-                    {children}
-                  </AppLayoutClient>
-              </ThemeProvider>
-            </LoadingProvider>
+            <NumberCapProvider>
+              <LoadingProvider>
+                <ThemeProvider
+                  attribute="class"
+                  defaultTheme="dark"
+                  enableSystem
+                  disableTransitionOnChange
+                >
+                    <Toaster position="top-right" />
+                    <LotteryNotificationToast />
+                    <SchedulerInitializer />
+                    <AppLayoutClient>
+                      {children}
+                    </AppLayoutClient>
+                </ThemeProvider>
+              </LoadingProvider>
+            </NumberCapProvider>
           </AuthProvider>
         </ReactQueryProvider>
       </body>

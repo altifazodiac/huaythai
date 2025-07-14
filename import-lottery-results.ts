@@ -151,6 +151,12 @@ function convertDate(dateStr: string): string {
     return `${year}-${month}-${day}`;
 }
 
+function toThaiDateString(date: Date) {
+  const tzOffset = 7 * 60 * 60 * 1000;
+  const tzDate = new Date(date.getTime() + tzOffset);
+  return tzDate.toISOString().split('T')[0];
+}
+
 function parseGovLotteryCards($: cheerio.CheerioAPI, url: string): LotteryResult[] {
     const cardResults: LotteryResult[] = [];
     $('div.card.my-3.w-100').each((_, cardEl) => {

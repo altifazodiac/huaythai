@@ -269,7 +269,7 @@ export default function LotteryTypeGrid({
   }
 
   const filteredGrouped = useMemo(() => {
-    return grouped.map(group => {
+    const processedGroups = grouped.map(group => {
       const filteredSubTypes = group.subTypes.filter((sub: any) => {
         if (sub.is_active === false) return false; // แสดงเฉพาะที่เปิดใช้งาน
         if (filterCountry !== "all" && sub.country_origin !== filterCountry) return false;
@@ -291,6 +291,25 @@ export default function LotteryTypeGrid({
         ...group,
         subTypes: sortedSubTypes,
       };
+    });
+
+    const desiredOrder = ['หวยไทย', 'หวยลาว', 'หวยฮานอย', 'หวยหุ้น', 'หวยออนไลน์'];
+    
+    return processedGroups.sort((a, b) => {
+      const indexA = desiredOrder.indexOf(a.type_name);
+      const indexB = desiredOrder.indexOf(b.type_name);
+
+      if (indexA !== -1 && indexB !== -1) { // both in the list
+        return indexA - indexB;
+      }
+      if (indexA !== -1) { // only a in the list
+        return -1;
+      }
+      if (indexB !== -1) { // only b in the list
+        return 1;
+      }
+      // neither in the list, sort alphabetically
+      return a.type_name.localeCompare(b.type_name, 'th');
     });
   }, [grouped, schedules, filterOpen, filterCountry]);
 

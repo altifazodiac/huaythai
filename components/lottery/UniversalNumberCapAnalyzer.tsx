@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Plus, Settings, Ban, Scissors } from "lucide-react";
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Plus, Settings, Ban, Scissors, BarChart3, Users, Calendar, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,6 +27,13 @@ import { NumberCapTable } from './NumberCapTable';
 interface Props {
   lottery_sub_type_id: number;
   onClose: () => void;
+}
+
+interface LotterySubType {
+  lottery_sub_type_id: number;
+  sub_type_name: string;
+  country_origin: string;
+  lottery_type_id: number;
 }
 
 interface NumberSalesData {
@@ -61,32 +69,18 @@ interface ManagedNumber {
   risk_percentage?: number;
 }
 
-function toThaiDateString(date: Date) {
-  const tzOffset = 7 * 60 * 60 * 1000;
-  const tzDate = new Date(date.getTime() + tzOffset);
-  return tzDate.toISOString().split('T')[0];
-}
-
-export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose }: Props) {
+export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClose }: Props) {
   const { managedNumbers, addManagedNumber, removeManagedNumber: removeManagedNumberFromContext, fetchManagedNumbers, updateManagedNumbersForSubType, checkNumberStatus } = useNumberCap();
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    return toThaiDateString(tomorrow);
-  });
+  const [lotterySubType, setLotterySubType] = useState<LotterySubType | null>(null);
+  // ฟังก์ชันแปลงวันที่ปัจจุบันเป็น yyyy-MM-dd (โซนเวลาไทย)
+  function getTodayTH() {
+    const now = new Date();
+    now.setHours(now.getHours() + 7 - now.getTimezoneOffset() / 60);
+    return now.toISOString().split('T')[0];
+  }
+  const [selectedDate, setSelectedDate] = useState(getTodayTH());
   const [riskThreshold, setRiskThreshold] = useState(70); // 70% risk threshold
   const { analysis, loading, fetchSalesAnalysis } = useNumberCapAnalysis(lottery_sub_type_id, selectedDate, riskThreshold);
-  
-  // Debug analysis changes
-  useEffect(() => {
-    console.log('📊 Analysis updated:', analysis ? {
-      total_sales: analysis.total_sales_all,
-      high_risk: analysis.high_risk_numbers.length,
-      medium_risk: analysis.medium_risk_numbers.length,
-      safe: analysis.safe_numbers.length
-    } : 'null');
-  }, [analysis]);
   const [testMode, setTestMode] = useState(false); // Test mode with sample data
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
   const [showManualAdd, setShowManualAdd] = useState(false);
@@ -97,26 +91,39 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
   const [manualReason, setManualReason] = useState('เลขดัง');
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
 
+  function toThaiDateString(date: Date) {
+    const tzOffset = 7 * 60 * 60 * 1000;
+    const tzDate = new Date(date.getTime() + tzOffset);
+    return tzDate.toISOString().split('T')[0];
+  }
+
   // ล้าง manual number เมื่อเปลี่ยน digit count
   useEffect(() => {
     setManualNumber('');
   }, [manualDigitCount]);
 
-  // Auto fetch analysis when component loads or parameters change
+  // Fetch lottery subtype information
   useEffect(() => {
-    console.log('🔄 GovernmentLotteryAnalyzer useEffect triggered:', { 
-      testMode, 
-      selectedDate, 
-      lottery_sub_type_id,
-      shouldFetch: !testMode && selectedDate && lottery_sub_type_id 
-    });
-    if (!testMode && selectedDate && lottery_sub_type_id) {
-      fetchSalesAnalysis();
-    }
-  }, [selectedDate, riskThreshold, lottery_sub_type_id, testMode, fetchSalesAnalysis]);
+    const fetchSubType = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('lottery_sub_types')
+          .select('lottery_sub_type_id, sub_type_name, country_origin, lottery_type_id')
+          .eq('lottery_sub_type_id', lottery_sub_type_id)
+          .single();
+
+        if (error) throw error;
+        setLotterySubType(data);
+      } catch (error) {
+        console.error('Error fetching lottery subtype:', error);
+        toast.error('ไม่สามารถดึงข้อมูลประเภทหวยได้');
+      }
+    };
+
+    fetchSubType();
+  }, [lottery_sub_type_id]);
 
   const generateSampleData = () => {
-    console.log('🧪 generateSampleData called');
     const sampleAnalysis: SalesAnalysis = {
       total_sales_all: 125000,
       total_potential_payout: 95000,
@@ -137,15 +144,29 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
         { number: "56", digit_count: 2, type_number: "ล่าง", total_sales: 200, price_paid: 90, potential_payout: 18000, risk_percentage: 14.4, is_capped: false, total_bets: 4 }
       ]
     };
-    // setAnalysis(sampleAnalysis); // This line is removed
+    // Note: sampleAnalysis is for display only in test mode
+    // The actual analysis comes from useNumberCapAnalysis hook
     const sampleManagedNumbers: ManagedNumber[] = [
       { number: "123", digit_count: 3, type_number: "บน", action: "close", reason: "ความเสี่ยง 100%+", is_manual: false, lottery_sub_type_id, draw_date: selectedDate },
       { number: "999", digit_count: 3, type_number: "บน", action: "half", reason: "เลขดัง", is_manual: true, lottery_sub_type_id, draw_date: selectedDate },
       { number: "456", digit_count: 3, type_number: "โต๊ด", action: "half", reason: "ความเสี่ยง 96.0%", is_manual: false, lottery_sub_type_id, draw_date: selectedDate }
     ];
-    // setManagedNumbers(sampleManagedNumbers); // This line is removed
+    // setManagedNumbers(sampleManagedNumbers); // This line is removed as managedNumbers is now from context
     toast.success("✅ แสดงข้อมูลตัวอย่างสำหรับทดสอบ", { duration: 3000 });
   };
+
+  // fetchSalesAnalysis is now provided by useNumberCapAnalysis hook
+
+  useEffect(() => {
+    if (!testMode) {
+      fetchSalesAnalysis();
+    }
+  }, [selectedDate, riskThreshold, testMode, lottery_sub_type_id, fetchSalesAnalysis]);
+
+  // Load managed numbers from Context when component mounts
+  useEffect(() => {
+    fetchManagedNumbers(lottery_sub_type_id, selectedDate);
+  }, [lottery_sub_type_id, selectedDate, fetchManagedNumbers]);
 
   // ลบ useEffect ที่ทำให้เกิด infinite loop
   // ไม่ต้อง sync managedNumbers อัตโนมัติเพราะทำให้เกิด infinite loop
@@ -188,15 +209,9 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
       return null;
     }).filter(Boolean) as ManagedNumber[];
 
-    // setManagedNumbers(prev => { // This line is removed
-    //     const existingKeys = new Set(prev.map(n => `${n.number}-${n.digit_count}-${n.type_number}`));
-    //     const trulyNew = newManagedNumbers.filter(n => !existingKeys.has(`${n.number}-${n.digit_count}-${n.type_number}`));
-    //     return [...prev, ...trulyNew];
-    // });
-
     try {
-      for (const newNumber of newManagedNumbers) {
-        await addManagedNumber(newNumber);
+      for (const newManagedNumber of newManagedNumbers) {
+        await addManagedNumber(newManagedNumber);
       }
       setSelectedNumbers([]);
       toast.success(`เพิ่ม ${newManagedNumbers.length} เลขเข้าระบบจัดการเรียบร้อย`);
@@ -238,12 +253,24 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
     }
   };
 
-  const clearManagedNumbers = () => {
-      if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างรายการจัดการทั้งหมด?')) {
-        // setManagedNumbers([]); // This line is removed
-        managedNumbers.forEach(n => removeManagedNumberFromContext(`${n.number}-${n.digit_count}-${n.type_number}`));
+  const clearManagedNumbers = async () => {
+    if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างรายการจัดการทั้งหมด?')) {
+      try {
+        // ลบข้อมูลใน supabase
+        const { error } = await supabase
+          .from('managed_numbers')
+          .delete()
+          .eq('lottery_sub_type_id', lottery_sub_type_id)
+          .eq('draw_date', selectedDate);
+        if (error) throw error;
+        // รีเฟรช context
+        await fetchManagedNumbers(lottery_sub_type_id, selectedDate);
         toast.success('ล้างรายการจัดการทั้งหมดแล้ว');
+      } catch (err) {
+        console.error('เกิดข้อผิดพลาดในการลบทั้งหมด:', err);
+        toast.error('เกิดข้อผิดพลาดในการลบทั้งหมด');
       }
+    }
   };
 
   const exportManagedNumbers = () => {
@@ -253,7 +280,7 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
     const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `รายการจัดการเลขอั้น_${selectedDate}.csv`;
+    link.download = `รายการจัดการเลขอั้น_${lotterySubType?.sub_type_name}_${selectedDate}.csv`;
     link.click();
     URL.revokeObjectURL(link.href);
     toast.success('ส่งออกรายการจัดการเรียบร้อยแล้ว');
@@ -261,6 +288,11 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 }).format(amount);
   const formatPercentage = (percentage: number) => percentage > 100 ? "100%+" : `${percentage.toFixed(1)}%`;
+  const getRiskColor = (percentage: number) => {
+    if (percentage > riskThreshold) return 'text-red-600 bg-red-50';
+    if (percentage > riskThreshold / 2) return 'text-orange-600 bg-orange-50';
+    return 'text-green-600 bg-green-50';
+  };
   const getRiskBadgeColor = (percentage: number) => {
     if (percentage > riskThreshold) return 'destructive';
     if (percentage > riskThreshold / 2) return 'secondary';
@@ -277,23 +309,97 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
     setActionDialogOpen(false);
   };
 
+  const renderNumberTable = (title: string, numbers: NumberSalesData[], icon: React.ReactNode, cardClass: string) => (
+    numbers.length > 0 && (
+      <Card className={cardClass}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {icon}
+            {title} ({numbers.length} เลข)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2 w-8">เลือก</th>
+                  <th className="text-left p-2">เลข</th>
+                  <th className="text-left p-2">ประเภท</th>
+                  <th className="text-right p-2">ยอดขาย</th>
+                  <th className="text-right p-2">เงินรางวัล</th>
+                  <th className="text-right p-2">ความเสี่ยง</th>
+                  <th className="text-center p-2">จำนวนบิล</th>
+                </tr>
+              </thead>
+              <tbody>
+                {numbers.map((number, index) => {
+                  const numberKey = `${number.number}-${number.digit_count}-${number.type_number}`;
+                  const isSelected = selectedNumbers.includes(numberKey);
+                  const isManaged = managedNumbers.some(m => `${m.number}-${m.digit_count}-${m.type_number}` === numberKey);
+                  return (
+                    <tr key={index} className={`border-b hover:bg-opacity-50 ${isSelected ? 'bg-blue-100' : ''} ${isManaged ? 'opacity-40 bg-gray-100' : 'hover:bg-gray-50'}`}>
+                      <td className="p-2">
+                        <Checkbox checked={isSelected} disabled={isManaged} onCheckedChange={() => toggleNumberSelection(numberKey)} />
+                      </td>
+                      <td className="p-2 font-mono font-bold">{number.number}</td>
+                      <td className="p-2">{number.digit_count} ตัว{number.type_number}</td>
+                      <td className="p-2 text-right">{formatCurrency(number.total_sales)}</td>
+                      <td className="p-2 text-right font-bold">{formatCurrency(number.potential_payout)}</td>
+                      <td className="p-2 text-right"><Badge variant={getRiskBadgeColor(number.risk_percentage)}>{formatPercentage(number.risk_percentage)}</Badge></td>
+                      <td className="p-2 text-center">{number.total_bets}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  );
+
   const filteredManagedNumbers = managedNumbers.filter(n => n.lottery_sub_type_id === lottery_sub_type_id && n.draw_date === selectedDate);
 
   return (
     <div className="p-4 bg-gray-50 min-h-[80vh] space-y-4">
+      {/* Header with lottery type info */}
+      <div className="bg-white rounded-lg p-4 shadow-sm border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="bg-red-100 p-2 rounded-lg">
+              <BarChart3 className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">ระบบจัดการเลขอั้น</h1>
+              <p className="text-sm text-gray-600">
+                {lotterySubType?.sub_type_name} • {lotterySubType?.country_origin}
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" onClick={onClose}>
+            ปิด
+          </Button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-4 items-center justify-between">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
               <label className="text-sm font-medium">วันที่ออกรางวัล:</label>
               <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-40" disabled={testMode || loading} />
             </div>
             <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500" />
               <label className="text-sm font-medium">เกณฑ์เลขอั้น (%):</label>
               <Input type="number" value={riskThreshold} onChange={(e) => setRiskThreshold(Number(e.target.value))} className="w-20" min="1" max="100" disabled={loading} />
             </div>
             <Button onClick={() => {
-              console.log('🔄 วิเคราะห์ใหม่ button clicked');
-              fetchSalesAnalysis();
+              console.log('🔄 UniversalNumberCapAnalyzer วิเคราะห์ใหม่ button clicked, testMode:', testMode);
+              if (!testMode) {
+                fetchSalesAnalysis();
+              }
             }} disabled={loading || testMode}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               วิเคราะห์ใหม่
@@ -304,16 +410,8 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
                 <Plus className="mr-2 h-4 w-4" />
                 เพิ่มเลขด้วยตนเอง
               </Button>
-              <Button onClick={() => { 
-                console.log('🧪 ทดสอบ button clicked, current testMode:', testMode);
-                setTestMode(prev => !prev); 
-                if(testMode) { 
-                  setSelectedNumbers([]); 
-                  toast.info("ออกจากโหมดทดสอบ"); 
-                } else { 
-                  generateSampleData(); 
-                } 
-              }} variant="outline" className={testMode ? "bg-orange-50 text-orange-700" : ""}>
+              <Button onClick={() => { setTestMode(prev => !prev); if(testMode) { 
+                setSelectedNumbers([]); toast.info("ออกจากโหมดทดสอบ"); } else { generateSampleData(); } }} variant="outline" className={testMode ? "bg-orange-50 text-orange-700" : ""}>
                 {testMode ? "ออกจากโหมดทดสอบ" : "ทดสอบ"}
               </Button>
           </div>
@@ -332,42 +430,9 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm">เลขอั้น</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{analysis.high_risk_numbers.length}</div><div className="text-xs text-gray-500">เลข</div></CardContent></Card>
           </div>
           
-          <NumberCapTable
-            title="เลขอั้น - ควรจัดการด่วน"
-            numbers={analysis.high_risk_numbers}
-            selectedNumbers={selectedNumbers}
-            onSelect={toggleNumberSelection}
-            managedNumbers={managedNumbers}
-            getRiskBadgeColor={getRiskBadgeColor}
-            formatCurrency={formatCurrency}
-            formatPercentage={formatPercentage}
-            icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
-            cardClass="border-red-200"
-          />
-          <NumberCapTable
-            title="เลขเสี่ยงปานกลาง - ควรติดตาม"
-            numbers={analysis.medium_risk_numbers}
-            selectedNumbers={selectedNumbers}
-            onSelect={toggleNumberSelection}
-            managedNumbers={managedNumbers}
-            getRiskBadgeColor={getRiskBadgeColor}
-            formatCurrency={formatCurrency}
-            formatPercentage={formatPercentage}
-            icon={<TrendingUp className="h-5 w-5 text-orange-600" />}
-            cardClass="border-orange-200"
-          />
-          <NumberCapTable
-            title="เลขปลอดภัย - ยอดขายสูงสุด"
-            numbers={analysis.safe_numbers}
-            selectedNumbers={selectedNumbers}
-            onSelect={toggleNumberSelection}
-            managedNumbers={managedNumbers}
-            getRiskBadgeColor={getRiskBadgeColor}
-            formatCurrency={formatCurrency}
-            formatPercentage={formatPercentage}
-            icon={<TrendingDown className="h-5 w-5 text-green-600" />}
-            cardClass="border-green-200"
-          />
+          {renderNumberTable('เลขอั้น - ควรจัดการด่วน', analysis.high_risk_numbers, <AlertTriangle className="h-5 w-5 text-red-600" />, 'border-red-200')}
+          {renderNumberTable('เลขเสี่ยงปานกลาง - ควรติดตาม', analysis.medium_risk_numbers, <TrendingUp className="h-5 w-5 text-orange-600" />, 'border-orange-200')}
+          {renderNumberTable('เลขปลอดภัย - ยอดขายสูงสุด', analysis.safe_numbers, <TrendingDown className="h-5 w-5 text-green-600" />, 'border-green-200')}
 
           {filteredManagedNumbers.length > 0 && (
             <Card className="border-green-200">
@@ -421,8 +486,8 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
                   setManualNumber(value);
                 }
               }} maxLength={manualDigitCount} /></div>
-              <div><label className="text-xs font-medium">หลัก</label><Select value={manualDigitCount.toString()} onValueChange={(v) => setManualDigitCount(Number(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="2">2 ตัว</SelectItem><SelectItem value="3">3 ตัว</SelectItem></SelectContent></Select></div>
-              <div><label className="text-xs font-medium">ประเภท</label><Select value={manualTypeNumber} onValueChange={(v) => setManualTypeNumber(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="บน">บน</SelectItem><SelectItem value="ล่าง">ล่าง</SelectItem><SelectItem value="โต๊ด">โต๊ด</SelectItem></SelectContent></Select></div>
+              <div><label className="text-xs font-medium">หลัก</label><Select value={manualDigitCount.toString()} onValueChange={(v) => setManualDigitCount(Number(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 ตัว</SelectItem><SelectItem value="2">2 ตัว</SelectItem><SelectItem value="3">3 ตัว</SelectItem></SelectContent></Select></div>
+              <div><label className="text-xs font-medium">ประเภท</label><Select value={manualTypeNumber} onValueChange={(v) => setManualTypeNumber(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="บน">บน</SelectItem><SelectItem value="ล่าง">ล่าง</SelectItem><SelectItem value="โต๊ด">โต๊ด</SelectItem><SelectItem value="วิ่งบน">วิ่งบน</SelectItem><SelectItem value="วิ่งล่าง">วิ่งล่าง</SelectItem></SelectContent></Select></div>
               <div><label className="text-xs font-medium">จัดการ</label><Select value={manualAction} onValueChange={(v: 'half'|'close') => setManualAction(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="half">หารครึ่ง</SelectItem><SelectItem value="close">ปิดรับ</SelectItem></SelectContent></Select></div>
               <Button onClick={addManualNumber}><Plus className="h-4 w-4" /></Button>
             </div>

@@ -332,10 +332,16 @@ async function sendLotteryResults(drawDate: string, drawingTime?: string, lotter
   };
 }
 
+function toThaiDateString(date: Date) {
+  const tzOffset = 7 * 60 * 60 * 1000;
+  const tzDate = new Date(date.getTime() + tzOffset);
+  return tzDate.toISOString().split('T')[0];
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const drawDate = searchParams.get('draw_date') || new Date().toISOString().split('T')[0];
+    const drawDate = searchParams.get('draw_date') || toThaiDateString(new Date());
     const drawingTime = searchParams.get('draw_time');
     const lotterySubTypeId = searchParams.get('lottery_sub_type_id');
     

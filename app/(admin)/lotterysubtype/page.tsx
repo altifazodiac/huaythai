@@ -58,7 +58,7 @@ import {
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { toast } from "sonner";
 import { useRef } from "react";
-import GovernmentLotteryAnalyzer from "@/components/lottery/GovernmentLotteryAnalyzer";
+import UniversalNumberCapAnalyzer from "@/components/lottery/UniversalNumberCapAnalyzer";
 
 interface LotteryType {
   lottery_type_id: number;
@@ -169,9 +169,9 @@ export default function LotterySubTypePage() {
   const tableRef = useRef<HTMLTableElement>(null);
   // Debounced search
   const [searchTerm, setSearchTerm] = useState("");
-  // Government Lottery Number Cap System
-  const [govLotteryAnalyzerOpen, setGovLotteryAnalyzerOpen] = useState(false);
-  const [govLotterySubTypeId, setGovLotterySubTypeId] = useState<number | null>(null);
+  // Universal Number Cap System
+  const [numberCapAnalyzerOpen, setNumberCapAnalyzerOpen] = useState(false);
+  const [numberCapSubTypeId, setNumberCapSubTypeId] = useState<number | null>(null);
   // เพิ่มตรงนี้
   const [showColumns, setShowColumns] = useState<Record<string, boolean>>({
     index: true,
@@ -642,21 +642,19 @@ export default function LotterySubTypePage() {
     await fetchPayouts(payoutSubTypeId);
   };
 
-  // Government Lottery Analyzer
-  const openGovLotteryAnalyzer = async (lottery_sub_type_id: number) => {
-    setGovLotterySubTypeId(lottery_sub_type_id);
-    setGovLotteryAnalyzerOpen(true);
+  // Universal Number Cap Analyzer
+  const openNumberCapAnalyzer = async (lottery_sub_type_id: number) => {
+    setNumberCapSubTypeId(lottery_sub_type_id);
+    setNumberCapAnalyzerOpen(true);
   };
 
-  const closeGovLotteryAnalyzer = () => {
-    setGovLotteryAnalyzerOpen(false);
-    setGovLotterySubTypeId(null);
+  const closeNumberCapAnalyzer = () => {
+    setNumberCapAnalyzerOpen(false);
+    setNumberCapSubTypeId(null);
   };
 
   // Helper function to check if it's Government Lottery
-  const isGovernmentLottery = (lottery_sub_type_id: number): boolean => {
-    return lottery_sub_type_id === 1; // หรือใช้ subtype name check
-  };
+
 
   // Memoized TableRow Component
   const TableRowComponent = React.memo(({ item, index, colWidths, lotteryTypes, handleEdit, handleDelete, handleToggleActive, openScheduleDialog, openAnimalDialog, openPayoutDrawer, expandedRow, setExpandedRow }: {
@@ -999,15 +997,9 @@ export default function LotterySubTypePage() {
                               <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
                                 อัตรา
                               </Button>
-                              {isGovernmentLottery(item.lottery_sub_type_id) ? (
-                                <Button size="sm" variant="outline" onClick={() => openGovLotteryAnalyzer(item.lottery_sub_type_id)} className="bg-red-50 text-red-700 hover:bg-red-100">
-                                  เลขอั้น
-                                </Button>
-                              ) : (
-                                <Button size="sm" variant="outline" onClick={() => openAnimalDialog(item.lottery_sub_type_id)}>
-                                  สัตว์
-                                </Button>
-                              )}
+                              <Button size="sm" variant="outline" onClick={() => openNumberCapAnalyzer(item.lottery_sub_type_id)} className="bg-red-50 text-red-700 hover:bg-red-100">
+                                เลขอั้น
+                              </Button>
                               <Button size="sm" className="bg-red-400 text-white" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
                               ลบ
                             </Button>
@@ -1380,19 +1372,19 @@ export default function LotterySubTypePage() {
         </DrawerContent>
       </Drawer>
      
-      {/* Government Lottery Analyzer Dialog */}
-      <Dialog open={govLotteryAnalyzerOpen} onOpenChange={setGovLotteryAnalyzerOpen}>
+      {/* Universal Number Cap Analyzer Dialog */}
+      <Dialog open={numberCapAnalyzerOpen} onOpenChange={setNumberCapAnalyzerOpen}>
         <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>ระบบเลขอั้นหวยรัฐบาล</DialogTitle>
+            <DialogTitle>ระบบจัดการเลขอั้น</DialogTitle>
             <DialogDescription>
               วิเคราะห์ความเสี่ยงและแสดงเลขอั้นที่ควรหารครึ่งหรือปิดรับตามยอดขายจริง
             </DialogDescription>
           </DialogHeader>
-          {govLotterySubTypeId && (
-            <GovernmentLotteryAnalyzer
-              lottery_sub_type_id={govLotterySubTypeId}
-              onClose={closeGovLotteryAnalyzer}
+          {numberCapSubTypeId && (
+            <UniversalNumberCapAnalyzer
+              lottery_sub_type_id={numberCapSubTypeId}
+              onClose={closeNumberCapAnalyzer}
             />
           )}
         </DialogContent>

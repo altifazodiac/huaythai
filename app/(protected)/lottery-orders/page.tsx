@@ -18,6 +18,9 @@ import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { FaMoneyBill } from 'react-icons/fa';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useNumberCap } from '@/lib/contexts/NumberCapContext';
+import NumberCapIndicator from '@/components/lottery/NumberCapIndicator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Define types for orders
 type OrderCategory = 'three' | 'two' | 'run';
@@ -121,7 +124,53 @@ const LotteryOrderPage = () => {
   const router = useRouter();
   // Use authenticated Supabase client from AuthContext
   const { supabase, user, credit, fetchCredit } = useAuth();
+  const { checkNumberStatus, fetchManagedNumbers, isUniversalNumberCapped, getUniversalNumberCapAction, getNumberCapStatsBySubType } = useNumberCap();
   const [isSaving, setIsSaving] = useState(false);
+
+  // เพิ่ม state สำหรับเก็บข้อมูลเลขอั้นที่ดึงจากฐานข้อมูลโดยตรง
+  const [managedNumbersCache, setManagedNumbersCache] = useState<any[]>([]);
+
+  // ฟังก์ชันดึงข้อมูลเลขอั้นจากฐานข้อมูลโดยตรง
+  const fetchDirectManagedNumbers = async (subTypeId: number, drawDate: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('managed_numbers')
+        .select('*')
+        .eq('lottery_sub_type_id', subTypeId)
+        .eq('draw_date', drawDate);
+
+      if (error) {
+        console.error('Error fetching managed numbers:', error);
+        return [];
+      }
+
+      setManagedNumbersCache(data || []);
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching managed numbers:', error);
+      return [];
+    }
+  };
+
+  // ฟังก์ชันตรวจสอบเลขอั้นโดยใช้ข้อมูลที่ดึงมาโดยตรง
+  const getDirectNumberCapAction = (number: string, digitCount: number, typeNumber: string, subTypeId: number, drawDate: string) => {
+    const managedNumber = managedNumbersCache.find(mn => 
+      mn.lottery_sub_type_id === subTypeId &&
+      mn.draw_date === drawDate &&
+      mn.number === number &&
+      mn.digit_count === digitCount &&
+      mn.type_number === typeNumber
+    );
+
+    if (managedNumber) {
+      return {
+        action: managedNumber.action as 'close' | 'half',
+        reason: managedNumber.reason
+      };
+    }
+
+    return null;
+  };
 
   // Handle URL parameters from LotteryTypeGrid
   const [initialState] = useState(() => {
@@ -185,7 +234,7 @@ const LotteryOrderPage = () => {
   // เพิ่ม state สำหรับควบคุมการแสดงผล Right Panel
   const [showRightPanel, setShowRightPanel] = useState(true);
   // เพิ่ม state สำหรับจัดการข้อมูลราคาของแต่ละรายการ
-  const [orderPrices, setOrderPrices] = useState<Record<number, { amount: string; pricePaid: string }>>({});
+  const [orderPrices, setOrderPrices] = useState<Record<number, { originalAmount?: string, amount?: string }>>({});
   // เพิ่ม state สำหรับจัดการ checkbox ของรายการที่เลือก
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<number>>(new Set());
   // เพิ่ม state สำหรับ checkbox ราคาที่กำหนดให้ทุกหมด
@@ -270,6 +319,16 @@ const LotteryOrderPage = () => {
     setSelectedPrizeIds([]);
     setIsReversed(false); // รีเซ็ตปุ่มกลับเลขด้วย
   }, [activeDigitTab]);
+
+  // โหลดข้อมูลเลขอั้นเมื่อเปลี่ยน subtype หรือ draw date
+  useEffect(() => {
+    if (initialState.subType && selectedDraw) {
+      const drawDateStr = selectedDraw.date.toISOString().split('T')[0];
+      fetchDirectManagedNumbers(initialState.subType, drawDateStr);
+      // ยังคงเรียก fetchManagedNumbers เพื่อให้ context ทำงาน
+      fetchManagedNumbers(initialState.subType, drawDateStr);
+    }
+  }, [initialState.subType, selectedDraw, fetchManagedNumbers]);
 
   const [isReversed, setIsReversed] = useState(false);
   const [isMoreOptionsOpen, setIsMoreOptionsOpen] = useState(true);
@@ -760,6 +819,7 @@ const LotteryOrderPage = () => {
     }
 
     const newOrders: Order[] = [];
+    let blockedNumbers: { num: string, reason: string }[] = [];
 
     selectedPrizeIds.forEach(prizeId => {
       const prize = prizeInfo.find(p => p.id === prizeId);
@@ -770,6 +830,37 @@ const LotteryOrderPage = () => {
       const numbersToAdd = isReversed && !isTote ? getPermutations(inputNumber) : [inputNumber];
 
       numbersToAdd.forEach(num => {
+        // ตรวจสอบเลขอั้นสำหรับทุกประเภทหวย
+        if (initialState.subType && selectedDrawDate) {
+          let digitCount = 3;
+          let typeNumber = 'บน';
+          if (prize.category === 'three') {
+            digitCount = 3;
+            typeNumber = prize.display_name.includes('โต๊ด') ? 'โต๊ด' : 'บน';
+          } else if (prize.category === 'two') {
+            digitCount = 2;
+            typeNumber = prize.display_name.includes('ล่าง') ? 'ล่าง' : 'บน';
+          } else if (prize.category === 'run') {
+            digitCount = 1;
+            typeNumber = prize.display_name.includes('ล่าง') ? 'วิ่งล่าง' : 'วิ่งบน';
+          }
+          const drawDate = selectedDrawDate.toISOString().split('T')[0];
+          
+          // ใช้ฟังก์ชันตรวจสอบโดยตรงก่อน แล้วค่อย fallback ไป context
+          let numberStatus = getDirectNumberCapAction(num, digitCount, typeNumber, initialState.subType, drawDate);
+          if (!numberStatus) {
+            numberStatus = getUniversalNumberCapAction(num, digitCount, typeNumber, initialState.subType, drawDate);
+          }
+          
+          if (numberStatus) {
+            if (numberStatus.action === 'close') {
+              blockedNumbers.push({ num, reason: numberStatus.reason });
+              return; // ไม่เพิ่มเลขนี้
+            } else if (numberStatus.action === 'half') {
+              toast.warning(`✂️ เลข ${num} อยู่ในระบบหารครึ่ง (${numberStatus.reason})`, { duration: 4000 });
+            }
+          }
+        }
         newOrders.push({
           id: Date.now() + Math.random(),
           numbers: num,
@@ -781,13 +872,18 @@ const LotteryOrderPage = () => {
       });
     });
 
+    if (blockedNumbers.length > 0) {
+      blockedNumbers.forEach(({ num, reason }) => {
+        toast.warning(`🚫 เลข ${num} ถูกปิดรับ (${reason})`, { duration: 4000 });
+      });
+    }
+
     if (newOrders.length === 0) {
       toast.error('ไม่สามารถเพิ่มรายการได้');
       return;
     }
 
     setOrders(prev => [...prev, ...newOrders]);
-
     toast.success(`เพิ่ม ${newOrders.length} รายการสำเร็จ`);
   };
 
@@ -869,24 +965,18 @@ const LotteryOrderPage = () => {
   };
 
   // เพิ่มฟังก์ชันสำหรับจัดการข้อมูลราคาของแต่ละรายการ
-  const handleOrderPriceChange = (orderId: number, field: 'amount' | 'pricePaid', value: string) => {
-    let processedValue = value;
-
-    if (field === 'amount') {
-      // 1. อนุญาตให้ใช้เฉพาะตัวเลข
-      processedValue = value.replace(/[^0-9]/g, '');
-
-      // 2. ป้องกันการใส่ 0 นำหน้า (เช่น "05" จะกลายเป็น "5")
-      if (processedValue.length > 1 && processedValue.startsWith('0')) {
-        processedValue = processedValue.substring(1);
-      }
+  const handleOrderPriceChange = (orderId: number, value: string) => {
+    let processedValue = value.replace(/[^0-9]/g, '');
+    if (processedValue.length > 1 && processedValue.startsWith('0')) {
+      processedValue = processedValue.substring(1);
     }
-
+    
     setOrderPrices(prev => ({
       ...prev,
       [orderId]: {
         ...prev[orderId],
-        [field]: processedValue
+        originalAmount: processedValue,
+        amount: processedValue // For manual input, original and final are the same
       }
     }));
   };
@@ -944,10 +1034,41 @@ const LotteryOrderPage = () => {
     setOrderPrices(prev => {
       const newPrices = { ...prev };
       targetIds.forEach(orderId => {
-        newPrices[orderId] = {
-          ...newPrices[orderId],
-          amount: price.toString()
-        };
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          // ตรวจสอบเลขอั้นสำหรับทุกประเภทหวย
+          let finalPrice = price;
+          if (initialState.subType && selectedDrawDate) {
+            const prize = prizeInfo.find(p => p.id === order.prizeId);
+            if (prize) {
+              let digitCount = 3;
+              let typeNumber = 'บน';
+              
+              if (prize.category === 'three') {
+                digitCount = 3;
+                typeNumber = prize.display_name.includes('โต๊ด') ? 'โต๊ด' : 'บน';
+              } else if (prize.category === 'two') {
+                digitCount = 2;
+                typeNumber = prize.display_name.includes('ล่าง') ? 'ล่าง' : 'บน';
+              } else if (prize.category === 'run') {
+                digitCount = 1;
+                typeNumber = prize.display_name.includes('ล่าง') ? 'วิ่งล่าง' : 'วิ่งบน';
+              }
+              
+              const drawDate = selectedDrawDate.toISOString().split('T')[0];
+              const numberStatus = getUniversalNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
+
+              if (numberStatus?.action === 'half') {
+                finalPrice = Math.floor(price / 2);
+              }
+            }
+          }
+
+          newPrices[orderId] = {
+            originalAmount: price.toString(),
+            amount: finalPrice.toString()
+          };
+        }
       });
       return newPrices;
     });
@@ -956,6 +1077,39 @@ const LotteryOrderPage = () => {
       ? `ใส่ราคา ${price} บาท สำหรับทุกรายการ (${targetIds.length} รายการ)`
       : `ใส่ราคา ${price} บาท สำหรับ ${targetIds.length} รายการ`;
     toast.success(message);
+  };
+
+  // ฟังก์ชันตรวจสอบสถานะเลขอั้นของรายการ (Universal for all lottery types)
+  const getOrderNumberStatus = (order: Order) => {
+    if (!initialState.subType || !selectedDrawDate) return null;
+    
+    // Determine digit count and type based on order category and prize info
+    const prizeData = prizeInfo.find(p => p.id === order.prizeId);
+    if (!prizeData) return null;
+    
+    let digitCount = 3;
+    let typeNumber = 'บน';
+    
+    if (prizeData.category === 'three') {
+      digitCount = 3;
+      typeNumber = prizeData.display_name.includes('โต๊ด') ? 'โต๊ด' : 'บน';
+    } else if (prizeData.category === 'two') {
+      digitCount = 2;
+      typeNumber = prizeData.display_name.includes('ล่าง') ? 'ล่าง' : 'บน';
+    } else if (prizeData.category === 'run') {
+      digitCount = 1;
+      typeNumber = prizeData.display_name.includes('ล่าง') ? 'วิ่งล่าง' : 'วิ่งบน';
+    }
+    
+    const drawDate = selectedDrawDate.toISOString().split('T')[0];
+    
+    // ใช้ฟังก์ชันตรวจสอบโดยตรงก่อน แล้วค่อย fallback ไป context
+    let numberStatus = getDirectNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
+    if (!numberStatus) {
+      numberStatus = getUniversalNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
+    }
+    
+    return numberStatus;
   };
 
   const renderInputBoxes = () => {
@@ -1080,12 +1234,19 @@ const LotteryOrderPage = () => {
     toast.info('กำลังบันทึกรายการ...');
   
     try {
-      const itemsToInsert = selectedOrders.map(order => ({
-        lottery_sub_type_id: initialState.subType,
-        lottery_sub_number_id: order.prizeId, // Assuming prizeId maps to lottery_sub_number_id
-        numbers: [order.numbers], // Assuming a single number string per item
-        amount: orderPrices[order.id]?.amount || '0',
-      }));
+      const itemsToInsert = selectedOrders.map(order => {
+        const prices = orderPrices[order.id];
+        const finalAmount = prices?.amount || '0';
+        const originalAmount = prices?.originalAmount || finalAmount;
+
+        return {
+          lottery_sub_type_id: initialState.subType,
+          lottery_sub_number_id: order.prizeId, // Assuming prizeId maps to lottery_sub_number_id
+          numbers: [order.numbers], // Assuming a single number string per item
+          amount: finalAmount,
+          original_amount: originalAmount,
+        };
+      });
   
       const { error } = await supabase.rpc('handle_lottery_order', {
         p_user_id: user.id,
@@ -1192,6 +1353,16 @@ const LotteryOrderPage = () => {
       </header>
 
       <main className="max-w-7xl mx-auto py-1 px-1">
+        {/* แสดงตัวบ่งชี้เลขอั้นสำหรับทุกประเภทหวย */}
+        {initialState.subType && selectedDrawDate && (
+          <NumberCapIndicator 
+          lottery_sub_type_id={initialState.subType} 
+            drawDate={selectedDrawDate.toISOString().split('T')[0]}
+            showStats={true}
+            lotterySubTypeName={subTypeObj?.sub_type_name}
+          />
+        )}
+        
         <div className={`grid ${!showRightPanel ? 'grid-cols-10' : 'grid-cols-5'} gap-2 md:gap-4`}>
 
           {/* Left Panel: Order List */}
@@ -1307,14 +1478,23 @@ const LotteryOrderPage = () => {
                             </AnimatePresence>
                             <ul className="overflow-y-auto">
                               <AnimatePresence>
-                                {getFilteredOrders(filteredOrders, prize.id).map((order, index) => (
+                                {getFilteredOrders(filteredOrders, prize.id).map((order, index) => {
+                                  const numberStatus = getOrderNumberStatus(order);
+                                  const isCapped = numberStatus && (numberStatus.action === 'close' || numberStatus.action === 'half');
+                                  const cappedBgClass =
+                                    numberStatus?.action === 'close'
+                                      ? 'bg-red-50 dark:bg-red-900/40'
+                                      : numberStatus?.action === 'half'
+                                      ? 'bg-yellow-50 dark:bg-yellow-900/40'
+                                      : '';
+                                  const liContent = (
                                   <motion.li
                                     key={order.id}
                                     ref={index === filteredOrders.length - 1
                                       ? (el) => { lastOrderRefs.current[prize.id] = el; }
                                       : undefined
                                     }
-                                    className={`text-xs py-1 px-1`}
+                                      className={`text-xs py-1 px-1 ${cappedBgClass}`}
                                     layout
                                     initial={{ opacity: 0, x: 24 }}
                                     animate={{ opacity: 1, x: 0, transition: { duration: 0.35 } }}
@@ -1336,17 +1516,40 @@ const LotteryOrderPage = () => {
                                           {order.numbers.split('').map((num, i) => (
                                           <span key={i} className="text-[14px] w-6 h-6 bg-gray-100 dark:bg-red-500 flex items-center justify-center rounded-md mr-0.5">{num}</span>
                                           ))}
+                                          {/* แสดงตัวบ่งชี้เลขอั้น */}
+                                          {(() => {
+                                            if (numberStatus) {
+                                              return (
+                                                <div className="flex items-center ml-1">
+                                                  {numberStatus.action === 'half' && (
+                                                    <span className="text-xs bg-orange-100 text-orange-700 px-1 py-0.5 rounded flex items-center" title={numberStatus.reason}>
+                                                      ✂️
+                                                    </span>
+                                                  )}
+                                                  {numberStatus.action === 'close' && (
+                                                    <span className="text-xs bg-red-100 text-red-700 px-1 py-0.5 rounded flex items-center" title={numberStatus.reason}>
+                                                      🚫
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              );
+                                            }
+                                            return null;
+                                          })()}
                                             {!showRightPanel && (
                                           <>
                                                   <input
                                                     type="number"
                                                     placeholder="0"
                                                     value={orderPrices[order.id]?.amount || ''}
-                                                    onChange={(e) => handleOrderPriceChange(order.id, 'amount', e.target.value)}
+                                                    onChange={(e) => handleOrderPriceChange(order.id, e.target.value)}
                                                     onFocus={() => setFocusedOrderId(order.id)}
                                                     onBlur={() => setFocusedOrderId(null)}
                                               className="w-14 px-1 text-xs text-bold border border-border rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500 h-6 text-center"
                                                   />
+                                              {orderPrices[order.id]?.originalAmount && orderPrices[order.id]?.originalAmount !== orderPrices[order.id]?.amount && (
+                                                <del className="text-xs text-gray-500 mx-1">{orderPrices[order.id]?.originalAmount}</del>
+                                              )}
                                             <div className="w-10 text-xs h-6 flex items-center justify-center font-medium text-gray-500">
                                               x{(prize.prize_rate || 0).toLocaleString()}
                                             </div>
@@ -1361,8 +1564,21 @@ const LotteryOrderPage = () => {
                                       </div>
                                     </div>
                                   </motion.li>
-                                ))}
-
+                                  );
+                                  return isCapped ? (
+                                    <TooltipProvider key={order.id}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>{liContent}</TooltipTrigger>
+                                        <TooltipContent side="right" className="max-w-xs">
+                                          <div className="font-bold">
+                                            {numberStatus.action === 'close' ? 'เลขนี้ปิดรับ' : 'เลขนี้หารครึ่ง'}
+                                          </div>
+                                          <div className="text-xs text-muted-foreground">{numberStatus.reason}</div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  ) : liContent;
+                                })}
                               </AnimatePresence>
                             </ul>
                           </CardContent>

@@ -24,6 +24,12 @@ interface LotteryResult {
   [key: string]: string | undefined;
 }
 
+function toThaiDateString(date: Date) {
+  const tzOffset = 7 * 60 * 60 * 1000;
+  const tzDate = new Date(date.getTime() + tzOffset);
+  return tzDate.toISOString().split('T')[0];
+}
+
 // Browser Manager Singleton to handle concurrent scraping
 class BrowserManager {
   private static instance: BrowserManager;
@@ -157,7 +163,7 @@ export async function scrapeAndParseResults(targetUrl: string, targetLotteryName
               const lottery_name = cells[1]?.textContent?.trim();
               const first_prize = cells[2]?.textContent?.trim();
               if (lottery_name && draw_time && first_prize && first_prize !== 'รอผล') {
-                const today = new Date().toISOString().split('T')[0];
+                const today = toThaiDateString(new Date());
                 results.push({
                   lottery_name,
                   draw_date: today,

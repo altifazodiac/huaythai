@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useNumberCapAnalysis } from './useNumberCapAnalysis';
+import { NumberCapTable } from './NumberCapTable';
 
 interface Props {
   lottery_sub_type_id: number;
@@ -47,16 +49,15 @@ interface ManagedNumber {
   is_manual: boolean; // เพิ่มด้วยตนเอง
 }
 
-export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose }: Props) {
-  const [analysis, setAnalysis] = useState<SalesAnalysis | null>(null);
-  const [loading, setLoading] = useState(false);
+export default function NumberCapManager({ lottery_sub_type_id, onClose }: Props) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    return toThaiDateString(tomorrow);
   });
   const [riskThreshold, setRiskThreshold] = useState(70); // 70% risk threshold
+  const { analysis, loading, fetchSalesAnalysis } = useNumberCapAnalysis(lottery_sub_type_id, selectedDate, riskThreshold);
   const [testMode, setTestMode] = useState(false); // Test mode with sample data
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
   const [managedNumbers, setManagedNumbers] = useState<ManagedNumber[]>([]);
@@ -70,6 +71,18 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
   // Manual add states
   const [quickAddDialog, setQuickAddDialog] = useState(false);
   const [quickAddNumber, setQuickAddNumber] = useState<NumberSalesData | null>(null);
+
+  // ล้าง manual number เมื่อเปลี่ยน digit count
+  useEffect(() => {
+    setManualNumber('');
+  }, [manualDigitCount]);
+
+  // Auto fetch analysis when component loads or parameters change
+  useEffect(() => {
+    if (!testMode && selectedDate && lottery_sub_type_id) {
+      fetchSalesAnalysis();
+    }
+  }, [selectedDate, riskThreshold, lottery_sub_type_id, testMode, fetchSalesAnalysis]);
 
   // Generate sample data for testing
   const generateSampleData = () => {
@@ -184,7 +197,8 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
       ]
     };
     
-    setAnalysis(sampleAnalysis);
+    // Note: sampleAnalysis is for display only in test mode
+    // The actual analysis comes from useNumberCapAnalysis hook
     
     // เพิ่มข้อมูลตัวอย่างสำหรับรายการจัดการด้วย
     const sampleManagedNumbers: ManagedNumber[] = [
@@ -218,178 +232,6 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
     toast.success("✅ แสดงข้อมูลตัวอย่างสำหรับทดสอบ", { duration: 3000 });
   };
 
-  // Fetch sales data and calculate risks
-  const fetchSalesAnalysis = async () => {
-    if (!selectedDate) return;
-    
-    setLoading(true);
-    try {
-      console.log('Fetching sales data for date:', selectedDate);
-      
-      // 1. Get all ticket sales for the selected date - simplified query first
-      const { data: salesData, error: salesError } = await supabase
-        .from('lottery_tickets')
-        .select(`
-          total_amount,
-          lottery_ticket_items!inner (
-            numbers,
-            amount,
-            lottery_sub_type_id,
-            lottery_sub_number_id
-          )
-        `)
-        .eq('draw_date', selectedDate)
-        .eq('status', 'confirmed');
-
-      if (salesError) {
-        console.error('Sales query error:', salesError);
-        throw new Error(`Database error: ${salesError.message || 'Unknown error'}`);
-      }
-
-      console.log('Sales data:', salesData);
-
-      // 2. Get payout rules for government lottery
-      const { data: payoutRules, error: payoutError } = await supabase
-        .from('lottery_sub_number')
-        .select('*')
-        .eq('lottery_sub_type_id', lottery_sub_type_id);
-
-      if (payoutError) {
-        console.error('Payout rules error:', payoutError);
-        throw new Error(`Payout rules error: ${payoutError.message || 'Unknown error'}`);
-      }
-
-      console.log('Payout rules:', payoutRules);
-
-      // 3. Check if we have data
-      if (!salesData || salesData.length === 0) {
-        console.log('No sales data found for date:', selectedDate);
-        setAnalysis({
-          total_sales_all: 0,
-          total_potential_payout: 0,
-          overall_risk_percentage: 0,
-          high_risk_numbers: [],
-          medium_risk_numbers: [],
-          safe_numbers: []
-        });
-        return;
-      }
-
-      // 4. Create payout rules lookup
-      const payoutRulesMap: Record<number, any> = {};
-      payoutRules?.forEach(rule => {
-        payoutRulesMap[rule.id] = rule;
-      });
-
-      // 5. Process and analyze the data
-      const numberSalesMap: Record<string, NumberSalesData> = {};
-      let totalSalesAll = 0;
-
-      // Process each ticket
-      salesData.forEach(ticket => {
-        totalSalesAll += Number(ticket.total_amount || 0);
-        
-        ticket.lottery_ticket_items?.forEach(item => {
-          const payoutRule = payoutRulesMap[item.lottery_sub_number_id];
-          
-          // Skip if no payout rule found
-          if (!payoutRule) return;
-          
-          item.numbers?.forEach(number => {
-            const key = `${number}-${payoutRule.digit_number}-${payoutRule.type_number}`;
-            
-            if (!numberSalesMap[key]) {
-              numberSalesMap[key] = {
-                number,
-                digit_count: payoutRule.digit_number,
-                type_number: payoutRule.type_number,
-                total_sales: 0,
-                price_paid: Number(payoutRule.price_paid || 0),
-                potential_payout: 0,
-                risk_percentage: 0,
-                is_capped: false,
-                total_bets: 0
-              };
-            }
-            
-            const sales = Number(item.amount || 0);
-            numberSalesMap[key].total_sales += sales;
-            numberSalesMap[key].total_bets += 1;
-            numberSalesMap[key].potential_payout = numberSalesMap[key].total_sales * numberSalesMap[key].price_paid;
-          });
-        });
-      });
-
-      // 6. Calculate risk percentages after processing all data
-      Object.values(numberSalesMap).forEach(numberData => {
-        numberData.risk_percentage = totalSalesAll > 0 
-          ? (numberData.potential_payout / totalSalesAll) * 100 
-          : 0;
-        numberData.is_capped = numberData.risk_percentage > riskThreshold;
-      });
-
-      // 7. Categorize numbers by risk level
-      const allNumbers = Object.values(numberSalesMap);
-      const highRiskNumbers = allNumbers.filter(n => n.risk_percentage > riskThreshold);
-      const mediumRiskNumbers = allNumbers.filter(n => n.risk_percentage > 30 && n.risk_percentage <= riskThreshold);
-      const safeNumbers = allNumbers.filter(n => n.risk_percentage <= 30);
-
-      const totalPotentialPayout = allNumbers.reduce((sum, n) => sum + n.potential_payout, 0);
-      const overallRiskPercentage = totalSalesAll > 0 ? (totalPotentialPayout / totalSalesAll) * 100 : 0;
-
-      console.log('Analysis results:', {
-        totalSalesAll,
-        totalPotentialPayout,
-        overallRiskPercentage,
-        highRiskCount: highRiskNumbers.length,
-        mediumRiskCount: mediumRiskNumbers.length,
-        safeCount: safeNumbers.length
-      });
-
-      setAnalysis({
-        total_sales_all: totalSalesAll,
-        total_potential_payout: totalPotentialPayout,
-        overall_risk_percentage: overallRiskPercentage,
-        high_risk_numbers: highRiskNumbers.sort((a, b) => b.risk_percentage - a.risk_percentage),
-        medium_risk_numbers: mediumRiskNumbers.sort((a, b) => b.risk_percentage - a.risk_percentage),
-        safe_numbers: safeNumbers.sort((a, b) => b.risk_percentage - a.risk_percentage)
-      });
-
-      // Show toast notification
-      if (highRiskNumbers.length > 0) {
-        toast.warning(`⚠️ พบเลขอั้น ${highRiskNumbers.length} เลข ควรหารครึ่งหรือปิดรับ`, {
-          duration: 4000,
-        });
-      } else {
-        toast.success(`✅ ไม่พบเลขอั้น ความเสี่ยงอยู่ในระดับปกติ`, {
-          duration: 3000,
-        });
-      }
-
-    } catch (error) {
-      console.error('Error fetching sales analysis:', error);
-      const errorMessage = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการวิเคราะห์ข้อมูล';
-      toast.error(errorMessage);
-      
-      // Set empty analysis on error
-      setAnalysis({
-        total_sales_all: 0,
-        total_potential_payout: 0,
-        overall_risk_percentage: 0,
-        high_risk_numbers: [],
-        medium_risk_numbers: [],
-        safe_numbers: []
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-fetch when date changes
-  useEffect(() => {
-    fetchSalesAnalysis();
-  }, [selectedDate, riskThreshold]);
-
   // Toggle number selection
   const toggleNumberSelection = (numberKey: string) => {
     setSelectedNumbers(prev => 
@@ -400,7 +242,7 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
   };
 
   // Add selected numbers to managed list
-  const addSelectedToManaged = (action: 'half' | 'close') => {
+  const addSelectedToManaged = async (action: 'half' | 'close') => {
     if (selectedNumbers.length === 0) {
       toast.error('กรุณาเลือกหมายเลขก่อน');
       return;
@@ -424,6 +266,30 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
       };
     });
 
+    // Save to database
+    const dbRecords = newManagedNumbers.map(mn => ({
+      lottery_sub_type_id,
+      draw_date: selectedDate,
+      number: mn.number,
+      digit_count: mn.digit_count,
+      type_number: mn.type_number,
+      action: mn.action,
+      reason: mn.reason,
+      is_manual: mn.is_manual
+    }));
+
+    const { error: saveError } = await supabase
+      .from('managed_numbers')
+      .upsert(dbRecords, { 
+        onConflict: 'lottery_sub_type_id,draw_date,number,digit_count,type_number' 
+      });
+
+    if (saveError) {
+      console.error('Error saving managed numbers:', saveError);
+      toast.error('เกิดข้อผิดพลาดในการบันทึก');
+      return;
+    }
+
     setManagedNumbers(prev => {
       const filtered = prev.filter(existing => 
         !selectedNumbers.includes(`${existing.number}-${existing.digit_count}-${existing.type_number}`)
@@ -436,9 +302,21 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
   };
 
   // Add manual number
-  const addManualNumber = () => {
+  const addManualNumber = async () => {
     if (!manualNumber.trim()) {
       toast.error('กรุณาใส่หมายเลข');
+      return;
+    }
+
+    // ตรวจสอบความยาวของเลขให้ตรงกับจำนวนหลักที่เลือก
+    if (manualNumber.length !== manualDigitCount) {
+      toast.error(`กรุณาใส่เลข ${manualDigitCount} หลัก`);
+      return;
+    }
+
+    // ตรวจสอบว่าเป็นตัวเลขเท่านั้น
+    if (!/^\d+$/.test(manualNumber)) {
+      toast.error('กรุณาใส่เฉพาะตัวเลขเท่านั้น');
       return;
     }
 
@@ -461,6 +339,28 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
       is_manual: true
     };
 
+    // Save to database
+    const { error: saveError } = await supabase
+      .from('managed_numbers')
+      .upsert([{
+        lottery_sub_type_id,
+        draw_date: selectedDate,
+        number: newManagedNumber.number,
+        digit_count: newManagedNumber.digit_count,
+        type_number: newManagedNumber.type_number,
+        action: newManagedNumber.action,
+        reason: newManagedNumber.reason,
+        is_manual: newManagedNumber.is_manual
+      }], { 
+        onConflict: 'lottery_sub_type_id,draw_date,number,digit_count,type_number' 
+      });
+
+    if (saveError) {
+      console.error('Error saving manual number:', saveError);
+      toast.error('เกิดข้อผิดพลาดในการบันทึก');
+      return;
+    }
+
     setManagedNumbers(prev => [...prev, newManagedNumber]);
     setManualNumber('');
     setShowManualAdd(false);
@@ -468,7 +368,25 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
   };
 
   // Remove managed number
-  const removeManagedNumber = (numberKey: string) => {
+  const removeManagedNumber = async (numberKey: string) => {
+    const [number, digit_count, type_number] = numberKey.split('-');
+    
+    // Remove from database
+    const { error: deleteError } = await supabase
+      .from('managed_numbers')
+      .delete()
+      .eq('lottery_sub_type_id', lottery_sub_type_id)
+      .eq('draw_date', selectedDate)
+      .eq('number', number)
+      .eq('digit_count', parseInt(digit_count))
+      .eq('type_number', type_number);
+
+    if (deleteError) {
+      console.error('Error deleting managed number:', deleteError);
+      toast.error('เกิดข้อผิดพลาดในการลบ');
+      return;
+    }
+
     setManagedNumbers(prev => 
       prev.filter(n => `${n.number}-${n.digit_count}-${n.type_number}` !== numberKey)
     );
@@ -476,7 +394,20 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
   };
 
   // Clear all managed numbers
-  const clearManagedNumbers = () => {
+  const clearManagedNumbers = async () => {
+    // Remove from database
+    const { error: deleteError } = await supabase
+      .from('managed_numbers')
+      .delete()
+      .eq('lottery_sub_type_id', lottery_sub_type_id)
+      .eq('draw_date', selectedDate);
+
+    if (deleteError) {
+      console.error('Error clearing managed numbers:', deleteError);
+      toast.error('เกิดข้อผิดพลาดในการล้างข้อมูล');
+      return;
+    }
+
     setManagedNumbers([]);
     setSelectedNumbers([]);
     toast.success('ล้างรายการจัดการทั้งหมดแล้ว');
@@ -543,7 +474,7 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
     return 'secondary';
   };
 
-  const addQuickNumber = (number: NumberSalesData, action: 'half' | 'close') => {
+  const addQuickNumber = async (number: NumberSalesData, action: 'half' | 'close') => {
     const numberKey = `${number.number}-${number.digit_count}-${number.type_number}`;
     
     // Check if already managed
@@ -564,6 +495,28 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
       reason: action === 'half' ? 'หารครึ่ง - เลขเสี่ยงจากการวิเคราะห์' : 'ปิดรับ - เลขเสี่ยงจากการวิเคราะห์',
       is_manual: false
     };
+
+    // Save to database
+    const { error: saveError } = await supabase
+      .from('managed_numbers')
+      .upsert([{
+        lottery_sub_type_id,
+        draw_date: selectedDate,
+        number: newManagedNumber.number,
+        digit_count: newManagedNumber.digit_count,
+        type_number: newManagedNumber.type_number,
+        action: newManagedNumber.action,
+        reason: newManagedNumber.reason,
+        is_manual: newManagedNumber.is_manual
+      }], { 
+        onConflict: 'lottery_sub_type_id,draw_date,number,digit_count,type_number' 
+      });
+
+    if (saveError) {
+      console.error('Error saving quick number:', saveError);
+      toast.error('เกิดข้อผิดพลาดในการบันทึก');
+      return;
+    }
     
     setManagedNumbers(prev => [...prev, newManagedNumber]);
     setQuickAddDialog(false);
@@ -571,6 +524,12 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
     
     toast.success(`✅ เพิ่มหมายเลข ${number.number} (${action === 'half' ? 'หารครึ่ง' : 'ปิดรับ'}) เรียบร้อยแล้ว`);
   };
+
+  function toThaiDateString(date: Date) {
+    const tzOffset = 7 * 60 * 60 * 1000;
+    const tzDate = new Date(date.getTime() + tzOffset);
+    return tzDate.toISOString().split('T')[0];
+  }
 
   return (
     <div className="space-y-6">
@@ -599,7 +558,10 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
           <span className="text-sm text-gray-500">%</span>
         </div>
         <div className="flex gap-2">
-          <Button onClick={fetchSalesAnalysis} disabled={loading || testMode}>
+          <Button onClick={() => {
+            console.log('🔄 NumberCapManager วิเคราะห์ใหม่ button clicked');
+            fetchSalesAnalysis();
+          }} disabled={loading || testMode}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             วิเคราะห์ใหม่
           </Button>
@@ -607,7 +569,6 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
             onClick={() => {
               if (testMode) {
                 setTestMode(false);
-                setAnalysis(null);
                 setManagedNumbers([]);
                 setSelectedNumbers([]);
                 toast.info("ออกจากโหมดทดสอบ");
@@ -973,17 +934,23 @@ export default function GovernmentLotteryAnalyzer({ lottery_sub_type_id, onClose
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   <div>
-                    <label className="text-sm font-medium mb-1 block">หมายเลข</label>
+                    <label className="text-sm font-medium mb-1 block">หมายเลข ({manualDigitCount} หลัก)</label>
                     <Input
-                      placeholder="เช่น 123"
+                      placeholder={`เช่น ${'1'.repeat(manualDigitCount)}`}
                       value={manualNumber}
-                      onChange={(e) => setManualNumber(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // อนุญาตเฉพาะตัวเลขและจำกัดความยาวตาม digit count
+                        if (/^\d*$/.test(value) && value.length <= manualDigitCount) {
+                          setManualNumber(value);
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           addManualNumber();
                         }
                       }}
-                      maxLength={4}
+                      maxLength={manualDigitCount}
                     />
                   </div>
                   <div>
