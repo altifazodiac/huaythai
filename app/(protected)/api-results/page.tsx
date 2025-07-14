@@ -97,7 +97,7 @@ export default function LotteryResultsPage() {
         console.log('📋 Fetching lottery aliases...');
         const { data: aliases, error: aliasError } = await supabase
           .from("lottery_name_aliases")
-          .select("alias_name, lottery_sub_type_id, lottery_sub_types(country, country_origin)");
+          .select("alias_name, lottery_sub_type_id, lottery_sub_types(country_origin)");
         
         if (aliasError) {
           console.error('❌ Alias Error:', aliasError);
@@ -169,7 +169,7 @@ export default function LotteryResultsPage() {
     return {
       id: `placeholder-${alias.alias_name}`,
       draw_date: today,
-      country: alias.lottery_sub_types?.country || "OTHER",
+      country: alias.lottery_sub_types?.country_origin || "OTHER",
       lottery_name: alias.alias_name,
       results: ["3 ตัวบน: xxx", "2 ตัวล่าง: xx"],
       draw_time: alias.draw_time || null,
