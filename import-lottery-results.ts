@@ -164,10 +164,21 @@ function parseGovLotteryCards($: cheerio.CheerioAPI, url: string): LotteryResult
         const card = $(cardEl);
         const header = card.find('.card-header').clone().children().remove().end().text().trim();
         let lotteryName = '';
-        if (header.includes('หวยรัฐบาลไทย')) lotteryName = 'หวยรัฐบาล';
-        else if (header.includes('หวย ธกส.')) lotteryName = 'หวย ธกส.';
-        else if (header.includes('หวยออมสิน')) lotteryName = 'หวยออมสิน';
-        else return;
+        let drawTime: string | undefined = undefined;
+
+        if (header.includes('หวยรัฐบาลไทย')) {
+            lotteryName = 'หวยรัฐบาล';
+            drawTime = '15:40:00';
+        } else if (header.includes('หวย ธกส.')) {
+            lotteryName = 'หวย ธกส.';
+            drawTime = '08:30:00';
+        } else if (header.includes('หวยออมสิน')) {
+            lotteryName = 'หวยออมสิน';
+            drawTime = '12:30:00';
+        } else {
+            return;
+        }
+
         const date = card.find('.dateGovTitle').text().trim();
         if (!date) return;
         const prizeContainer = card.find('.dataGovContainer');
@@ -191,7 +202,7 @@ function parseGovLotteryCards($: cheerio.CheerioAPI, url: string): LotteryResult
         const meta = LOTTERY_METADATA[metaLookupName as keyof typeof LOTTERY_METADATA];
         if (!meta) return;
 
-        cardResults.push({ draw_date: date, country: meta.country, lottery_name: lotteryName, results: availablePrizes, source_url: url });
+        cardResults.push({ draw_date: date, draw_time: drawTime, country: meta.country, lottery_name: lotteryName, results: availablePrizes, source_url: url });
     });
     console.log(`[Parser] Found ${cardResults.length} results from special cards.`);
     return cardResults;
