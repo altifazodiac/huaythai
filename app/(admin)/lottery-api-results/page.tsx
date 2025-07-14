@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { format } from 'date-fns';
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerClient } from '@supabase/ssr';
 
 export type LotteryResult = {
   id: number | string;
@@ -20,12 +20,39 @@ export type LotteryResult = {
 // ฟังก์ชันสำหรับจัดหมวดหมู่หวย
 const getCategoryName = (countryCode: string) => {
   switch (countryCode) {
-    case 'TH': return 'หวยไทย';
-    case 'LA': return 'หวยลาว/แม่โขง';
-    case 'VN': return 'หวยเวียดนาม';
-    case 'STOCK': return 'หวยหุ้น';
-    case 'MY': return 'หวยมาเลย์';
+    case 'TH': 
+    case 'Thailand': return 'หวยไทย';
+    case 'LA': 
+    case 'Laos': return 'หวยลาว/แม่โขง';
+    case 'VN': 
+    case 'Vietnam': return 'หวยเวียดนาม';
+    case 'STOCK': 
+    case 'US': return 'หวยหุ้น';
+    case 'MY': 
+    case 'Malaysia': return 'หวยมาเลย์';
+    case 'CN': return 'หวยจีน';
+    case 'JP': return 'หวยญี่ปุ่น';
+    case 'KR': return 'หวยเกาหลี';
+    case 'TW': return 'หวยไต้หวัน';
+    case 'DE': return 'หวยเยอรมัน';
     default: return 'อื่นๆ';
+  }
+};
+
+// ฟังก์ชันแมปประเทศสำหรับการจัดหมวดหมู่
+const mapCountryToCategory = (countryOrigin: string) => {
+  switch (countryOrigin) {
+    case 'Thailand': return 'TH';
+    case 'Laos': return 'LA';
+    case 'Vietnam': return 'VN';
+    case 'US': return 'STOCK';
+    case 'Malaysia': return 'MY';
+    case 'CN': return 'CN';
+    case 'JP': return 'JP';
+    case 'KR': return 'KR';
+    case 'TW': return 'TW';
+    case 'DE': return 'DE';
+    default: return 'OTHER';
   }
 };
 
@@ -48,13 +75,23 @@ function getDayOfWeekTH(day: string | null | undefined): string {
 export const revalidate = 0;
 
 export default async function LotteryResultsPage() {
-  const supabase = createServerComponentClient({ cookies });
- 
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
 
   // 1. ดึง alias + sub_type
   const { data: aliases } = await supabase
     .from('lottery_name_aliases')
-    .select('alias_name, lottery_sub_type_id, lottery_sub_types(country, country_origin)');
+    .select('alias_name, lottery_sub_type_id, lottery_sub_types(country_origin)');
   // 2. ดึง schedule
   const { data: schedules } = await supabase
     .from('drawing_schedules')
@@ -81,7 +118,7 @@ export default async function LotteryResultsPage() {
     return {
       id: `placeholder-${alias.alias_name}`,
       draw_date: todayStr,
-      country: alias.lottery_sub_types?.country || 'OTHER',
+      country: mapCountryToCategory(alias.lottery_sub_types?.country_origin || ''),
       lottery_name: alias.alias_name,
       results: ['3 ตัวบน: xxx', '2 ตัวล่าง: xx'],
       draw_time: alias.draw_time || null,
@@ -108,7 +145,7 @@ export default async function LotteryResultsPage() {
     },
     {} as Record<string, LotteryResult[]>
   );
-  const categoryOrder = ['TH', 'LA', 'VN', 'STOCK', 'MY', 'OTHER'];
+  const categoryOrder = ['TH', 'LA', 'VN', 'CN', 'JP', 'KR', 'TW', 'STOCK', 'MY', 'DE', 'OTHER'];
   const sortedCategories = Object.entries(groupedByCategory).sort(
     ([a], [b]) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
   );

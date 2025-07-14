@@ -1,6 +1,29 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// ฟังก์ชันสำหรับแปลง cookie string อย่างปลอดภัย
+function parseCookieValue(value: string): string | null {
+  try {
+    // ถ้าค่าเป็น base64 encoded JSON
+    if (value.startsWith('base64-')) {
+      const base64String = value.replace('base64-', '');
+      const decodedString = Buffer.from(base64String, 'base64').toString('utf-8');
+      JSON.parse(decodedString); // ตรวจสอบว่าเป็น JSON ที่ถูกต้อง
+      return decodedString;
+    }
+    // ถ้าเป็น JSON string โดยตรง
+    if (value.startsWith('{') || value.startsWith('[')) {
+      JSON.parse(value); // ตรวจสอบว่าเป็น JSON ที่ถูกต้อง
+      return value;
+    }
+    // ถ้าเป็น string ธรรมดา
+    return value;
+  } catch (error) {
+    // ถ้า parse ไม่ได้ ให้ส่งค่าดั้งเดิมกลับไป
+    return value;
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const startTime = Date.now();
   const pathname = request.nextUrl.pathname;
@@ -19,41 +42,58 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return request.cookies.get(name)?.value
+          const cookie = request.cookies.get(name);
+          if (!cookie) return undefined;
+          
+          try {
+            const parsedValue = parseCookieValue(cookie.value);
+            return parsedValue;
+          } catch (error) {
+            console.error(`Failed to parse cookie "${name}":`, error);
+            return undefined;
+          }
         },
         set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
+          try {
+            request.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            response.cookies.set({
+              name,
+              value,
+              ...options,
+            })
+          } catch (error) {
+            console.error(`Failed to set cookie "${name}":`, error);
+          }
         },
         remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          try {
+            request.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            response.cookies.set({
+              name,
+              value: '',
+              ...options,
+            })
+          } catch (error) {
+            console.error(`Failed to remove cookie "${name}":`, error);
+          }
         },
       },
     }

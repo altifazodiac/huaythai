@@ -1,10 +1,20 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from "next/headers";
 import LotteryTypeofApiClient from "./Client";
 
 export default async function LotteryTypeofApiPage() {
   const cookieStore = await cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+      },
+    }
+  );
   const { data: subTypes } = await supabase.from("lottery_sub_types").select();
   const { data: apiNamesRaw } = await supabase.from("lottery_api_results").select("lottery_name");
   const { data: aliases } = await supabase.from("lottery_name_aliases").select("id, lottery_sub_type_id, alias_name");
