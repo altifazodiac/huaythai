@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { chromium } from 'playwright';
+import chromium from '@sparticuz/chromium';
+import playwright from 'playwright-core';
 import { formatInTimeZone } from 'date-fns-tz';
 import {subMinutes } from 'date-fns';
 
@@ -47,10 +48,10 @@ async function scrapeAndParseResults(targetUrl: string, context: any, targetLott
   const page = await context.newPage();
   
   try {
-    await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     // รอให้ข้อมูลโหลดเสร็จ
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
     
     // ดึงข้อมูลจากหน้าเว็บ
     const scrapedData = await page.evaluate(() => {
@@ -114,7 +115,11 @@ async function scrapeAndParseResults(targetUrl: string, context: any, targetLott
     console.error('[Scraper] Error during scraping:', error);
     return [];
   } finally {
-    await page.close();
+    try {
+      await page.close();
+    } catch (closeError) {
+      console.error('[Scraper] Error closing page:', closeError);
+    }
   }
 }
 
@@ -380,14 +385,20 @@ export async function POST(request: NextRequest) {
         console.log(`[API] Target lottery names: ${targetLotteryNames.join(', ')}`);
         
         // เปิด browser และ scrape
-        browser = await chromium.launch({ 
+        browser = await playwright.chromium.launch({ 
           headless: true, 
-          args: ['--disable-gpu', '--no-sandbox'],
+          args: chromium.args,
+          executablePath: await chromium.executablePath(),
           timeout: 360000 
         });
         
         const context = await browser.newContext({ 
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' 
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+          viewport: { width: 1280, height: 720 },
+          ignoreHTTPSErrors: true,
+          extraHTTPHeaders: {
+            'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8'
+          }
         });
         
         const targetUrl = 'https://xn--t3cjebmjd5a.com/';
@@ -396,24 +407,44 @@ export async function POST(request: NextRequest) {
         for (let attempt = 1; attempt <= 3; attempt++) {
           console.log(`[API] Scrape attempt ${attempt}/3`);
           
-          scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
-          
-          if (scrapedData.length > 0) {
-            console.log(`[API] Found ${scrapedData.length} results on attempt ${attempt}`);
-            break;
-          }
-          
-          if (attempt < 3) {
-            console.log(`[API] No results found, waiting 30s before retry...`);
-            await new Promise(resolve => setTimeout(resolve, 30000));
+          try {
+            scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+            
+            if (scrapedData.length > 0) {
+              console.log(`[API] Found ${scrapedData.length} results on attempt ${attempt}`);
+              break;
+            }
+            
+            if (attempt < 3) {
+              console.log(`[API] No results found, waiting 30s before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 30000));
+            }
+          } catch (scrapeError) {
+            console.error(`[API] Error on attempt ${attempt}:`, scrapeError);
+            if (attempt < 3) {
+              console.log(`[API] Waiting 30s before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 30000));
+            }
           }
         }
         
-        await browser.close();
+        if (browser) {
+          try {
+            await browser.close();
+          } catch (closeError) {
+            console.error('[API] Error closing browser:', closeError);
+          }
+        }
         
       } catch (error) {
         console.error('[API] Error during scraping:', error);
-        if (browser) await browser.close();
+        if (browser) {
+          try {
+            await browser.close();
+          } catch (closeError) {
+            console.error('[API] Error closing browser:', closeError);
+          }
+        }
         throw error;
       }
       
