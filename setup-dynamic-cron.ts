@@ -59,6 +59,7 @@ async function setupDynamicCron() {
         ].join(' ');
 
         // 4. สร้าง cron jobs สำหรับแต่ละเวลา
+        const bunPath = '/root/.bun/bin/bun'; // ใช้ path เต็มของ bun
         uniqueTimes.forEach(time => {
             const [hour, minute] = time.split(':');
             const hourNum = parseInt(hour, 10);
@@ -68,23 +69,23 @@ async function setupDynamicCron() {
             const scrapeMinute = (minuteNum + 1) % 60;
             const scrapeHour = scrapeMinute === 0 ? (hourNum + 1) % 24 : hourNum;
             
-            const scrapeCron = `${scrapeMinute} ${scrapeHour} * * * cd ${projectPath} && ${envVars} bun run import-lottery-results.ts >> ${logDir}/scrape-${time.replace(':', '')}.log 2>&1`;
+            const scrapeCron = `${scrapeMinute} ${scrapeHour} * * * cd ${projectPath} && ${envVars} ${bunPath} run import-lottery-results.ts >> ${logDir}/scrape-${time.replace(':', '')}.log 2>&1`;
             cronEntries.push(scrapeCron);
 
             // Send job: รันที่เวลาหวยออก + 3 นาที
             const sendMinute = (minuteNum + 3) % 60;
             const sendHour = sendMinute < 3 ? (hourNum + 1) % 24 : hourNum;
             
-            const sendCron = `${sendMinute} ${sendHour} * * * cd ${projectPath} && ${envVars} bun run send-lottery-results.ts >> ${logDir}/send-${time.replace(':', '')}.log 2>&1`;
+            const sendCron = `${sendMinute} ${sendHour} * * * cd ${projectPath} && ${envVars} ${bunPath} run send-lottery-results.ts >> ${logDir}/send-${time.replace(':', '')}.log 2>&1`;
             cronEntries.push(sendCron);
         });
 
         // 5. เพิ่ม cron สำหรับอัปเดตตารางเวลาอัตโนมัติ (ทุกวันเวลา 00:05)
-        const updateCron = `5 0 * * * cd ${projectPath} && ${envVars} bun run setup-dynamic-cron.ts >> ${logDir}/update-cron.log 2>&1`;
+        const updateCron = `5 0 * * * cd ${projectPath} && ${envVars} ${bunPath} run setup-dynamic-cron.ts >> ${logDir}/update-cron.log 2>&1`;
         cronEntries.push(updateCron);
 
         // 6. เพิ่ม cron สำหรับรัน background task processor (restart ทุกชั่วโมง)
-        const processorCron = `0 * * * * cd ${projectPath} && ${envVars} bun run scripts/start-background-processor.ts >> ${logDir}/background-processor.log 2>&1`;
+        const processorCron = `0 * * * * cd ${projectPath} && ${envVars} ${bunPath} run scripts/start-background-processor.ts >> ${logDir}/background-processor.log 2>&1`;
         cronEntries.push(processorCron);
 
         // 6. สร้างไฟล์ crontab ใหม่

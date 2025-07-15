@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { easeInOut } from "framer-motion"; // เพิ่มบรรทัดนี้
 
 // --- TypeScript Interfaces ---
 interface LotteryTypeDetail {
@@ -109,7 +110,11 @@ const LotteryScheduleCard: React.FC<LotteryScheduleCardProps> = ({
 }) => {
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: easeInOut }
+    }
   };
 
   const processedSubNumbers = subNumbers
