@@ -1072,38 +1072,15 @@ export default function LotterySubTypePage() {
               </div>
               <div>
                 <label className="text-sm font-medium">วันในสัปดาห์</label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start font-normal">
-                      <span>{scheduleForm.day_of_week || "เลือกวัน"}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56">
-                    <DropdownMenuLabel>วันในสัปดาห์</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {daysOfWeek.map((day) => (
-                      <DropdownMenuCheckboxItem
-                        key={day.eng}
-                        checked={scheduleForm.day_of_week?.includes(day.th)}
-                        onCheckedChange={() => {
-                          const currentDays = scheduleForm.day_of_week?.split(", ").filter(Boolean) || [];
-                          let newDays;
-                          if (currentDays.includes(day.th)) {
-                            newDays = currentDays.filter((d) => d !== day.th);
-                          } else {
-                            newDays = [...currentDays, day.th];
-                          }
-                          setScheduleForm((prev) => ({
-                           ...prev,
-                            day_of_week: newDays.join(", "),
-                          }));
-                        }}
-                      >
-                        {day.th}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <input
+                  type="text"
+                  name="day_of_week"
+                  value={scheduleForm.day_of_week || ""}
+                  onChange={handleScheduleChange}
+                  placeholder="เช่น จันทร์, พุธ, ศุกร์"
+                  required
+                  className="w-full border rounded px-2 py-1"
+                />
               </div>
               <div>
                 <label className="text-sm font-medium">เวลาเปิดรับ</label>

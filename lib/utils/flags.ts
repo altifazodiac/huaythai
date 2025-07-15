@@ -37,6 +37,13 @@ export const countryFlagImg = (country: string) => {
     "THS": "THS.jpg",
     "YIKI88": "Yiki88.png",
     "GSB": "GSB.jpg",
+    
+    "DJI": "USA.jpg",
+    "NIKKEI": "Japan.jpg",
+    "HANGSENG": "Hongkong.jpg",
+    "SET": "Thailand.jpg",
+    "SSE": "China.jpg",
+    "KOSPI": "KOSPI.jpg",
      
   };
   const filename = map[country] || "Unknown.jpg";

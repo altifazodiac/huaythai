@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { createClient, SupabaseClient  } from "@supabase/supabase-js";
 import { format } from "date-fns";
-import { motion } from 'framer-motion';
+import { motion, easeInOut } from 'framer-motion';
 import { MdContentPaste } from "react-icons/md";
 import {
   Drawer,
@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { easeInOut } from "framer-motion"; // เพิ่มบรรทัดนี้
 
 // --- TypeScript Interfaces ---
 interface LotteryTypeDetail {

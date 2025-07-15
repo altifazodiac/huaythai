@@ -22,6 +22,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { DirectionProvider } from "@radix-ui/react-direction";
 import { supabase } from "@/lib/supabase/supabaseClient";
 
+
 // --- Unchanged Logic & Utility Functions ---
 
 const LOTTERY_TYPE_COLORS: Record<string, string> = {
@@ -39,37 +40,63 @@ function getTypeColor(type: string) {
 function getCountryName(country: string, lotteryName: string) {
   if (country === 'VN' || /ฮานอย|เวียดนาม/i.test(lotteryName)) return 'เวียดนาม';
   if (country === 'LA' || /ลาว/i.test(lotteryName)) return 'ลาว';
-  if (country === 'TH' || /ไทย|ธกส|ออมสิน/i.test(lotteryName)) return 'ไทย';
+  if (country === 'TH' || /ไทย|ธกส|ออมสิน|หวยรัฐบาล/i.test(lotteryName)) return 'ไทย';
   if (country === 'MY' || /มาเลย์/i.test(lotteryName)) return 'มาเลเซีย';
-  if (country === 'STOCK' || /หุ้น|ดาวโจนส์|นิเคอิ|จีน|ฮั่งเส็ง|ไต้หวัน|เกาหลี|สิงคโปร์/i.test(lotteryName)) return 'หวยหุ้น';
+  if (country === 'DJI' || /ดาวโจนส์/i.test(lotteryName)) return 'ดาวโจนส์';
+  if (country === 'NIKKEI' || /นิเคอิ/i.test(lotteryName)) return 'นิเคอิ';
+  if (country === 'HANGSENG' || /ฮั่งเส็ง/i.test(lotteryName)) return 'ฮั่งเส็ง';
+  if (country === 'SET' || /ไต้หวัน/i.test(lotteryName)) return 'ไต้หวัน';
+  if (country === 'SSE' || /จีน/i.test(lotteryName)) return 'จีน';
+  if (country === 'KOSPI' || /เกาหลี/i.test(lotteryName)) return 'เกาหลี';
+  if (country === 'STOCK' || /หุ้น/i.test(lotteryName)) return 'หวยหุ้น';
+ 
   return 'อื่นๆ';
 }
 
 const COUNTRY_GROUPS: Record<string, string> = {
   'TH': 'หวยไทย',
+  'GLO': 'หวยไทย',
+  'GSB': 'หวยไทย',
+  'THS': 'หวยไทย',
   'LA': 'หวยลาว',
   'VN': 'หวยเวียดนาม',
   'MY': 'หวยมาเลเซีย',
   'STOCK': 'หวยหุ้น',
+  'JP': 'หวยหุ้น',
+  'CN': 'หวยหุ้น',
+  'KR': 'หวยหุ้น',
+  'SG': 'หวยหุ้น',
+  'HK': 'หวยหุ้น',
+  'TW': 'หวยหุ้น',
+  'DE': 'หวยหุ้น',
+  'GB': 'หวยหุ้น',
+  'US': 'หวยหุ้น',
+  'RU': 'หวยหุ้น',
+  'ID': 'หวยหุ้น',
+  'PH': 'หวยหุ้น',
+  'MX': 'หวยหุ้น',
+  'BR': 'หวยหุ้น',
+  'AR': 'หวยหุ้น',
+  'CO': 'หวยหุ้น',
   'OTHER': 'อื่นๆ',
 };
 
 function getCountryGroup(country: string) {
+  const stockCountries = ['STOCK', 'JP', 'CN', 'KR', 'SG', 'HK', 'TW', 'DE', 'GB', 'US', /* ... */];
+  if (stockCountries.includes(country)) return 'หวยหุ้น';
   return COUNTRY_GROUPS[country] || 'อื่นๆ';
 }
 
 function renderFlag(country: string, lotteryName: string) {
-  const countryName = getCountryName(country, lotteryName);
-  if (countryName === "หวยหุ้น") {
+  const url = countryFlagImg(country);
+  // สมมติว่าถ้า url มี "Unknown.jpg" ให้แสดง BarChart3 แทน
+  if (url.includes("Unknown.jpg")) {
     return <BarChart3 className="w-5 h-5 text-red-600 dark:text-red-400" />;
-  }
-  if (countryName === "อื่นๆ") {
-    return <span className="text-2xl" role="img" aria-label="other">🌍</span>;
   }
   return (
     <img
-      src={countryFlagImg(countryName)}
-      alt={countryName}
+      src={url}
+      alt={getCountryName(country, lotteryName)}
       className="w-6 h-6 rounded-full object-cover border border-white/20 shadow-md"
     />
   );
