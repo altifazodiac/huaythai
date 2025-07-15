@@ -42,7 +42,7 @@ interface UserProfile {
   phone: string | null;
   line_id: string | null;
   branch: string | null;
-  credit_balance: number;
+  credit_balance: number | null;
   created_at: string;
   updated_at: string | null;
   role: string;
@@ -55,7 +55,7 @@ interface CreateUserForm {
   name: string;
   line_id: string;
   branch: string;
-  credit_balance: number;
+  credit_balance: number | null;
   role: string;
 }
 
@@ -65,7 +65,7 @@ interface EditUserForm {
   email: string;
   line_id: string;
   branch: string;
-  credit_balance: number;
+  credit_balance: number | null;
   role: string;
 }
 
@@ -602,7 +602,7 @@ export default function UsersManagePage() {
                 <div>
                   <p className="text-sm text-gray-600">เครดิตรวม</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    ฿{users.reduce((sum, user) => sum + user.credit_balance, 0).toLocaleString()}
+                    ฿{users.reduce((sum, user) => sum + (user.credit_balance ?? 0), 0).toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -741,7 +741,7 @@ export default function UsersManagePage() {
                               <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
                                 <CreditCard className="h-5 w-5 text-green-600" />
                                 <span className="font-bold text-green-700 text-lg">
-                                  ฿{user.credit_balance.toLocaleString()}
+                                  ฿{(user.credit_balance ?? 0).toLocaleString()}
                                 </span>
                               </div>
                             </div>

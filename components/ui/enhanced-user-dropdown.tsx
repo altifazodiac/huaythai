@@ -11,7 +11,7 @@ interface User {
   name: string | null;
   email: string | null;
   phone: string | null;
-  credit_balance: number;
+  credit_balance: number | null;
   role?: string;
 }
 
@@ -59,11 +59,12 @@ export function EnhancedUserDropdown({
   // Filter users based on search
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
+    const creditBalance = user.credit_balance ?? 0;
     return (
       user.name?.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower) ||
       user.phone?.includes(searchTerm) ||
-      user.credit_balance.toString().includes(searchTerm)
+      creditBalance.toString().includes(searchTerm)
     );
   });
 
@@ -73,11 +74,17 @@ export function EnhancedUserDropdown({
     setSearchTerm("");
   };
 
-  const getBalanceColor = (balance: number) => {
-    if (balance >= 10000) return "text-green-600";
-    if (balance >= 1000) return "text-blue-600";
-    if (balance >= 100) return "text-yellow-600";
+  const getBalanceColor = (balance: number | null) => {
+    const safeBalance = balance ?? 0;
+    if (safeBalance >= 10000) return "text-green-600";
+    if (safeBalance >= 1000) return "text-blue-600";
+    if (safeBalance >= 100) return "text-yellow-600";
     return "text-red-600";
+  };
+
+  const formatBalance = (balance: number | null) => {
+    const safeBalance = balance ?? 0;
+    return safeBalance.toLocaleString();
   };
 
   return (
@@ -112,7 +119,7 @@ export function EnhancedUserDropdown({
                     <div className="text-xs text-gray-500 flex items-center gap-1">
                       <CreditCard className="h-3 w-3" />
                       <span className={getBalanceColor(selectedUserData.credit_balance)}>
-                        ฿{selectedUserData.credit_balance.toLocaleString()}
+                        ฿{formatBalance(selectedUserData.credit_balance)}
                       </span>
                     </div>
                   )}
@@ -186,7 +193,7 @@ export function EnhancedUserDropdown({
                         <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                           <CreditCard className="h-3 w-3" />
                           <span className={cn("text-sm font-medium", getBalanceColor(user.credit_balance))}>
-                            ฿{user.credit_balance.toLocaleString()}
+                            ฿{formatBalance(user.credit_balance)}
                           </span>
                         </div>
                       )}
