@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import { EnhancedUserDropdown } from "@/components/ui/enhanced-user-dropdown";
+import { SecurityMiddleware } from "@/components/ui/security-middleware";
 import { 
   UserPlus, 
   Edit, 
@@ -23,7 +25,15 @@ import {
   MessageCircle,
   Eye,
   EyeOff,
-  RefreshCw
+  RefreshCw,
+  Shield,
+  Users,
+  TrendingUp,
+  DollarSign,
+  Clock,
+  Filter,
+  Download,
+  Upload
 } from "lucide-react";
 
 interface UserProfile {
@@ -70,6 +80,10 @@ export default function UsersManagePage() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [securityVerified, setSecurityVerified] = useState(false);
+  const [selectedUserForAction, setSelectedUserForAction] = useState("");
+  const [filterRole, setFilterRole] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("created_at");
 
   const [createForm, setCreateForm] = useState<CreateUserForm>({
     phone: "",
@@ -366,38 +380,63 @@ export default function UsersManagePage() {
     setShowDeleteDialog(true);
   };
 
-  const filteredUsers = users.filter(user =>
-    user.phone?.includes(searchTerm) ||
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.branch?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter(user => {
+      const matchesSearch = 
+        user.phone?.includes(searchTerm) ||
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.branch?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesRole = filterRole === "all" || user.role === filterRole;
+      
+      return matchesSearch && matchesRole;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return (a.name || "").localeCompare(b.name || "");
+        case "credit_balance":
+          return b.credit_balance - a.credit_balance;
+        case "created_at":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        default:
+          return 0;
+      }
+    });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">จัดการผู้ใช้</h1>
-          <p className="text-gray-600 mt-1">สร้าง แก้ไข และจัดการผู้ใช้ในระบบ</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={handleRefresh}
-            variant="outline"
-            size="sm"
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            รีเฟรช
-          </Button>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                เพิ่มผู้ใช้ใหม่
-              </Button>
-            </DialogTrigger>
+    <SecurityMiddleware 
+      securityLevel="banking"
+      onSecurityPass={() => setSecurityVerified(true)}
+    >
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <Users className="h-8 w-8 text-blue-600" />
+              จัดการผู้ใช้
+            </h1>
+            <p className="text-gray-600 mt-1">สร้าง แก้ไข และจัดการผู้ใช้ในระบบด้วยระบบความปลอดภัยระดับธนาคาร</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleRefresh}
+              variant="outline"
+              size="sm"
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              รีเฟรช
+            </Button>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  เพิ่มผู้ใช้ใหม่
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>เพิ่มผู้ใช้ใหม่</DialogTitle>
@@ -512,29 +551,138 @@ export default function UsersManagePage() {
         </div>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="ค้นหาด้วยเบอร์โทร, ชื่อ, อีเมล หรือสาขา..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">ผู้ใช้ทั้งหมด</p>
+                  <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Users List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>รายการผู้ใช้ ({filteredUsers.length} คน)</CardTitle>
-          <CardDescription>
-            จัดการข้อมูลผู้ใช้ทั้งหมดในระบบ
-          </CardDescription>
-        </CardHeader>
+          <Card className="border-l-4 border-l-green-500">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-green-100 rounded-full">
+                  <TrendingUp className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">ผู้ใช้ทั่วไป</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {users.filter(u => u.role === 'user').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-red-500">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-100 rounded-full">
+                  <Shield className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">ผู้ดูแลระบบ</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {users.filter(u => u.role === 'admin').length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-purple-500">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <DollarSign className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">เครดิตรวม</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    ฿{users.reduce((sum, user) => sum + user.credit_balance, 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-gray-600" />
+              ตัวกรองและค้นหา
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="ค้นหาด้วยเบอร์โทร, ชื่อ, อีเมล หรือสาขา..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              <Select value={filterRole} onValueChange={setFilterRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="กรองตามสิทธิ์" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทั้งหมด</SelectItem>
+                  <SelectItem value="user">ผู้ใช้ทั่วไป</SelectItem>
+                  <SelectItem value="admin">ผู้ดูแลระบบ</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger>
+                  <SelectValue placeholder="เรียงลำดับ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at">วันที่สร้างล่าสุด</SelectItem>
+                  <SelectItem value="name">ชื่อ A-Z</SelectItem>
+                  <SelectItem value="credit_balance">เครดิตสูงสุด</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                ส่งออกข้อมูล
+              </Button>
+              <Button variant="outline" size="sm">
+                <Upload className="h-4 w-4 mr-2" />
+                นำเข้าข้อมูล
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+              {/* Users List */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-gray-600" />
+              รายการผู้ใช้ ({filteredUsers.length} คน)
+            </CardTitle>
+            <CardDescription>
+              จัดการข้อมูลผู้ใช้ทั้งหมดในระบบ
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8">
@@ -549,57 +697,68 @@ export default function UsersManagePage() {
               ) : (
                 <div className="grid gap-4">
                   {filteredUsers.map((user) => (
-                    <Card key={user.id} className="border-l-4 border-l-blue-500">
+                    <Card key={user.id} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
                       <CardContent className="pt-4">
                         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-lg">{user.name || "ไม่ระบุชื่อ"}</h3>
-                              <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>
-                                {user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้ทั่วไป'}
-                              </Badge>
+                          <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                                {user.name?.charAt(0) || user.email?.charAt(0) || "U"}
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-lg">{user.name || "ไม่ระบุชื่อ"}</h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>
+                                    {user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้ทั่วไป'}
+                                  </Badge>
+                                  <span className="text-xs text-gray-500">
+                                    สร้างเมื่อ: {new Date(user.created_at).toLocaleDateString('th-TH')}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm text-gray-600">
-                              <div className="flex items-center gap-1">
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                              <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
                                 <Phone className="h-4 w-4 text-blue-600" />
                                 <span className="font-medium">{user.phone || "ไม่ระบุเบอร์"}</span>
                               </div>
                               {user.email && (
-                                <div className="flex items-center gap-1">
-                                  <Mail className="h-4 w-4" />
-                                  <span>{user.email}</span>
+                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                                  <Mail className="h-4 w-4 text-gray-600" />
+                                  <span className="truncate">{user.email}</span>
                                 </div>
                               )}
                               {user.line_id && (
-                                <div className="flex items-center gap-1">
-                                  <MessageCircle className="h-4 w-4" />
+                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                                  <MessageCircle className="h-4 w-4 text-green-600" />
                                   <span>{user.line_id}</span>
                                 </div>
                               )}
                               {user.branch && (
-                                <div className="flex items-center gap-1">
-                                  <Building className="h-4 w-4" />
+                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                                  <Building className="h-4 w-4 text-purple-600" />
                                   <span>{user.branch}</span>
                                 </div>
                               )}
                             </div>
-                            <div className="flex items-center gap-4 text-sm">
-                              <div className="flex items-center gap-1">
-                                <CreditCard className="h-4 w-4 text-green-600" />
-                                <span className="font-medium text-green-600">
+                            
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                                <CreditCard className="h-5 w-5 text-green-600" />
+                                <span className="font-bold text-green-700 text-lg">
                                   ฿{user.credit_balance.toLocaleString()}
                                 </span>
                               </div>
-                              <span className="text-gray-500">
-                                สร้างเมื่อ: {new Date(user.created_at).toLocaleDateString('th-TH')}
-                              </span>
                             </div>
                           </div>
+                          
                           <div className="flex gap-2 flex-wrap">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => openEditDialog(user)}
+                              className="hover:bg-blue-50 hover:border-blue-300"
                             >
                               <Edit className="h-4 w-4 mr-1" />
                               แก้ไข
@@ -608,6 +767,7 @@ export default function UsersManagePage() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleResetPassword(user)}
+                              className="hover:bg-yellow-50 hover:border-yellow-300"
                             >
                               รีเซ็ตรหัสผ่าน
                             </Button>
@@ -615,6 +775,7 @@ export default function UsersManagePage() {
                               size="sm"
                               variant="destructive"
                               onClick={() => openDeleteDialog(user)}
+                              className="hover:bg-red-50"
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
                               ลบ
@@ -745,5 +906,6 @@ export default function UsersManagePage() {
         </DialogContent>
       </Dialog>
     </div>
+    </SecurityMiddleware>
   );
 }
