@@ -9,7 +9,7 @@ const navItems = [
   { title: "รายการซื้อ", url: "/ticket-purchases", icon: TicketIcon },
   { title: "ตรวจผล", url: "/results", icon: BookOpen }, 
   { title: "ซื้อหวย", url: "/", icon: Ticket },
-  { title: "สรุปรายงาน", url: "/summary", icon: PieChart },
+  { title: "รายงานหวย", url: "/lottery-report", icon: PieChart },
   { title: "ผลหวย", url: "/api-results", icon: Calendar },
 
   
