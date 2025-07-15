@@ -32,7 +32,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { PrinterIcon, Trash2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { PrinterIcon, Trash2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, Edit } from "lucide-react";
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
 import { useRouter } from "next/navigation";
@@ -92,6 +92,16 @@ interface LotteryTicket {
   payout_amount: number;
   deleted_at?: string | null;
   lottery_ticket_items: LotteryTicketItem[];
+}
+
+interface StatusChangeHistory {
+  id: number;
+  ticket_id: number;
+  user_id: string;
+  old_status: string;
+  new_status: string;
+  changed_at: string;
+  username?: string;
 }
 
 interface Grouped {
@@ -164,13 +174,29 @@ const fetchTickets = async (
   return data || [];
 };
 
+// Fetch Status History Function
+const fetchStatusHistory = async (supabase: any, ticketId: number) => {
+  const { data, error } = await supabase
+    .from("status_change_history")
+    .select(`
+      *,
+      profiles:user_id(username)
+    `)
+    .eq("ticket_id", ticketId)
+    .order("changed_at", { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+};
+
 // Columns Definition
 const createColumns = (
   onPrintClick: (billNumber: string) => Promise<void>,
   setDeletingTicket: (ticket: LotteryTicket | null) => void,
   setDeleteDialogOpen: (open: boolean) => void,
   onRestoreClick: (ticket: LotteryTicket) => Promise<void>,
-  showDeleted: boolean
+  showDeleted: boolean,
+  onEditStatusClick: (ticket: LotteryTicket) => void
 ): ColumnDef<LotteryTicket>[] => [
   {
     accessorKey: "bill_number",
@@ -299,6 +325,17 @@ const createColumns = (
               <PrinterIcon className="mr-1 h-4 w-4" />
               พิมพ์
             </Button>
+            {row.original.status === "pending" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onEditStatusClick(row.original)}
+                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+              >
+                <Edit className="mr-1 h-4 w-4" />
+                แก้ไขสถานะ
+              </Button>
+            )}
             <Button
               variant="destructive"
               size="sm"
@@ -346,6 +383,11 @@ export default function LotteryPurchasePage() {
   const [deleteReason, setDeleteReason] = useState("");
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [showDeleted, setShowDeleted] = useState(false);
+  const [statusEditDialogOpen, setStatusEditDialogOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState<LotteryTicket | null>(null);
+  const [newStatus, setNewStatus] = useState<string>("");
+  const [statusHistory, setStatusHistory] = useState<StatusChangeHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<Set<number>>(new Set());
 
   // Fetch user data
   React.useEffect(() => {
@@ -450,6 +492,42 @@ export default function LotteryPurchasePage() {
     }
   };
 
+  // Status edit function
+  const handleEditStatus = async () => {
+    if (!editingTicket || !newStatus || !user) return;
+    
+    try {
+      const { error } = await supabase
+        .from("lottery_tickets")
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", editingTicket.id);
+      
+      if (error) throw error;
+      
+      // Log status change
+      await supabase
+        .from("status_change_history")
+        .insert({
+          ticket_id: editingTicket.id,
+          user_id: user.id,
+          old_status: editingTicket.status,
+          new_status: newStatus,
+          changed_at: new Date().toISOString(),
+        });
+        
+      toast.success("อัปเดตสถานะสำเร็จ");
+      setStatusEditDialogOpen(false);
+      setEditingTicket(null);
+      setNewStatus("");
+      refetch(); // Refresh the data
+    } catch (error: any) {
+      toast.error("เกิดข้อผิดพลาดในการอัปเดตสถานะ: " + error.message);
+    }
+  };
+
   // Group Bet Details
   const createGroups = (ticketItems: LotteryTicketItem[]) => {
     const allTypeLabels: Record<number, string[]> = {};
@@ -504,10 +582,53 @@ export default function LotteryPurchasePage() {
     return groups;
   };
 
+  // Load status history when row is expanded
+  const handleRowExpand = async (ticketId: number) => {
+    setExpandedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(ticketId)) {
+        newSet.delete(ticketId);
+        return newSet;
+      } else {
+        newSet.add(ticketId);
+        // Load status history when expanding
+        if (!loadingHistory.has(ticketId)) {
+          setLoadingHistory(prev => new Set(prev).add(ticketId));
+          fetchStatusHistory(supabase, ticketId)
+            .then(history => {
+              setStatusHistory(history);
+            })
+            .catch(error => {
+              console.error("Error loading status history:", error);
+            })
+            .finally(() => {
+              setLoadingHistory(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(ticketId);
+                return newSet;
+              });
+            });
+        }
+        return newSet;
+      }
+    });
+  };
+
   // TanStack Table
   const table = useReactTable({
     data: tickets,
-    columns: createColumns(onPrintClick, setDeletingTicket, setDeleteDialogOpen, handleRestoreTicket, showDeleted),
+    columns: createColumns(
+      onPrintClick, 
+      setDeletingTicket, 
+      setDeleteDialogOpen, 
+      handleRestoreTicket, 
+      showDeleted,
+      (ticket: LotteryTicket) => {
+        setEditingTicket(ticket);
+        setNewStatus("");
+        setStatusEditDialogOpen(true);
+      }
+    ),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     initialState: {
@@ -666,15 +787,7 @@ export default function LotteryPurchasePage() {
                                 transition={{ duration: 0.3 }}
                                 data-state={row.getIsSelected() && "selected"}
                                 onClick={() => {
-                                  setExpandedRows((prev) => {
-                                    const newSet = new Set(prev);
-                                    if (newSet.has(row.original.id)) {
-                                      newSet.delete(row.original.id);
-                                    } else {
-                                      newSet.add(row.original.id);
-                                    }
-                                    return newSet;
-                                  });
+                                  handleRowExpand(row.original.id);
                                 }}
                                 className="cursor-pointer"
                               >
@@ -705,55 +818,109 @@ export default function LotteryPurchasePage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3, delay: 0.1 }}
                                       >
-                                        <h4 className="text-sm font-semibold mb-2">
-                                          รายละเอียดการแทง
-                                        </h4>
-                                        {Array.from(
-                                          createGroups(row.original.lottery_ticket_items).values()
-                                        ).map((group, idx) => (
-                                          <div key={idx} className="flex gap-4 mb-2">
-                                            <div className="w-24">
-                                              <div className="text-xs">
-                                                {group.digit_number} ตัว
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                          {/* Bet Details */}
+                                          <div>
+                                            <h4 className="text-sm font-semibold mb-2">
+                                              รายละเอียดการแทง
+                                            </h4>
+                                            {Array.from(
+                                              createGroups(row.original.lottery_ticket_items).values()
+                                            ).map((group, idx) => (
+                                              <div key={idx} className="flex gap-4 mb-2">
+                                                <div className="w-24">
+                                                  <div className="text-xs">
+                                                    {group.digit_number} ตัว
+                                                  </div>
+                                                  <div className="text-xs text-primary">
+                                                    {group.typeLabels.join(" x ")}
+                                                  </div>
+                                                  <div className="text-xs">
+                                                    {group.typeLabels
+                                                      .map(
+                                                        (label: string) =>
+                                                          group.amounts[label] || 0
+                                                      )
+                                                      .join(" x ")}
+                                                  </div>
+                                                  <div className="text-xs text-muted-foreground">
+                                                    รวม{" "}
+                                                    {group.typeLabels
+                                                      .reduce(
+                                                        (sum: number, label: string) =>
+                                                          sum +
+                                                          (group.amounts[label] || 0) *
+                                                            group.numbers.length,
+                                                        0
+                                                      )
+                                                      .toLocaleString()}{" "}
+                                                    ฿
+                                                  </div>
+                                                </div>
+                                                <div className="flex-1">
+                                                  <div className="text-xs bg-background p-2 rounded border border-border">
+                                                    {group.numbers
+                                                      .map((num) =>
+                                                        typeof num === "string"
+                                                          ? num.replace(/[\[\]"]+/g, "") // ลบ [, ], "
+                                                          : num
+                                                      )
+                                                      .join("  ")}
+                                                  </div>
+                                                </div>
                                               </div>
-                                              <div className="text-xs text-primary">
-                                                {group.typeLabels.join(" x ")}
-                                              </div>
-                                              <div className="text-xs">
-                                                {group.typeLabels
-                                                  .map(
-                                                    (label: string) =>
-                                                      group.amounts[label] || 0
-                                                  )
-                                                  .join(" x ")}
-                                              </div>
-                                              <div className="text-xs text-muted-foreground">
-                                                รวม{" "}
-                                                {group.typeLabels
-                                                  .reduce(
-                                                    (sum: number, label: string) =>
-                                                      sum +
-                                                      (group.amounts[label] || 0) *
-                                                        group.numbers.length,
-                                                    0
-                                                  )
-                                                  .toLocaleString()}{" "}
-                                                ฿
-                                              </div>
-                                            </div>
-                                            <div className="flex-1">
-                                              <div className="text-xs bg-background p-2 rounded border border-border">
-                                                {group.numbers
-                                                  .map((num) =>
-                                                    typeof num === "string"
-                                                      ? num.replace(/[\[\]"]+/g, "") // ลบ [, ], "
-                                                      : num
-                                                  )
-                                                  .join("  ")}
-                                              </div>
-                                            </div>
+                                            ))}
                                           </div>
-                                        ))}
+
+                                          {/* Status History */}
+                                          <div>
+                                            <h4 className="text-sm font-semibold mb-2">
+                                              ประวัติการเปลี่ยนแปลงสถานะ
+                                            </h4>
+                                            {loadingHistory.has(row.original.id) ? (
+                                              <div className="flex items-center justify-center py-4">
+                                                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                              </div>
+                                            ) : statusHistory.length > 0 ? (
+                                              <div className="space-y-2">
+                                                {statusHistory.map((history) => (
+                                                  <div key={history.id} className="text-xs bg-background p-2 rounded border border-border">
+                                                    <div className="flex justify-between items-start">
+                                                      <div>
+                                                        <span className="font-medium">
+                                                          {history.old_status === "pending" ? "รอดำเนินการ" :
+                                                           history.old_status === "confirmed" ? "ยืนยันแล้ว" :
+                                                           history.old_status === "cancelled" ? "ยกเลิก" : history.old_status}
+                                                        </span>
+                                                        <span className="mx-2">→</span>
+                                                        <span className={`font-medium ${
+                                                          history.new_status === "confirmed" ? "text-green-600" :
+                                                          history.new_status === "cancelled" ? "text-red-600" : ""
+                                                        }`}>
+                                                          {history.new_status === "pending" ? "รอดำเนินการ" :
+                                                           history.new_status === "confirmed" ? "ยืนยันแล้ว" :
+                                                           history.new_status === "cancelled" ? "ยกเลิก" : history.new_status}
+                                                        </span>
+                                                      </div>
+                                                      <div className="text-muted-foreground">
+                                                        {format(new Date(history.changed_at), "d MMM yyyy HH:mm", { locale: th })}
+                                                      </div>
+                                                    </div>
+                                                    {history.username && (
+                                                      <div className="text-muted-foreground mt-1">
+                                                        โดย: {history.username}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <div className="text-xs text-muted-foreground py-2">
+                                                ไม่มีประวัติการเปลี่ยนแปลงสถานะ
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
                                       </motion.div>
                                     </TableCell>
                                   </motion.tr>
@@ -842,6 +1009,54 @@ export default function LotteryPurchasePage() {
                       </Button>
                       <Button variant="destructive" onClick={handleDeleteTicket}>
                         ยืนยันลบ
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </AnimatePresence>
+
+            {/* Status Edit Dialog */}
+            <AnimatePresence>
+              {statusEditDialogOpen && (
+                <Dialog open={statusEditDialogOpen} onOpenChange={setStatusEditDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>แก้ไขสถานะรายการ</DialogTitle>
+                    </DialogHeader>
+                    <div className="text-sm mb-4">
+                      <div className="mb-2">
+                        เลขบิล: <span className="font-bold">{editingTicket?.bill_number}</span>
+                      </div>
+                      <div className="mb-2">
+                        สถานะปัจจุบัน: <span className="font-bold text-yellow-600">รอดำเนินการ</span>
+                      </div>
+                      <div className="mb-2">
+                        เปลี่ยนเป็น:
+                      </div>
+                    </div>
+                    <Select
+                      value={newStatus}
+                      onValueChange={setNewStatus}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="เลือกสถานะใหม่" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="confirmed">ยืนยันแล้ว</SelectItem>
+                        <SelectItem value="cancelled">ยกเลิก</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setStatusEditDialogOpen(false)}>
+                        ยกเลิก
+                      </Button>
+                      <Button 
+                        onClick={handleEditStatus}
+                        disabled={!newStatus}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        อัปเดตสถานะ
                       </Button>
                     </DialogFooter>
                   </DialogContent>
