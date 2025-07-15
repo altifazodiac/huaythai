@@ -184,15 +184,41 @@ export default function LotterySubTypePage() {
     actions: true,
   });
 
+  // เพิ่ม state สำหรับ autocomplete วันในสัปดาห์
   const daysOfWeek = [
-    { eng: "Monday", th: "จันทร์" },
-    { eng: "Tuesday", th: "อังคาร" },
-    { eng: "Wednesday", th: "พุธ" },
-    { eng: "Thursday", th: "พฤหัสบดี" },
-    { eng: "Friday", th: "ศุกร์" },
-    { eng: "Saturday", th: "เสาร์" },
-    { eng: "Sunday", th: "อาทิตย์" },
+    "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"
   ];
+  const [dayInput, setDayInput] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // sync scheduleForm.day_of_week <-> dayInput
+  useEffect(() => {
+    if (scheduleDialogOpen) {
+      setDayInput(scheduleForm.day_of_week || "");
+    }
+  }, [scheduleDialogOpen, scheduleForm.day_of_week]);
+
+  const handleDayInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDayInput(value);
+    setScheduleForm({ ...scheduleForm, day_of_week: value });
+    if (value) {
+      setSuggestions(daysOfWeek.filter(day => day.includes(value) && !value.split(',').map(v=>v.trim()).includes(day)));
+    } else {
+      setSuggestions([]);
+    }
+  };
+
+  const handleSuggestionClick = (day: string) => {
+    let current = dayInput.split(',').map(v => v.trim()).filter(Boolean);
+    if (!current.includes(day)) {
+      current.push(day);
+      const newValue = current.join(', ');
+      setDayInput(newValue);
+      setScheduleForm({ ...scheduleForm, day_of_week: newValue });
+      setSuggestions([]);
+    }
+  };
 
   // Debounce search input
   useEffect(() => {
@@ -376,11 +402,16 @@ export default function LotterySubTypePage() {
   const handleScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentSubTypeId) return;
-    
+
+    // หา lottery_type_id จาก subTypes
+    const subType = subTypes.find(s => s.lottery_sub_type_id === currentSubTypeId);
+    const lottery_type_id = subType?.lottery_type_id;
+
     // เตรียมข้อมูลให้ถูกต้อง
     const formData = {
       ...scheduleForm,
       lottery_sub_type_id: currentSubTypeId,
+      lottery_type_id, // เพิ่มตรงนี้
       frequency_value: Number(scheduleForm.frequency_value),
       is_active: scheduleForm.is_active ?? true
     };
@@ -1072,15 +1103,30 @@ export default function LotterySubTypePage() {
               </div>
               <div>
                 <label className="text-sm font-medium">วันในสัปดาห์</label>
-                <input
-                  type="text"
-                  name="day_of_week"
-                  value={scheduleForm.day_of_week || ""}
-                  onChange={handleScheduleChange}
-                  placeholder="เช่น จันทร์, พุธ, ศุกร์"
-                  required
-                  className="w-full border rounded px-2 py-1"
-                />
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    name="day_of_week"
+                    value={dayInput}
+                    onChange={handleDayInputChange}
+                    placeholder="เช่น จันทร์, พุธ, ศุกร์"
+                    autoComplete="off"
+                    className="w-full border rounded px-2 py-1"
+                  />
+                  {suggestions.length > 0 && (
+                    <ul className="absolute z-10 bg-white border w-full mt-1 rounded shadow">
+                      {suggestions.map(day => (
+                        <li
+                          key={day}
+                          className="px-2 py-1 hover:bg-blue-100 cursor-pointer"
+                          onClick={() => handleSuggestionClick(day)}
+                        >
+                          {day}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">เวลาเปิดรับ</label>
