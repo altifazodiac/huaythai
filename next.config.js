@@ -25,6 +25,17 @@ const nextConfig = {
     // Also disable ESLint during builds
     ignoreDuringBuilds: true,
   },
+  // 👇 เปลี่ยนตรงนี้
+  serverExternalPackages: ['playwright'],
+  // เพิ่มการตั้งค่าสำหรับ Playwright ใน serverless environment
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push({
+        'playwright': 'commonjs playwright',
+      });
+    }
+    return config;
+  },
   async redirects() {
     return [
       {

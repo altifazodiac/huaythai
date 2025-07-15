@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { phone, password, email, name, line_id, branch, credit_balance, role } = await request.json();
+    const { phone, password, email, name, line_id, branch, credit_balance, role, percent } = await request.json();
 
     // Validate required fields
     if (!phone || !password) {
@@ -30,8 +30,8 @@ export async function POST(request: Request) {
       );
     } else {
       // Fallback to cookies
-      const cookieStore = await cookies();
-      supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+      const cookieStore = cookies();
+      supabase = createRouteHandlerClient({ cookies: async () => cookieStore });
     }
 
     // 1. Check if the current user is an admin
@@ -119,6 +119,7 @@ export async function POST(request: Request) {
         line_id,
         branch,
         credit_balance,
+        percent: percent ?? 0,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'id'
@@ -131,12 +132,14 @@ export async function POST(request: Request) {
       throw new Error(`Profile Error: ${profileError.message}`);
     }
 
-    // 8. Set the new user's role
+    // 8. Set the new user's role (use upsert to handle existing role from trigger)
     const { error: roleInsertError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
+      .upsert({
         user_id: newUserId,
         role,
+      }, {
+        onConflict: 'user_id'
       });
 
     if (roleInsertError) {
@@ -200,8 +203,8 @@ export async function DELETE(request: Request) {
       );
     } else {
       // Fallback to cookies
-      const cookieStore = await cookies();
-      supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+      const cookieStore = cookies();
+      supabase = createRouteHandlerClient({ cookies: async () => cookieStore });
     }
 
     // 1. Check if the current user is an admin
@@ -298,8 +301,8 @@ export async function PUT(request: Request) {
       );
     } else {
       // Fallback to cookies
-      const cookieStore = await cookies();
-      supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+      const cookieStore = cookies();
+      supabase = createRouteHandlerClient({ cookies: async () => cookieStore });
     }
 
     // 1. Check if the current user is an admin
@@ -351,7 +354,7 @@ export async function PUT(request: Request) {
     }
 
     if (action === 'update_user') {
-      const { name, phone, email, line_id, branch, credit_balance, role } = requestBody;
+      const { name, phone, email, line_id, branch, credit_balance, role, percent } = requestBody;
       
       // Check if credit balance changed
       const { data: currentProfile } = await supabaseAdmin
@@ -374,6 +377,7 @@ export async function PUT(request: Request) {
           line_id,
           branch,
           credit_balance,
+          percent: percent ?? 0,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);

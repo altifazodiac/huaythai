@@ -1,4 +1,3 @@
- 
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -128,9 +127,9 @@ const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
           net_profit_loss: 0
         };
       }
-      acc[date].total_bills = 1;
-      acc[date].total_purchase_amount = Number(ticket.total_amount || 0);
-      acc[date].net_profit_loss = Number(ticket.total_amount || 0);
+      acc[date].total_bills += 1;
+      acc[date].total_purchase_amount += Number(ticket.total_amount || 0);
+      acc[date].net_profit_loss += Number(ticket.total_amount || 0);
       return acc;
     }, {});
     
@@ -140,14 +139,14 @@ const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
       if (ticket) {
         const date = ticket.draw_date;
         if (groupedData[date]) {
-          groupedData[date].total_numbers = 1;
+          groupedData[date].total_numbers += 1;
         }
       }
     });
-    
     return Object.values(groupedData).sort((a: any, b: any) =>
       new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime()
     ) as DailySummary[];
+    
   } catch (err) {
     console.error('Error in fetchDailySummary:', err);
     throw err;
@@ -219,10 +218,10 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
       }
       
       acc[subTypeId].total_bills.add(item.ticket_id);
-      acc[subTypeId].total_numbers = 1;
+      acc[subTypeId].total_numbers += 1;
       if (ticket) {
-        acc[subTypeId].total_purchase_amount = Number(ticket.total_amount || 0);
-        acc[subTypeId].net_profit_loss = Number(ticket.total_amount || 0);
+        acc[subTypeId].total_purchase_amount += Number(ticket.total_amount || 0);
+        acc[subTypeId].net_profit_loss += Number(ticket.total_amount || 0);
       }
       
       return acc;
@@ -252,15 +251,17 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
     
     const { data, error } = await supabase.rpc('get_bill_summary', params);
     
+    // Always filter only confirmed status, even if RPC returns more
     if (!error && data) {
-      console.log('Received bill summary data:', data);
-      return data;
+      const filtered = (data as BillSummary[]).filter((b: BillSummary) => b.status === 'confirmed');
+      console.log('Received bill summary data:', filtered);
+      return filtered;
     }
     
     // Fallback to direct SQL query
     console.log('RPC function failed, using direct query fallback');
     
-    // Get tickets
+    // Get tickets (force confirmed only)
     let ticketQuery = supabase
       .from('lottery_tickets')
       .select('id, bill_number, draw_date, total_amount, status, user_id')
@@ -338,7 +339,7 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
         numbers_count: ticketItems.length,
         status: ticket.status
       };
-    });
+    }).filter((b: BillSummary) => b.status === 'confirmed'); // filter again for safety
     
     console.log('Transformed bill summary data:', transformedData);
     return transformedData;
@@ -959,4 +960,5 @@ const LotterySummaryPage: React.FC = () => {
 };
 
 export default LotterySummaryPage;
+
  
