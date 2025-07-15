@@ -117,25 +117,60 @@ async function createLotteryImportErrorToast(errorMessage: string) {
 
 async function autoScroll(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
       let lastHeight = 0;
       let retries = 0;
       const maxRetries = 5; // Number of times to check for new content before stopping
+      const maxTimeout = 30000; // 30 second timeout to prevent infinite scrolling
+      const startTime = Date.now();
+      
       const timer = setInterval(() => {
-        const currentHeight = document.body.scrollHeight;
-        window.scrollTo(0, currentHeight);
-        if (currentHeight === lastHeight) {
-          retries++;
-          if (retries >= maxRetries) {
-            console.log(`[AutoScroll] Page height is stable at ${currentHeight}px. Finishing scroll.`);
+        try {
+          // Check for timeout
+          if (Date.now() - startTime > maxTimeout) {
+            console.log('[AutoScroll] Timeout reached, stopping scroll');
             clearInterval(timer);
             resolve();
+            return;
           }
-        } else {
-          lastHeight = currentHeight;
-          retries = 0;
+          
+          const currentHeight = document.body.scrollHeight;
+          window.scrollTo(0, currentHeight);
+          
+          if (currentHeight === lastHeight) {
+            retries++;
+            if (retries >= maxRetries) {
+              console.log(`[AutoScroll] Page height is stable at ${currentHeight}px. Finishing scroll.`);
+              clearInterval(timer);
+              resolve();
+            }
+          } else {
+            lastHeight = currentHeight;
+            retries = 0;
+          }
+        } catch (error) {
+          console.error('[AutoScroll] Error during scrolling:', error);
+          clearInterval(timer);
+          reject(error);
         }
       }, 500); // Check for new content every 500ms
+      
+      // Cleanup function to ensure timer is cleared
+      const cleanup = () => {
+        if (timer) {
+          clearInterval(timer);
+        }
+      };
+      
+      // Ensure cleanup on page unload
+      window.addEventListener('beforeunload', cleanup);
+      
+      // Remove event listener when promise resolves
+      const originalResolve = resolve;
+      resolve = () => {
+        window.removeEventListener('beforeunload', cleanup);
+        originalResolve();
+      };
     });
   });
 }

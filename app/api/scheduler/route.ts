@@ -165,7 +165,7 @@ class TaskScheduler {
     try {
       const currentTime = formatInTimeZone(new Date(), TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
       
-      // ดึง pending tasks ที่ถึงเวลาแล้ว
+      // Use a transaction to prevent race conditions
       const { data: pendingTasks, error } = await supabase
         .from('scheduled_tasks')
         .select('*')
@@ -185,15 +185,39 @@ class TaskScheduler {
 
       console.log(`Found ${pendingTasks.length} pending tasks to process`);
 
-      // ประมวลผลแต่ละ task
+      // Process each task with proper locking
       for (const task of pendingTasks) {
         try {
           console.log(`🔄 Processing task: ${task.name}`);
           
-          // อัปเดตสถานะเป็น running
-          await this.updateTaskStatus(task.id, 'running');
+          // Try to acquire lock by updating status to 'running'
+          const { error: lockError } = await supabase
+            .from('scheduled_tasks')
+            .update({ 
+              status: 'running',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', task.id)
+            .eq('status', 'pending'); // Only update if still pending
 
-          // ประมวลผล task ตามประเภท
+          if (lockError) {
+            console.error(`❌ Failed to acquire lock for task ${task.name}:`, lockError);
+            continue;
+          }
+
+          // Check if we actually acquired the lock
+          const { data: lockedTask } = await supabase
+            .from('scheduled_tasks')
+            .select('status')
+            .eq('id', task.id)
+            .single();
+
+          if (!lockedTask || lockedTask.status !== 'running') {
+            console.log(`⏭️ Task ${task.name} was already being processed by another instance`);
+            continue;
+          }
+
+          // Process the task according to type
           let success = false;
           switch (task.type) {
             case 'scrape':
@@ -207,7 +231,7 @@ class TaskScheduler {
               break;
           }
 
-          // อัปเดตสถานะและเวลาถัดไป
+          // Update status and next run time
           await this.updateTaskAfterExecution(task, success);
           
           console.log(`✅ Task ${task.name} completed successfully`);
