@@ -131,12 +131,14 @@ export async function POST(request: Request) {
       throw new Error(`Profile Error: ${profileError.message}`);
     }
 
-    // 8. Set the new user's role
+    // 8. Set the new user's role (use upsert to handle existing role from trigger)
     const { error: roleInsertError } = await supabaseAdmin
       .from('user_roles')
-      .insert({
+      .upsert({
         user_id: newUserId,
         role,
+      }, {
+        onConflict: 'user_id'
       });
 
     if (roleInsertError) {
