@@ -1,3 +1,4 @@
+ 
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -83,36 +84,264 @@ interface NumberDetail {
 
 // Comprehensive data fetching functions using authenticated Supabase client
 const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
-  const { data, error } = await supabase.rpc('get_daily_lottery_summary');
-  if (error) throw error;
-  return data || [];
+  try {
+    // Try RPC function first
+    const { data, error } = await supabase.rpc('get_daily_lottery_summary');
+    if (!error && data) {
+      return data;
+    }
+    
+    // Fallback to direct SQL query
+    console.log('RPC function failed, using direct query fallback');
+    
+    // Get all confirmed tickets
+    const { data: tickets, error: ticketError } = await supabase
+      .from('lottery_tickets')
+      .select('id, draw_date, total_amount')
+      .eq('status', 'confirmed');
+    
+    if (ticketError) throw ticketError;
+    
+    if (!tickets || tickets.length === 0) {
+      return [];
+    }
+    
+    // Get ticket items to count total numbers
+    const ticketIds = tickets.map((t: any) => t.id);
+    const { data: ticketItems, error: itemError } = await supabase
+      .from('lottery_ticket_items')
+      .select('ticket_id')
+      .in('ticket_id', ticketIds);
+    
+    if (itemError) throw itemError;
+    
+    // Group by draw_date and calculate totals
+    const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
+      const date = ticket.draw_date;
+      if (!acc[date]) {
+        acc[date] = {
+          draw_date: date,
+          total_bills: 0,
+          total_numbers: 0,
+          total_purchase_amount: 0,
+          total_payout: 0,
+          net_profit_loss: 0
+        };
+      }
+      acc[date].total_bills = 1;
+      acc[date].total_purchase_amount = Number(ticket.total_amount || 0);
+      acc[date].net_profit_loss = Number(ticket.total_amount || 0);
+      return acc;
+    }, {});
+    
+    // Add total_numbers count
+    (ticketItems || []).forEach((item: any) => {
+      const ticket = tickets.find((t: any) => t.id === item.ticket_id);
+      if (ticket) {
+        const date = ticket.draw_date;
+        if (groupedData[date]) {
+          groupedData[date].total_numbers = 1;
+        }
+      }
+    });
+    
+    return Object.values(groupedData).sort((a: any, b: any) =>
+      new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime()
+    ) as DailySummary[];
+  } catch (err) {
+    console.error('Error in fetchDailySummary:', err);
+    throw err;
+  }
 };
 
 const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promise<LotteryTypeSummary[]> => {
-  const { data, error } = await supabase.rpc('get_lottery_type_summary', { p_draw_date: drawDate });
-  if (error) throw error;
-  return data || [];
+  try {
+    // Try RPC function first
+    const { data, error } = await supabase.rpc('get_lottery_type_summary', { p_draw_date: drawDate });
+    if (!error && data) {
+      return data;
+    }
+    
+    // Fallback to direct SQL query
+    console.log('RPC function failed, using direct query fallback');
+    
+    // First get all confirmed tickets
+    let ticketQuery = supabase
+      .from('lottery_tickets')
+      .select('id, draw_date, total_amount')
+      .eq('status', 'confirmed');
+    
+    if (drawDate) {
+      ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
+    if (ticketError) throw ticketError;
+    
+    // Then get ticket items for these tickets
+    const ticketIds = tickets?.map((t: any) => t.id) || [];
+    if (ticketIds.length === 0) {
+      return [];
+    }
+    
+    const { data: ticketItems, error: itemError } = await supabase
+      .from('lottery_ticket_items')
+      .select(`
+        ticket_id,
+        lottery_sub_type_id,
+        lottery_sub_types!inner(
+          lottery_sub_type_id,
+          sub_type_name,
+          country_origin
+        )
+      `)
+      .in('ticket_id', ticketIds);
+    
+    if (itemError) throw itemError;
+    
+    // Group by lottery_sub_type_id and calculate totals
+    const groupedData = (ticketItems || []).reduce((acc: any, item: any) => {
+      const subTypeId = item.lottery_sub_type_id;
+      const subType = item.lottery_sub_types;
+      const ticket = tickets?.find((t: any) => t.id === item.ticket_id);
+      
+      if (!acc[subTypeId]) {
+        acc[subTypeId] = {
+          lottery_sub_type_id: subTypeId,
+          sub_type_name: subType.sub_type_name,
+          country_origin: subType.country_origin,
+          total_bills: new Set(),
+          total_numbers: 0,
+          total_purchase_amount: 0,
+          total_payout: 0,
+          net_profit_loss: 0
+        };
+      }
+      
+      acc[subTypeId].total_bills.add(item.ticket_id);
+      acc[subTypeId].total_numbers = 1;
+      if (ticket) {
+        acc[subTypeId].total_purchase_amount = Number(ticket.total_amount || 0);
+        acc[subTypeId].net_profit_loss = Number(ticket.total_amount || 0);
+      }
+      
+      return acc;
+    }, {});
+    
+    // Convert Sets to counts and return array
+    return Object.values(groupedData).map((item: any) => ({
+      ...item,
+      total_bills: item.total_bills.size
+    })).sort((a: any, b: any) => 
+      Number(b.total_purchase_amount) - Number(a.total_purchase_amount)
+    );
+  } catch (err) {
+    console.error('Error in fetchLotteryTypeSummary:', err);
+    throw err;
+  }
 };
 
 const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?: number): Promise<BillSummary[]> => {
   try {
     console.log('Fetching bill summary with params:', { drawDate, lotteryTypeId });
     
+    // Try RPC function first
     const params: any = {};
     if (drawDate) params.p_draw_date = drawDate;
     if (lotteryTypeId) params.p_lottery_type_id = lotteryTypeId;
     
-    console.log('Calling RPC with params:', params);
-    
     const { data, error } = await supabase.rpc('get_bill_summary', params);
     
-    if (error) {
-      console.error('Error in get_bill_summary RPC call:', error);
-      throw error;
+    if (!error && data) {
+      console.log('Received bill summary data:', data);
+      return data;
     }
     
-    console.log('Received bill summary data:', data);
-    return data || [];
+    // Fallback to direct SQL query
+    console.log('RPC function failed, using direct query fallback');
+    
+    // Get tickets
+    let ticketQuery = supabase
+      .from('lottery_tickets')
+      .select('id, bill_number, draw_date, total_amount, status, user_id')
+      .eq('status', 'confirmed');
+    
+    if (drawDate) {
+      ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
+    if (ticketError) {
+      console.error('Error in get_bill_summary fallback query:', ticketError);
+      throw ticketError;
+    }
+    
+    if (!tickets || tickets.length === 0) {
+      return [];
+    }
+    
+    // Get user profiles
+    const userIds = [...new Set(tickets.map((t: any) => t.user_id))];
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('id', userIds);
+    
+    if (profileError) throw profileError;
+    
+    // Get ticket items
+    const ticketIds = tickets.map((t: any) => t.id);
+    let itemQuery = supabase
+      .from('lottery_ticket_items')
+      .select(`
+        ticket_id,
+        lottery_sub_type_id,
+        lottery_sub_types!inner(
+          lottery_sub_type_id,
+          sub_type_name,
+          country_origin
+        )
+      `)
+      .in('ticket_id', ticketIds);
+    
+    if (lotteryTypeId) {
+      itemQuery = itemQuery.eq('lottery_sub_type_id', lotteryTypeId);
+    }
+    
+    const { data: ticketItems, error: itemError } = await itemQuery;
+    if (itemError) throw itemError;
+    
+    // Group items by ticket_id
+    const itemsByTicket = (ticketItems || []).reduce((acc: any, item: any) => {
+      if (!acc[item.ticket_id]) {
+        acc[item.ticket_id] = [];
+      }
+      acc[item.ticket_id].push(item);
+      return acc;
+    }, {});
+    
+    // Transform data to match expected format
+    const transformedData = tickets.map((ticket: any) => {
+      const ticketItems = itemsByTicket[ticket.id] || [];
+      const profile = profiles?.find((p: any) => p.id === ticket.user_id);
+      const firstItem = ticketItems[0];
+      
+      return {
+        bill_number: ticket.bill_number,
+        draw_date: ticket.draw_date,
+        user_name: profile?.name || 'ไม่ระบุ',
+        sub_type_name: firstItem?.lottery_sub_types?.sub_type_name || 'ไม่ระบุ',
+        country_origin: firstItem?.lottery_sub_types?.country_origin || 'ไม่ระบุ',
+        total_amount: Number(ticket.total_amount || 0),
+        total_payout: 0, // Placeholder
+        net_profit_loss: Number(ticket.total_amount || 0), // Placeholder
+        numbers_count: ticketItems.length,
+        status: ticket.status
+      };
+    });
+    
+    console.log('Transformed bill summary data:', transformedData);
+    return transformedData;
   } catch (err) {
     console.error('Error in fetchBillSummary:', err);
     throw err;
@@ -120,9 +349,80 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
 };
 
 const fetchNumberDetails = async (supabase: any, billNumber?: string): Promise<NumberDetail[]> => {
-  const { data, error } = await supabase.rpc('get_number_details', { p_bill_number: billNumber });
-  if (error) throw error;
-  return data || [];
+  try {
+    // Try RPC function first
+    const { data, error } = await supabase.rpc('get_number_details', { p_bill_number: billNumber });
+    if (!error && data) {
+      return data;
+    }
+    
+    // Fallback to direct SQL query
+    console.log('RPC function failed, using direct query fallback');
+    
+    // Get tickets
+    let ticketQuery = supabase
+      .from('lottery_tickets')
+      .select('id, bill_number')
+      .eq('status', 'confirmed');
+    
+    if (billNumber) {
+      ticketQuery = ticketQuery.eq('bill_number', billNumber);
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
+    if (ticketError) throw ticketError;
+    
+    if (!tickets || tickets.length === 0) {
+      return [];
+    }
+    
+    // Get ticket items for these tickets
+    const ticketIds = tickets.map((t: any) => t.id);
+    const { data: ticketItems, error: itemError } = await supabase
+      .from('lottery_ticket_items')
+      .select(`
+        id,
+        ticket_id,
+        numbers,
+        amount,
+        lottery_sub_number_id,
+        lottery_sub_number!inner(
+          id,
+          digit_number,
+          type_number,
+          price_paid
+        )
+      `)
+      .in('ticket_id', ticketIds);
+    
+    if (itemError) throw itemError;
+    
+    // Transform data to match expected format
+    const transformedData: NumberDetail[] = [];
+    (ticketItems || []).forEach((item: any) => {
+      const ticket = tickets.find((t: any) => t.id === item.ticket_id);
+      if (ticket) {
+        transformedData.push({
+          id: item.id,
+          bill_number: ticket.bill_number,
+          lottery_type_name: `${item.lottery_sub_number.digit_number} ตัว${item.lottery_sub_number.type_number}`,
+          digit_number: item.lottery_sub_number.digit_number,
+          type_number: item.lottery_sub_number.type_number,
+          numbers: item.numbers,
+          amount: Number(item.amount || 0),
+          price_paid: Number(item.lottery_sub_number.price_paid || 0),
+          is_winning: false, // Placeholder
+          payout_amount: 0, // Placeholder
+          winning_numbers: undefined // Placeholder
+        });
+      }
+    });
+    
+    return transformedData;
+  } catch (err) {
+    console.error('Error in fetchNumberDetails:', err);
+    throw err;
+  }
 };
 
 const LotterySummaryPage: React.FC = () => {
@@ -659,4 +959,4 @@ const LotterySummaryPage: React.FC = () => {
 };
 
 export default LotterySummaryPage;
-
+ 

@@ -133,6 +133,8 @@ const LotteryOrderPage = () => {
   // ฟังก์ชันดึงข้อมูลเลขอั้นจากฐานข้อมูลโดยตรง
   const fetchDirectManagedNumbers = async (subTypeId: number, drawDate: string) => {
     try {
+      console.log(`Fetching managed numbers for subType: ${subTypeId}, drawDate: ${drawDate}`);
+      
       const { data, error } = await supabase
         .from('managed_numbers')
         .select('*')
@@ -144,6 +146,7 @@ const LotteryOrderPage = () => {
         return [];
       }
 
+      console.log(`Found ${data?.length || 0} managed numbers`);
       setManagedNumbersCache(data || []);
       return data || [];
     } catch (error) {
@@ -163,6 +166,7 @@ const LotteryOrderPage = () => {
     );
 
     if (managedNumber) {
+      console.log(`Found managed number: ${number} (${digitCount} digits, ${typeNumber}) - Action: ${managedNumber.action}`);
       return {
         action: managedNumber.action as 'close' | 'half',
         reason: managedNumber.reason
@@ -262,6 +266,8 @@ const LotteryOrderPage = () => {
   useEffect(() => {
     const fetchPrizeData = async () => {
       if (initialState.subType) {
+        console.log(`Fetching prize data for subType: ${initialState.subType}`);
+        
         const { data, error } = await supabase
           .from('lottery_sub_number')
           .select('id, digit_number, type_number, price_paid')
@@ -271,6 +277,8 @@ const LotteryOrderPage = () => {
           console.error('Error fetching prize data:', error);
           setPrizeInfo([]);
         } else if (data) {
+          console.log(`Found ${data.length} prize configurations`);
+          
           const mappedData: PrizeInfo[] = data.map((item: any) => {
             let category = '';
             let displayName = '';
@@ -299,6 +307,8 @@ const LotteryOrderPage = () => {
               category: category,
             };
           });
+          
+          console.log('Mapped prize data:', mappedData);
           setPrizeInfo(mappedData);
         }
       }
@@ -324,7 +334,11 @@ const LotteryOrderPage = () => {
   useEffect(() => {
     if (initialState.subType && selectedDraw) {
       const drawDateStr = selectedDraw.date.toISOString().split('T')[0];
+      console.log(`Loading managed numbers for subType: ${initialState.subType}, drawDate: ${drawDateStr}`);
+      
+      // ดึงข้อมูลเลขอั้นจากฐานข้อมูลโดยตรง
       fetchDirectManagedNumbers(initialState.subType, drawDateStr);
+      
       // ยังคงเรียก fetchManagedNumbers เพื่อให้ context ทำงาน
       fetchManagedNumbers(initialState.subType, drawDateStr);
     }
@@ -846,6 +860,8 @@ const LotteryOrderPage = () => {
           }
           const drawDate = selectedDrawDate.toISOString().split('T')[0];
           
+          console.log(`Checking number cap for: ${num} (${digitCount} digits, ${typeNumber})`);
+          
           // ใช้ฟังก์ชันตรวจสอบโดยตรงก่อน แล้วค่อย fallback ไป context
           let numberStatus = getDirectNumberCapAction(num, digitCount, typeNumber, initialState.subType, drawDate);
           if (!numberStatus) {
@@ -853,6 +869,7 @@ const LotteryOrderPage = () => {
           }
           
           if (numberStatus) {
+            console.log(`Number ${num} status: ${numberStatus.action} - ${numberStatus.reason}`);
             if (numberStatus.action === 'close') {
               blockedNumbers.push({ num, reason: numberStatus.reason });
               return; // ไม่เพิ่มเลขนี้
@@ -1234,26 +1251,44 @@ const LotteryOrderPage = () => {
     toast.info('กำลังบันทึกรายการ...');
   
     try {
+      // ปรับปรุงการเตรียมข้อมูลให้ตรงกับ RPC function
       const itemsToInsert = selectedOrders.map(order => {
         const prices = orderPrices[order.id];
         const finalAmount = prices?.amount || '0';
         const originalAmount = prices?.originalAmount || finalAmount;
 
+        // ตรวจสอบและปรับปรุงข้อมูลให้ถูกต้อง
+        const prize = prizeInfo.find(p => p.id === order.prizeId);
+        if (!prize) {
+          throw new Error(`ไม่พบข้อมูลรางวัลสำหรับ ID: ${order.prizeId}`);
+        }
+
         return {
           lottery_sub_type_id: initialState.subType,
-          lottery_sub_number_id: order.prizeId, // Assuming prizeId maps to lottery_sub_number_id
-          numbers: [order.numbers], // Assuming a single number string per item
+          lottery_sub_number_id: order.prizeId,
+          numbers: [order.numbers], // เก็บเป็น array ของ string
           amount: finalAmount,
           original_amount: originalAmount,
         };
       });
   
+      console.log('Sending order data:', {
+        p_user_id: user.id,
+        p_bill_name: billName,
+        p_bill_number: billNumber,
+        p_draw_date: selectedDraw.date.toISOString().split('T')[0],
+        p_draw_time: selectedDraw.schedule.draw_time,
+        p_close_time: selectedDraw.schedule.close_time,
+        p_total_amount: totalPayment,
+        p_ticket_items: itemsToInsert,
+      });
+
       const { error } = await supabase.rpc('handle_lottery_order', {
         p_user_id: user.id,
         p_bill_name: billName,
         p_bill_number: billNumber,
         p_draw_date: selectedDraw.date.toISOString().split('T')[0],
-        p_draw_time: selectedDraw.schedule.draw_time, // เพิ่มค่านี้
+        p_draw_time: selectedDraw.schedule.draw_time,
         p_close_time: selectedDraw.schedule.close_time,
         p_total_amount: totalPayment,
         p_ticket_items: itemsToInsert,
@@ -1279,6 +1314,7 @@ const LotteryOrderPage = () => {
       router.push(`/order-preview/${billNumber}`);
   
     } catch (error: any) {
+      console.error('Order confirmation error:', error);
       toast.error('เกิดข้อผิดพลาดในการบันทึก', {
         description: error.message || 'กรุณาลองใหม่อีกครั้ง',
       });
