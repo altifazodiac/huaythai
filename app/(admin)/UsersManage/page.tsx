@@ -23,7 +23,9 @@ import {
   MessageCircle,
   Eye,
   EyeOff,
-  RefreshCw
+  RefreshCw,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 
 interface UserProfile {
@@ -60,6 +62,13 @@ interface EditUserForm {
   role: string;
 }
 
+interface FormErrors {
+  phone?: string;
+  password?: string;
+  email?: string;
+  name?: string;
+}
+
 export default function UsersManagePage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +79,16 @@ export default function UsersManagePage() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Loading states for better UX
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [updatingUser, setUpdatingUser] = useState(false);
+  const [deletingUser, setDeletingUser] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null);
+  
+  // Form validation states
+  const [createFormErrors, setCreateFormErrors] = useState<FormErrors>({});
+  const [editFormErrors, setEditFormErrors] = useState<FormErrors>({});
 
   const [createForm, setCreateForm] = useState<CreateUserForm>({
     phone: "",
@@ -114,6 +133,46 @@ export default function UsersManagePage() {
     }
     
     return cleanPhone;
+  };
+
+  // Real-time validation for create form
+  const validateCreateForm = (): boolean => {
+    const errors: FormErrors = {};
+    
+    if (!createForm.phone) {
+      errors.phone = "เบอร์โทรศัพท์เป็นข้อมูลที่จำเป็น";
+    } else if (!validatePhoneNumber(createForm.phone)) {
+      errors.phone = "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง";
+    }
+    
+    if (!createForm.password) {
+      errors.password = "รหัสผ่านเป็นข้อมูลที่จำเป็น";
+    } else if (createForm.password.length < 6) {
+      errors.password = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";
+    }
+    
+    if (createForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createForm.email)) {
+      errors.email = "รูปแบบอีเมลไม่ถูกต้อง";
+    }
+    
+    setCreateFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Real-time validation for edit form
+  const validateEditForm = (): boolean => {
+    const errors: FormErrors = {};
+    
+    if (editForm.phone && !validatePhoneNumber(editForm.phone)) {
+      errors.phone = "รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง";
+    }
+    
+    if (editForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email)) {
+      errors.email = "รูปแบบอีเมลไม่ถูกต้อง";
+    }
+    
+    setEditFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const fetchUsers = async () => {
@@ -163,12 +222,13 @@ export default function UsersManagePage() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate phone number
-    if (!validatePhoneNumber(createForm.phone)) {
-      toast.error("รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678 หรือ +66812345678)");
+    if (!validateCreateForm()) {
+      toast.error("กรุณาตรวจสอบข้อมูลที่กรอก");
       return;
     }
 
+    setCreatingUser(true);
+    
     try {
       const formattedPhone = formatPhoneNumber(createForm.phone);
       
@@ -202,6 +262,22 @@ export default function UsersManagePage() {
         throw new Error(result.error || 'Something went wrong');
       }
 
+      // Optimistic update - add new user to the list
+      const newUser: UserProfile = {
+        id: result.user.id,
+        email: result.user.email,
+        phone: result.user.phone,
+        name: createForm.name || null,
+        line_id: createForm.line_id || null,
+        branch: createForm.branch || null,
+        credit_balance: createForm.credit_balance,
+        role: createForm.role,
+        created_at: new Date().toISOString(),
+        updated_at: null
+      };
+
+      setUsers(prevUsers => [newUser, ...prevUsers]);
+
       toast.success("สร้างผู้ใช้สำเร็จ");
       setShowCreateDialog(false);
       setCreateForm({
@@ -214,9 +290,11 @@ export default function UsersManagePage() {
         credit_balance: 0,
         role: "user"
       });
-      fetchUsers();
+      setCreateFormErrors({});
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการสร้างผู้ใช้: " + error.message);
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -225,12 +303,13 @@ export default function UsersManagePage() {
     
     if (!selectedUser) return;
 
-    // Validate phone number if it's changed
-    if (editForm.phone && !validatePhoneNumber(editForm.phone)) {
-      toast.error("รูปแบบเบอร์โทรศัพท์ไม่ถูกต้อง (เช่น 0812345678 หรือ +66812345678)");
+    if (!validateEditForm()) {
+      toast.error("กรุณาตรวจสอบข้อมูลที่กรอก");
       return;
     }
 
+    setUpdatingUser(true);
+    
     try {
       const formattedPhone = editForm.phone ? formatPhoneNumber(editForm.phone) : editForm.phone;
 
@@ -268,18 +347,36 @@ export default function UsersManagePage() {
         throw new Error(result.error || 'Something went wrong');
       }
 
+      // Optimistic update - update user in the list
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === selectedUser.id 
+            ? { 
+                ...user, 
+                ...editForm, 
+                phone: formattedPhone || user.phone,
+                updated_at: new Date().toISOString()
+              }
+            : user
+        )
+      );
+
       toast.success("อัปเดตข้อมูลผู้ใช้สำเร็จ");
       setShowEditDialog(false);
       setSelectedUser(null);
-      fetchUsers();
+      setEditFormErrors({});
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการอัปเดตข้อมูลผู้ใช้: " + error.message);
+    } finally {
+      setUpdatingUser(false);
     }
   };
 
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
 
+    setDeletingUser(true);
+    
     try {
       // Get current session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -305,16 +402,22 @@ export default function UsersManagePage() {
         throw new Error(result.error || 'Something went wrong');
       }
 
+      // Optimistic update - remove user from the list
+      setUsers(prevUsers => prevUsers.filter(user => user.id !== selectedUser.id));
+
       toast.success("ลบผู้ใช้สำเร็จ");
       setShowDeleteDialog(false);
       setSelectedUser(null);
-      fetchUsers();
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการลบผู้ใช้: " + error.message);
+    } finally {
+      setDeletingUser(false);
     }
   };
 
   const handleResetPassword = async (user: UserProfile) => {
+    setResettingPassword(user.id);
+    
     try {
       // Get current session token
       const { data: { session } } = await supabase.auth.getSession();
@@ -344,6 +447,8 @@ export default function UsersManagePage() {
       toast.success(`รีเซ็ตรหัสผ่านสำเร็จ รหัสผ่านใหม่: ${result.newPassword}`);
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน: " + error.message);
+    } finally {
+      setResettingPassword(null);
     }
   };
 
@@ -358,6 +463,7 @@ export default function UsersManagePage() {
       credit_balance: user.credit_balance,
       role: user.role
     });
+    setEditFormErrors({});
     setShowEditDialog(true);
   };
 
@@ -413,10 +519,22 @@ export default function UsersManagePage() {
                       id="phone"
                       type="tel"
                       value={createForm.phone}
-                      onChange={(e) => setCreateForm({...createForm, phone: e.target.value})}
+                      onChange={(e) => {
+                        setCreateForm({...createForm, phone: e.target.value});
+                        if (createFormErrors.phone) {
+                          setCreateFormErrors({...createFormErrors, phone: undefined});
+                        }
+                      }}
                       placeholder="เช่น 0812345678"
                       required
+                      className={createFormErrors.phone ? "border-red-500" : ""}
                     />
+                    {createFormErrors.phone && (
+                      <p className="text-sm text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {createFormErrors.phone}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">รหัสผ่าน *</Label>
@@ -425,9 +543,15 @@ export default function UsersManagePage() {
                         id="password"
                         type={showPassword ? "text" : "password"}
                         value={createForm.password}
-                        onChange={(e) => setCreateForm({...createForm, password: e.target.value})}
+                        onChange={(e) => {
+                          setCreateForm({...createForm, password: e.target.value});
+                          if (createFormErrors.password) {
+                            setCreateFormErrors({...createFormErrors, password: undefined});
+                          }
+                        }}
                         required
                         minLength={6}
+                        className={createFormErrors.password ? "border-red-500" : ""}
                       />
                       <Button
                         type="button"
@@ -439,6 +563,12 @@ export default function UsersManagePage() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
+                    {createFormErrors.password && (
+                      <p className="text-sm text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {createFormErrors.password}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="name">ชื่อ-นามสกุล</Label>
@@ -454,9 +584,21 @@ export default function UsersManagePage() {
                       id="email"
                       type="email"
                       value={createForm.email}
-                      onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                      onChange={(e) => {
+                        setCreateForm({...createForm, email: e.target.value});
+                        if (createFormErrors.email) {
+                          setCreateFormErrors({...createFormErrors, email: undefined});
+                        }
+                      }}
                       placeholder="optional"
+                      className={createFormErrors.email ? "border-red-500" : ""}
                     />
+                    {createFormErrors.email && (
+                      <p className="text-sm text-red-500 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {createFormErrors.email}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="line_id">Line ID</Label>
@@ -499,11 +641,26 @@ export default function UsersManagePage() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowCreateDialog(false);
+                      setCreateFormErrors({});
+                    }}
+                    disabled={creatingUser}
+                  >
                     ยกเลิก
                   </Button>
-                  <Button type="submit">
-                    สร้างผู้ใช้
+                  <Button type="submit" disabled={creatingUser}>
+                    {creatingUser ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        กำลังสร้าง...
+                      </>
+                    ) : (
+                      "สร้างผู้ใช้"
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
@@ -538,7 +695,10 @@ export default function UsersManagePage() {
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span>กำลังโหลดข้อมูล...</span>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -600,6 +760,7 @@ export default function UsersManagePage() {
                               size="sm"
                               variant="outline"
                               onClick={() => openEditDialog(user)}
+                              disabled={updatingUser}
                             >
                               <Edit className="h-4 w-4 mr-1" />
                               แก้ไข
@@ -608,13 +769,22 @@ export default function UsersManagePage() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleResetPassword(user)}
+                              disabled={resettingPassword === user.id}
                             >
-                              รีเซ็ตรหัสผ่าน
+                              {resettingPassword === user.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  กำลังรีเซ็ต...
+                                </>
+                              ) : (
+                                "รีเซ็ตรหัสผ่าน"
+                              )}
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
                               onClick={() => openDeleteDialog(user)}
+                              disabled={deletingUser}
                             >
                               <Trash2 className="h-4 w-4 mr-1" />
                               ลบ
@@ -648,9 +818,21 @@ export default function UsersManagePage() {
                   id="edit-phone"
                   type="tel"
                   value={editForm.phone}
-                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  onChange={(e) => {
+                    setEditForm({...editForm, phone: e.target.value});
+                    if (editFormErrors.phone) {
+                      setEditFormErrors({...editFormErrors, phone: undefined});
+                    }
+                  }}
                   placeholder="เช่น 0812345678"
+                  className={editFormErrors.phone ? "border-red-500" : ""}
                 />
+                {editFormErrors.phone && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {editFormErrors.phone}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-name">ชื่อ-นามสกุล</Label>
@@ -666,8 +848,20 @@ export default function UsersManagePage() {
                   id="edit-email"
                   type="email"
                   value={editForm.email}
-                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                  onChange={(e) => {
+                    setEditForm({...editForm, email: e.target.value});
+                    if (editFormErrors.email) {
+                      setEditFormErrors({...editFormErrors, email: undefined});
+                    }
+                  }}
+                  className={editFormErrors.email ? "border-red-500" : ""}
                 />
+                {editFormErrors.email && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {editFormErrors.email}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-line_id">Line ID</Label>
@@ -710,11 +904,26 @@ export default function UsersManagePage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setShowEditDialog(false);
+                  setEditFormErrors({});
+                }}
+                disabled={updatingUser}
+              >
                 ยกเลิก
               </Button>
-              <Button type="submit">
-                บันทึกการเปลี่ยนแปลง
+              <Button type="submit" disabled={updatingUser}>
+                {updatingUser ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    กำลังบันทึก...
+                  </>
+                ) : (
+                  "บันทึกการเปลี่ยนแปลง"
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -735,11 +944,26 @@ export default function UsersManagePage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={deletingUser}
+            >
               ยกเลิก
             </Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>
-              ลบผู้ใช้
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteUser}
+              disabled={deletingUser}
+            >
+              {deletingUser ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  กำลังลบ...
+                </>
+              ) : (
+                "ลบผู้ใช้"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
