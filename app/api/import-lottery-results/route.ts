@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { chromium } from 'playwright';
+import { chromium as playwrightChromium } from 'playwright';
 import { formatInTimeZone } from 'date-fns-tz';
 import {subMinutes } from 'date-fns';
+import chromium from '@sparticuz/chromium';
 
 
 const supabase = createClient(
@@ -380,9 +381,11 @@ export async function POST(request: NextRequest) {
         console.log(`[API] Target lottery names: ${targetLotteryNames.join(', ')}`);
         
         // เปิด browser และ scrape
-        browser = await chromium.launch({ 
+        const executablePath = await chromium.executablePath;
+        browser = await playwrightChromium.launch({ 
           headless: true, 
-          args: ['--disable-gpu', '--no-sandbox'],
+          args: chromium.args,
+          executablePath,
           timeout: 360000 
         });
         
