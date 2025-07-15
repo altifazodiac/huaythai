@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { ChevronDown, User, CreditCard, Shield, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { ChevronDown, User, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 
 interface User {
   id: string;
@@ -36,55 +34,14 @@ export function EnhancedUserDropdown({
   className,
   disabled = false,
   showBalance = true,
-  securityLevel = "banking"
+  securityLevel = "basic"
 }: EnhancedUserDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [securityCheck, setSecurityCheck] = useState(false);
-  const [botDetection, setBotDetection] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedUserData = users.find(u => u.id === selectedUser);
-
-  // Security features
-  useEffect(() => {
-    if (securityLevel === "advanced" || securityLevel === "banking") {
-      // Bot detection - check for rapid clicking
-      let clickCount = 0;
-      let lastClickTime = 0;
-      
-      const handleClick = () => {
-        const now = Date.now();
-        if (now - lastClickTime < 100) {
-          clickCount++;
-          if (clickCount > 5) {
-            setBotDetection(true);
-            toast.error("ตรวจพบพฤติกรรมที่น่าสงสัย กรุณาลองใหม่อีกครั้ง");
-            setTimeout(() => setBotDetection(false), 30000);
-          }
-        } else {
-          clickCount = 0;
-        }
-        lastClickTime = now;
-      };
-
-      const element = dropdownRef.current;
-      if (element) {
-        element.addEventListener('click', handleClick);
-        return () => element.removeEventListener('click', handleClick);
-      }
-    }
-  }, [securityLevel]);
-
-  // Security check for banking level
-  useEffect(() => {
-    if (securityLevel === "banking" && isOpen) {
-      setSecurityCheck(true);
-      const timer = setTimeout(() => setSecurityCheck(false), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, securityLevel]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -111,25 +68,9 @@ export function EnhancedUserDropdown({
   });
 
   const handleUserSelect = (userId: string) => {
-    if (botDetection) {
-      toast.error("กรุณารอสักครู่ก่อนดำเนินการต่อ");
-      return;
-    }
-    
     onUserSelect(userId);
     setIsOpen(false);
     setSearchTerm("");
-    toast.success("เลือกผู้ใช้สำเร็จ");
-  };
-
-  const getSecurityIcon = () => {
-    if (securityLevel === "banking") {
-      return <Shield className="h-4 w-4 text-green-600" />;
-    }
-    if (securityLevel === "advanced") {
-      return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-    }
-    return null;
   };
 
   const getBalanceColor = (balance: number) => {
@@ -150,11 +91,10 @@ export function EnhancedUserDropdown({
             "border-2 transition-all duration-200",
             "hover:border-blue-400 hover:shadow-md",
             isOpen && "border-blue-500 shadow-lg",
-            disabled && "opacity-50 cursor-not-allowed",
-            botDetection && "border-red-500 bg-red-50"
+            disabled && "opacity-50 cursor-not-allowed"
           )}
           onClick={() => !disabled && setIsOpen(!isOpen)}
-          disabled={disabled || botDetection}
+          disabled={disabled}
         >
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {selectedUserData ? (
@@ -184,7 +124,6 @@ export function EnhancedUserDropdown({
                 <span>{placeholder}</span>
               </div>
             )}
-            {getSecurityIcon()}
           </div>
           <ChevronDown 
             className={cn(
@@ -193,16 +132,6 @@ export function EnhancedUserDropdown({
             )} 
           />
         </Button>
-
-        {/* Security overlay for banking level */}
-        {securityLevel === "banking" && securityCheck && (
-          <div className="absolute inset-0 bg-blue-50 border-2 border-blue-200 rounded-md flex items-center justify-center">
-            <div className="flex items-center gap-2 text-blue-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm font-medium">ตรวจสอบความปลอดภัย...</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Dropdown menu */}
@@ -248,43 +177,25 @@ export function EnhancedUserDropdown({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">
-                        {user.name || user.email || user.phone}
+                        {user.name || user.email || user.phone || "ไม่ระบุชื่อ"}
                       </div>
                       <div className="text-sm text-gray-500 truncate">
-                        {user.email && user.name ? user.email : user.phone}
+                        {user.email && user.phone ? `${user.email} • ${user.phone}` : user.email || user.phone || ""}
                       </div>
                       {showBalance && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <CreditCard className="h-3 w-3 text-gray-400" />
+                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                          <CreditCard className="h-3 w-3" />
                           <span className={cn("text-sm font-medium", getBalanceColor(user.credit_balance))}>
                             ฿{user.credit_balance.toLocaleString()}
                           </span>
-                          {user.role && (
-                            <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'} className="text-xs">
-                              {user.role === 'admin' ? 'Admin' : 'User'}
-                            </Badge>
-                          )}
                         </div>
                       )}
                     </div>
-                    {selectedUser === user.id && (
-                      <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-                    )}
                   </div>
                 </div>
               ))
             )}
           </div>
-
-          {/* Security footer */}
-          {securityLevel === "banking" && (
-            <div className="p-3 bg-gray-50 border-t border-gray-100">
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Shield className="h-3 w-3" />
-                <span>ระบบความปลอดภัย</span>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { EnhancedUserDropdown } from "@/components/ui/enhanced-user-dropdown";
-import { SecurityMiddleware } from "@/components/ui/security-middleware";
 import { 
   UserPlus, 
   Edit, 
@@ -80,7 +79,6 @@ export default function UsersManagePage() {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [securityVerified, setSecurityVerified] = useState(false);
   const [selectedUserForAction, setSelectedUserForAction] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("created_at");
@@ -406,11 +404,7 @@ export default function UsersManagePage() {
     });
 
   return (
-    <SecurityMiddleware 
-      securityLevel="banking"
-      onSecurityPass={() => setSecurityVerified(true)}
-    >
-      <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -906,6 +900,5 @@ export default function UsersManagePage() {
         </DialogContent>
       </Dialog>
     </div>
-    </SecurityMiddleware>
   );
 }
