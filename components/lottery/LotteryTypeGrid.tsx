@@ -21,37 +21,76 @@ function isOpenNow(schedule: any): boolean {
   }
 
   const now = new Date();
-  const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
   const currentDate = now.getDate();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
 
-  // Check for specific month dates (e.g. "1 ของเดือน")
+  // กรณีหวยไทย (ออกวันที่ 1 หรือ 16 ของเดือน หรือหลายวันในเดือน)
   if (schedule.day_of_week.includes('ของเดือน')) {
-    const dayMatch = schedule.day_of_week.match(/(\d+)\s*ของเดือน/);
-    if (dayMatch && dayMatch[1]) {
-      const targetDate = parseInt(dayMatch[1]);
-      if (currentDate !== targetDate) {
-        return false;
+    // รองรับหลายวัน เช่น "1,16 ของเดือน" หรือ "1 ของเดือน, 16 ของเดือน"
+    const dayMatches = schedule.day_of_week.match(/\d+/g);
+    if (dayMatches && dayMatches.length > 0) {
+      const closeTime = schedule.close_time.split(':');
+      const closeHour = parseInt(closeTime[0]);
+      const closeMinute = parseInt(closeTime[1]);
+      let prevTarget: Date | null = null;
+      let nextTarget: Date | null = null;
+      for (const dayStr of dayMatches) {
+        const targetDate = parseInt(dayStr);
+        // รอบถัดไป (ของเดือนนี้หรือเดือนหน้า)
+        let nextMonth = currentMonth;
+        let nextYear = currentYear;
+        if (currentDate >= targetDate) {
+          nextMonth = currentMonth + 1;
+          if (nextMonth > 11) {
+            nextMonth = 0;
+            nextYear += 1;
+          }
+        }
+        const thisTarget = new Date(currentYear, currentMonth, targetDate, closeHour, closeMinute, 0, 0);
+        const next = new Date(nextYear, nextMonth, targetDate, closeHour, closeMinute, 0, 0);
+        // รอบก่อนหน้า (ของเดือนนี้หรือเดือนที่แล้ว)
+        let prevMonth = currentMonth;
+        let prevYear = currentYear;
+        if (currentDate < targetDate) {
+          prevMonth = currentMonth - 1;
+          if (prevMonth < 0) {
+            prevMonth = 11;
+            prevYear -= 1;
+          }
+        }
+        const prev = new Date(prevYear, prevMonth, targetDate, closeHour, closeMinute, 0, 0);
+        // หา prevTarget ที่ใกล้ที่สุดก่อน now และ nextTarget ที่ใกล้ที่สุดหลัง now
+        if (!prevTarget || (prev < now && prev > prevTarget)) prevTarget = prev;
+        if (!nextTarget || (next > now && next < nextTarget)) nextTarget = next;
+        if (!nextTarget || (thisTarget > now && thisTarget < nextTarget)) nextTarget = thisTarget;
+        if (!prevTarget || (thisTarget < now && thisTarget > prevTarget)) prevTarget = thisTarget;
       }
-    } else {
+      // เปิดรับระหว่าง prevTarget < now < nextTarget
+      if (prevTarget && nextTarget && now > prevTarget && now < nextTarget) {
+        return true;
+      }
       return false;
     }
-  } 
+    return false;
+  }
+
+  // ... logic เดิมสำหรับหวยอื่น ...
+  const currentDay = now.toLocaleString('en-US', { weekday: 'long' });
+  const currentDateNum = now.getDate();
+
   // Check for day ranges (e.g. "จันทร์–ศุกร์")
-  else if (schedule.day_of_week.includes('–') || schedule.day_of_week.includes(',')) {
+  if (schedule.day_of_week.includes('–') || schedule.day_of_week.includes(',')) {
     const dayRanges = schedule.day_of_week.split(/[–,]/).map((d: string) => d.trim());
     const dayMap: Record<string, string> = {
       'จันทร์': 'Monday', 'อังคาร': 'Tuesday', 'พุธ': 'Wednesday',
       'พฤหัส': 'Thursday', 'ศุกร์': 'Friday', 'เสาร์': 'Saturday', 'อาทิตย์': 'Sunday'
     };
-    
     const allowedDays = dayRanges.flatMap((day: string) => dayMap[day] || day);
-    
     if (!allowedDays.includes(currentDay)) {
       return false;
     }
-  }
-  // Check for single day
-  else {
+  } else {
     const dayMap: Record<string, string> = {
       'จันทร์': 'Monday', 'อังคาร': 'Tuesday', 'พุธ': 'Wednesday',
       'พฤหัส': 'Thursday', 'ศุกร์': 'Friday', 'เสาร์': 'Saturday', 'อาทิตย์': 'Sunday'
@@ -74,7 +113,7 @@ function isOpenNow(schedule: any): boolean {
 
   const openTimeOnToday = new Date(todayFullDate.getFullYear(), todayFullDate.getMonth(), todayFullDate.getDate(), openH, openM, 0);
   const closeTimeOnToday = new Date(todayFullDate.getFullYear(), todayFullDate.getMonth(), todayFullDate.getDate(), closeH, closeM, 0);
-  
+
   const openTimeOnYesterday = new Date(yesterdayFullDate.getFullYear(), yesterdayFullDate.getMonth(), yesterdayFullDate.getDate(), openH, openM, 0);
   const closeTimeOnTomorrow = new Date(tomorrowFullDate.getFullYear(), tomorrowFullDate.getMonth(), tomorrowFullDate.getDate(), closeH, closeM, 0);
 
