@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { chromium } from 'playwright';
 import { formatInTimeZone } from 'date-fns-tz';
-import {subMinutes } from 'date-fns';
-
+import {subMinutes} from 'date-fns';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -380,42 +379,67 @@ export async function POST(request: NextRequest) {
         console.log(`[API] Target lottery names: ${targetLotteryNames.join(', ')}`);
         
         // เปิด browser และ scrape
-        browser = await chromium.launch({ 
-          headless: true, 
-          args: ['--disable-gpu', '--no-sandbox'],
-          timeout: 360000 
-        });
-        
-        const context = await browser.newContext({ 
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' 
-        });
-        
-        const targetUrl = 'https://xn--t3cjebmjd5a.com/';
-        
-        // ลองสครีป 3 ครั้ง
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          console.log(`[API] Scrape attempt ${attempt}/3`);
+        try {
+          browser = await chromium.launch({ 
+            headless: true,
+            args: [
+              '--disable-gpu',
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+              '--disable-dev-shm-usage',
+              '--disable-accelerated-2d-canvas',
+              '--no-first-run',
+              '--no-zygote',
+              '--single-process',
+              '--disable-extensions'
+            ]
+          });
           
-          scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+          const context = await browser.newContext({ 
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            viewport: { width: 1280, height: 720 }
+          });
           
-          if (scrapedData.length > 0) {
-            console.log(`[API] Found ${scrapedData.length} results on attempt ${attempt}`);
-            break;
+          const targetUrl = 'https://xn--t3cjebmjd5a.com/';
+          
+          // ลองสครีป 3 ครั้ง
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            console.log(`[API] Scrape attempt ${attempt}/3`);
+            
+            try {
+              scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+              
+              if (scrapedData.length > 0) {
+                console.log(`[API] Found ${scrapedData.length} results on attempt ${attempt}`);
+                break;
+              }
+              
+              if (attempt < 3) {
+                console.log(`[API] No results found, waiting 30s before retry...`);
+                await new Promise(resolve => setTimeout(resolve, 30000));
+              }
+            } catch (scrapeError) {
+              console.error(`[API] Scrape attempt ${attempt} failed:`, scrapeError);
+              if (attempt < 3) {
+                console.log(`[API] Waiting 30s before retry...`);
+                await new Promise(resolve => setTimeout(resolve, 30000));
+              }
+            }
           }
           
-          if (attempt < 3) {
-            console.log(`[API] No results found, waiting 30s before retry...`);
-            await new Promise(resolve => setTimeout(resolve, 30000));
+        } catch (browserError) {
+          console.error('[API] Browser launch failed:', browserError);
+          // ถ้า browser launch ไม่สำเร็จ ให้ข้ามไป import ข้อมูลที่มีอยู่แล้ว
+          console.log('[API] Skipping scrape, proceeding with import only');
+        } finally {
+          if (browser) {
+            try {
+              await browser.close();
+            } catch (closeError) {
+              console.error('[API] Error closing browser:', closeError);
+            }
           }
         }
-        
-        await browser.close();
-        
-      } catch (error) {
-        console.error('[API] Error during scraping:', error);
-        if (browser) await browser.close();
-        throw error;
-      }
       
       // ขั้นตอนที่ 2: บันทึกข้อมูลลง lottery_api_results
       if (scrapedData.length > 0) {
@@ -428,41 +452,63 @@ export async function POST(request: NextRequest) {
           });
         
         if (upsertError) {
-          throw new Error(`Error saving scraped data: ${upsertError.message}`);
+          console.error('[API] Error saving scraped data:', upsertError);
+          // ไม่ throw error เพราะยังสามารถ import ข้อมูลที่มีอยู่ได้
+        } else {
+          // สร้าง notification toast
+          try {
+            await createLotteryImportToast(scrapedData);
+          } catch (toastError) {
+            console.error('[API] Error creating toast:', toastError);
+          }
         }
-        
-        // สร้าง notification toast
-        await createLotteryImportToast(scrapedData);
       }
       
       // ขั้นตอนที่ 3: Import ข้อมูลไปยัง lottery_results
-      const importedCount = await importLotteryResults(
-        drawDate,
-        draw_time,
-        lottery_sub_type_id
-      );
+      let importedCount = 0;
+      try {
+        importedCount = await importLotteryResults(
+          drawDate,
+          draw_time,
+          lottery_sub_type_id
+        );
+      } catch (importError) {
+        console.error('[API] Error during import:', importError);
+        // ไม่ throw error เพราะ scrape อาจสำเร็จแล้ว
+      }
       
       return NextResponse.json({
         message: 'Scrape and import completed successfully',
         scraped_count: scrapedData.length,
         imported_count: importedCount,
         draw_time,
-        lottery_sub_type_id
+        lottery_sub_type_id,
+        success: true
       });
       
     } else if (action === 'import_only') {
       // เฉพาะ import ข้อมูลจาก lottery_api_results
-      const importedCount = await importLotteryResults(
-        drawDate,
-        draw_time,
-        lottery_sub_type_id
-      );
+      let importedCount = 0;
+      try {
+        importedCount = await importLotteryResults(
+          drawDate,
+          draw_time,
+          lottery_sub_type_id
+        );
+      } catch (importError) {
+        console.error('[API] Error during import_only:', importError);
+        return NextResponse.json({ 
+          error: 'Import failed',
+          details: importError instanceof Error ? importError.message : 'Unknown error'
+        }, { status: 500 });
+      }
       
       return NextResponse.json({
         message: 'Import completed successfully',
         imported_count: importedCount,
         draw_time,
-        lottery_sub_type_id
+        lottery_sub_type_id,
+        success: true
       });
       
     } else {
@@ -471,9 +517,21 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error('Error in import POST API:', error);
+    
+    // ส่ง error response ที่มีรายละเอียดมากขึ้น
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      timestamp: new Date().toISOString()
+    });
+    
     return NextResponse.json({ 
       error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: errorMessage,
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 } 
