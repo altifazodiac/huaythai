@@ -26,16 +26,21 @@ export function CreditBalanceDisplay({
   animated = true
 }: CreditBalanceDisplayProps) {
   const [isVisible, setIsVisible] = useState(true);
-  const [displayBalance, setDisplayBalance] = useState(0);
+  const [displayBalance, setDisplayBalance] = useState(balance);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Animate balance change
+  // Update display balance immediately when balance changes
   useEffect(() => {
-    if (animated && balance !== displayBalance) {
+    if (!animated) {
+      setDisplayBalance(balance);
+      return;
+    }
+
+    if (balance !== displayBalance) {
       setIsAnimating(true);
       const startBalance = displayBalance;
       const endBalance = balance;
-      const duration = 1000;
+      const duration = 800; // Reduced duration for better responsiveness
       const startTime = Date.now();
 
       const animate = () => {
@@ -51,13 +56,12 @@ export function CreditBalanceDisplay({
         if (progress < 1) {
           requestAnimationFrame(animate);
         } else {
+          setDisplayBalance(endBalance); // Ensure final value is exact
           setIsAnimating(false);
         }
       };
 
       requestAnimationFrame(animate);
-    } else {
-      setDisplayBalance(balance);
     }
   }, [balance, animated, displayBalance]);
 
