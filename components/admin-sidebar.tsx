@@ -70,11 +70,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       href: "/lottery-results",
       icon: CalendarDays,
     },
-    {
-      title: "วันที่ออกสลาก",
-      href: "/lottery-dates",
-      icon: CalendarDays,
-    },
+     
     {
       title: "จัดการ Task Scheduler",
       href: "/task-manager",
@@ -97,7 +93,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
     },
     {
       title: "รายงาน",
-      href: "/lottery-managesummary",
+      href: "/lottery-report",
       icon: BarChart3,
     },
     {

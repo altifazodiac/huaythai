@@ -46,6 +46,7 @@ interface UserProfile {
   created_at: string;
   updated_at: string | null;
   role: string;
+  percent?: number | null;
 }
 
 interface CreateUserForm {
@@ -57,6 +58,7 @@ interface CreateUserForm {
   branch: string;
   credit_balance: number | null;
   role: string;
+  percent: number | null;
 }
 
 interface EditUserForm {
@@ -67,6 +69,7 @@ interface EditUserForm {
   branch: string;
   credit_balance: number | null;
   role: string;
+  percent: number | null;
 }
 
 export default function UsersManagePage() {
@@ -82,6 +85,8 @@ export default function UsersManagePage() {
   const [selectedUserForAction, setSelectedUserForAction] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("created_at");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   const [createForm, setCreateForm] = useState<CreateUserForm>({
     phone: "",
@@ -91,7 +96,8 @@ export default function UsersManagePage() {
     line_id: "",
     branch: "",
     credit_balance: 0,
-    role: "user"
+    role: "user",
+    percent: 0,
   });
 
   const [editForm, setEditForm] = useState<EditUserForm>({
@@ -101,7 +107,8 @@ export default function UsersManagePage() {
     line_id: "",
     branch: "",
     credit_balance: 0,
-    role: "user"
+    role: "user",
+    percent: 0,
   });
 
   const { supabase } = useAuth();
@@ -150,7 +157,8 @@ export default function UsersManagePage() {
       // Combine data
       const usersWithRoles = profiles?.map((profile: any) => ({
         ...profile,
-        role: roles?.find((role: any) => role.user_id === profile.id)?.role || 'user'
+        role: roles?.find((role: any) => role.user_id === profile.id)?.role || 'user',
+        percent: profile.percent ?? 0,
       })) || [];
 
       setUsers(usersWithRoles);
@@ -181,12 +189,14 @@ export default function UsersManagePage() {
       return;
     }
 
+    setCreateLoading(true);
     try {
       const formattedPhone = formatPhoneNumber(createForm.phone);
       
       const requestData = {
         ...createForm,
-        phone: formattedPhone
+        phone: formattedPhone,
+        percent: createForm.percent,
       };
 
       // Get current session token
@@ -224,11 +234,14 @@ export default function UsersManagePage() {
         line_id: "",
         branch: "",
         credit_balance: 0,
-        role: "user"
+        role: "user",
+        percent: 0,
       });
       fetchUsers();
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการสร้างผู้ใช้: " + error.message);
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -243,6 +256,7 @@ export default function UsersManagePage() {
       return;
     }
 
+    setEditLoading(true);
     try {
       const formattedPhone = editForm.phone ? formatPhoneNumber(editForm.phone) : editForm.phone;
 
@@ -270,7 +284,8 @@ export default function UsersManagePage() {
           line_id: editForm.line_id,
           branch: editForm.branch,
           credit_balance: editForm.credit_balance,
-          role: editForm.role
+          role: editForm.role,
+          percent: editForm.percent,
         }),
       });
 
@@ -286,6 +301,8 @@ export default function UsersManagePage() {
       fetchUsers();
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการอัปเดตข้อมูลผู้ใช้: " + error.message);
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -368,7 +385,8 @@ export default function UsersManagePage() {
       line_id: user.line_id || "",
       branch: user.branch || "",
       credit_balance: user.credit_balance,
-      role: user.role
+      role: user.role,
+      percent: user.percent ?? 0,
     });
     setShowEditDialog(true);
   };
@@ -519,6 +537,19 @@ export default function UsersManagePage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="percent">เปอร์เซ็นต์ค่าคอมมิชชั่น (%)</Label>
+                    <Input
+                      id="percent"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={createForm.percent !== null && createForm.percent !== undefined ? String(createForm.percent) : ""}
+                      onChange={(e) => setCreateForm({...createForm, percent: e.target.value === "" ? null : parseFloat(e.target.value) || 0})}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="role">สิทธิ์</Label>
                     <Select value={createForm.role} onValueChange={(value) => setCreateForm({...createForm, role: value})}>
                       <SelectTrigger>
@@ -535,8 +566,12 @@ export default function UsersManagePage() {
                   <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
                     ยกเลิก
                   </Button>
-                  <Button type="submit">
-                    สร้างผู้ใช้
+                  <Button type="submit" disabled={createLoading}>
+                    {createLoading ? (
+                      <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>กำลังบันทึก...</span>
+                    ) : (
+                      "สร้างผู้ใช้"
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
@@ -743,6 +778,11 @@ export default function UsersManagePage() {
                                 <span className="font-bold text-green-700 text-lg">
                                   ฿{(user.credit_balance ?? 0).toLocaleString()}
                                 </span>
+                                {typeof user.percent === 'number' && (
+                                  <Badge variant="outline" className="ml-2 text-xs px-2 py-1">
+                                    ค่าคอม {user.percent}%
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -852,6 +892,19 @@ export default function UsersManagePage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="edit-percent">เปอร์เซ็นต์ค่าคอมมิชชั่น (%)</Label>
+                <Input
+                  id="edit-percent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={editForm.percent !== null && editForm.percent !== undefined ? String(editForm.percent) : ""}
+                  onChange={(e) => setEditForm({...editForm, percent: e.target.value === "" ? null : parseFloat(e.target.value) || 0})}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="edit-role">สิทธิ์</Label>
                 <Select value={editForm.role} onValueChange={(value) => setEditForm({...editForm, role: value})}>
                   <SelectTrigger>
@@ -868,8 +921,12 @@ export default function UsersManagePage() {
               <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
                 ยกเลิก
               </Button>
-              <Button type="submit">
-                บันทึกการเปลี่ยนแปลง
+              <Button type="submit" disabled={editLoading}>
+                {editLoading ? (
+                  <span className="flex items-center"><span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>กำลังบันทึก...</span>
+                ) : (
+                  "บันทึกการเปลี่ยนแปลง"
+                )}
               </Button>
             </DialogFooter>
           </form>
