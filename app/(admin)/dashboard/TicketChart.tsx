@@ -1,39 +1,287 @@
 "use client"
-import { Bar } from 'react-chartjs-2'
+import React from 'react'
+import { Bar, Line } from 'react-chartjs-2'
+import { motion } from 'framer-motion'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  LineElement,
+  PointElement,
   Title,
   Tooltip,
   Legend,
+  ChartOptions,
+  Filler,
 } from 'chart.js'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale, 
+  LinearScale, 
+  BarElement, 
+  LineElement,
+  PointElement,
+  Title, 
+  Tooltip, 
+  Legend,
+  Filler
+)
 
-export default function TicketChart({ labels, values }: { labels: string[]; values: number[] }) {
-  const data = {
+interface TicketChartProps {
+  labels: string[]
+  values: number[]
+  chartType?: 'bar' | 'line'
+  showGradient?: boolean
+  animationDuration?: number
+  title?: string
+  color?: string
+  showComparison?: boolean
+  comparisonData?: number[]
+  comparisonLabel?: string
+}
+
+export default function TicketChart({ 
+  labels, 
+  values, 
+  chartType = 'bar',
+  showGradient = true,
+  animationDuration = 1000,
+  title = 'ยอดขายตั๋วแต่ละวัน',
+  color = '#F59E0B',
+  showComparison = false,
+  comparisonData = [],
+  comparisonLabel = 'เปรียบเทียบ'
+}: TicketChartProps) {
+  
+  const createGradient = (ctx: CanvasRenderingContext2D, color: string) => {
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400)
+    gradient.addColorStop(0, color + '80')
+    gradient.addColorStop(1, color + '20')
+    return gradient
+  }
+
+  const chartData = {
     labels,
     datasets: [
       {
-        label: 'ยอดขายตั๋ว (บาท)',
+        label: 'จำนวนตั๋ว',
         data: values,
-        backgroundColor: 'rgba(255, 206, 86, 0.6)',
-        borderColor: 'rgba(255, 206, 86, 1)',
-        borderWidth: 1,
+        backgroundColor: (context: any) => {
+          const ctx = context.chart.ctx
+          return showGradient ? createGradient(ctx, color) : color + '80'
+        },
+        borderColor: color,
+        borderWidth: 2,
+        borderRadius: chartType === 'bar' ? 8 : 0,
+        borderSkipped: false,
+        fill: chartType === 'line',
+        tension: 0.4,
+        pointBackgroundColor: color,
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: chartType === 'line' ? 6 : 0,
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: color,
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 3,
       },
+      ...(showComparison && comparisonData.length > 0 ? [{
+        label: comparisonLabel,
+        data: comparisonData,
+        backgroundColor: (context: any) => {
+          const ctx = context.chart.ctx
+          return showGradient ? createGradient(ctx, '#8B5CF6') : '#8B5CF6' + '80'
+        },
+        borderColor: '#8B5CF6',
+        borderWidth: 2,
+        borderRadius: chartType === 'bar' ? 8 : 0,
+        borderSkipped: false,
+        fill: chartType === 'line',
+        tension: 0.4,
+        pointBackgroundColor: '#8B5CF6',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: chartType === 'line' ? 6 : 0,
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: '#8B5CF6',
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 3,
+      }] : []),
     ],
   }
-  const options = {
+
+  const options: ChartOptions<'bar' | 'line'> = {
     responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: animationDuration,
+      easing: 'easeOutQuart',
+    },
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
     plugins: {
-      legend: { position: 'top' as const },
-      title: { display: true, text: 'ยอดขายตั๋วแต่ละวัน/เดือน' },
+      legend: {
+        display: showComparison,
+        position: 'top',
+        labels: {
+          usePointStyle: true,
+          pointStyle: 'circle',
+          padding: 20,
+          font: {
+            size: 12,
+            weight: '500',
+          },
+        },
+      },
+      title: {
+        display: true,
+        text: title,
+        font: {
+          size: 16,
+          weight: '600',
+        },
+        padding: {
+          top: 10,
+          bottom: 20,
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleColor: '#ffffff',
+        bodyColor: '#ffffff',
+        borderColor: '#374151',
+        borderWidth: 1,
+        cornerRadius: 8,
+        displayColors: true,
+        callbacks: {
+          title: (context) => {
+            return `${context[0].label}`
+          },
+          label: (context) => {
+            const value = context.parsed.y || 0
+            const percentage = values.length > 0 ? 
+              ((value / Math.max(...values)) * 100).toFixed(1) : '0'
+            
+            return [
+              `${context.dataset.label}: ${value.toLocaleString()} ตั๋ว`,
+              `เปอร์เซ็นต์: ${percentage}% ของยอดสูงสุด`
+            ]
+          },
+          afterLabel: (context) => {
+            const index = context.dataIndex
+            const total = values.reduce((sum, val) => sum + val, 0)
+            const percentage = total > 0 ? ((values[index] / total) * 100).toFixed(1) : '0'
+            return `สัดส่วน: ${percentage}% ของยอดรวม`
+          },
+        },
+      },
     },
     scales: {
-      y: { beginAtZero: true },
+      x: {
+        grid: {
+          display: false,
+        },
+        border: {
+          display: false,
+        },
+        ticks: {
+          font: {
+            size: 11,
+            weight: '500',
+          },
+          padding: 10,
+        },
+      },
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)',
+          drawBorder: false,
+        },
+        border: {
+          display: false,
+        },
+        ticks: {
+          callback: (value) => {
+            return Number(value).toLocaleString()
+          },
+          font: {
+            size: 11,
+            weight: '500',
+          },
+          padding: 10,
+        },
+      },
+    },
+    onHover: (event, elements) => {
+      if (event.native?.target) {
+        (event.native.target as HTMLElement).style.cursor = elements.length > 0 ? 'pointer' : 'default'
+      }
+    },
+    onClick: (event, elements) => {
+      if (elements.length > 0) {
+        const index = elements[0].index
+        console.log('Clicked on:', labels[index], 'Value:', values[index])
+      }
     },
   }
-  return <Bar data={data} options={options} />
+
+  const ChartComponent = chartType === 'bar' ? Bar : Line
+
+  const maxValue = Math.max(...values)
+  const minValue = Math.min(...values)
+  const avgValue = values.reduce((sum, val) => sum + val, 0) / values.length
+  const totalValue = values.reduce((sum, val) => sum + val, 0)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="w-full h-full"
+    >
+      <div className="relative h-full">
+        <ChartComponent data={chartData} options={options} />
+      </div>
+      
+      {/* Statistics Summary */}
+      <div className="mt-4 grid grid-cols-4 gap-3 text-center">
+        <div className="bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg">
+          <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+            {totalValue.toLocaleString()}
+          </div>
+          <div className="text-xs text-amber-600 dark:text-amber-500">
+            ยอดรวม
+          </div>
+        </div>
+        <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded-lg">
+          <div className="text-sm font-semibold text-green-700 dark:text-green-400">
+            {maxValue.toLocaleString()}
+          </div>
+          <div className="text-xs text-green-600 dark:text-green-500">
+            สูงสุด
+          </div>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg">
+          <div className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+            {Math.round(avgValue).toLocaleString()}
+          </div>
+          <div className="text-xs text-blue-600 dark:text-blue-500">
+            เฉลี่ย
+          </div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/20 p-2 rounded-lg">
+          <div className="text-sm font-semibold text-gray-700 dark:text-gray-400">
+            {minValue.toLocaleString()}
+          </div>
+          <div className="text-xs text-gray-600 dark:text-gray-500">
+            ต่ำสุด
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
 } 

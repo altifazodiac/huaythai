@@ -92,7 +92,12 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       icon: CreditCard,
     },
     {
-      title: "รายงาน",
+      title: "สรุปยอดรายได้",
+      href: "/lottery-report-summary",
+      icon: BarChart3,
+    },
+    {
+      title: "รายงานหวยแบบรายละเอียด",
       href: "/lottery-report",
       icon: BarChart3,
     },
