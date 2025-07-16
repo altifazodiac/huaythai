@@ -335,111 +335,112 @@ export async function POST(request: NextRequest) {
       let browser: any = null;
       let scrapedData: LotteryResult[] = [];
       
-      try {
-        console.log('[API] Starting scrape process...');
+      console.log('[API] Starting scrape process...');
+      
+      // ดึงข้อมูล aliases สำหรับหา target lottery names
+      const { data: aliases, error: aliasError } = await supabase
+        .from('lottery_name_aliases')
+        .select('alias_name, lottery_sub_type_id');
+      
+      if (aliasError) {
+        throw new Error(`Error fetching aliases: ${aliasError.message}`);
+      }
+      
+      // กรองเฉพาะ lottery ที่ต้องการ
+      let targetLotteryNames: string[] = [];
+      if (lottery_sub_type_id) {
+        targetLotteryNames = aliases
+          .filter(a => a.lottery_sub_type_id === lottery_sub_type_id)
+          .map(a => a.alias_name);
+      } else if (draw_time) {
+        // ถ้าไม่มี sub_type_id ให้ใช้ draw_time หา
+        const { data: schedules } = await supabase
+          .from('drawing_schedules')
+          .select('lottery_sub_type_id')
+          .eq('draw_time', draw_time);
         
-        // ดึงข้อมูล aliases สำหรับหา target lottery names
-        const { data: aliases, error: aliasError } = await supabase
-          .from('lottery_name_aliases')
-          .select('alias_name, lottery_sub_type_id');
-        
-        if (aliasError) {
-          throw new Error(`Error fetching aliases: ${aliasError.message}`);
-        }
-        
-        // กรองเฉพาะ lottery ที่ต้องการ
-        let targetLotteryNames: string[] = [];
-        if (lottery_sub_type_id) {
+        if (schedules && schedules.length > 0) {
+          const subTypeIds = schedules.map(s => s.lottery_sub_type_id);
           targetLotteryNames = aliases
-            .filter(a => a.lottery_sub_type_id === lottery_sub_type_id)
+            .filter(a => subTypeIds.includes(a.lottery_sub_type_id))
             .map(a => a.alias_name);
-        } else if (draw_time) {
-          // ถ้าไม่มี sub_type_id ให้ใช้ draw_time หา
-          const { data: schedules } = await supabase
-            .from('drawing_schedules')
-            .select('lottery_sub_type_id')
-            .eq('draw_time', draw_time);
-          
-          if (schedules && schedules.length > 0) {
-            const subTypeIds = schedules.map(s => s.lottery_sub_type_id);
-            targetLotteryNames = aliases
-              .filter(a => subTypeIds.includes(a.lottery_sub_type_id))
-              .map(a => a.alias_name);
-          }
         }
+      }
+      
+      if (targetLotteryNames.length === 0) {
+        console.log('[API] No target lottery names found');
+        return NextResponse.json({
+          message: 'No target lottery names found',
+          imported_count: 0
+        });
+      }
+      
+      console.log(`[API] Target lottery names: ${targetLotteryNames.join(', ')}`);
+      
+      // เปิด browser และ scrape
+      try {
+        browser = await chromium.launch({ 
+          headless: true,
+          args: [
+            '--disable-gpu',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-extensions'
+          ]
+        });
         
-        if (targetLotteryNames.length === 0) {
-          console.log('[API] No target lottery names found');
-          return NextResponse.json({
-            message: 'No target lottery names found',
-            imported_count: 0
-          });
-        }
+        const context = await browser.newContext({ 
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+          viewport: { width: 1280, height: 720 }
+        });
         
-        console.log(`[API] Target lottery names: ${targetLotteryNames.join(', ')}`);
+        const targetUrl = 'https://xn--t3cjebmjd5a.com/';
         
-        // เปิด browser และ scrape
-        try {
-          browser = await chromium.launch({ 
-            headless: true,
-            args: [
-              '--disable-gpu',
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-accelerated-2d-canvas',
-              '--no-first-run',
-              '--no-zygote',
-              '--single-process',
-              '--disable-extensions'
-            ]
-          });
+        // ลองสครีป 3 ครั้ง
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          console.log(`[API] Scrape attempt ${attempt}/3`);
           
-          const context = await browser.newContext({ 
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-            viewport: { width: 1280, height: 720 }
-          });
-          
-          const targetUrl = 'https://xn--t3cjebmjd5a.com/';
-          
-          // ลองสครีป 3 ครั้ง
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            console.log(`[API] Scrape attempt ${attempt}/3`);
+          try {
+            scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
             
-            try {
-              scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
-              
-              if (scrapedData.length > 0) {
-                console.log(`[API] Found ${scrapedData.length} results on attempt ${attempt}`);
-                break;
-              }
-              
-              if (attempt < 3) {
-                console.log(`[API] No results found, waiting 30s before retry...`);
-                await new Promise(resolve => setTimeout(resolve, 30000));
-              }
-            } catch (scrapeError) {
-              console.error(`[API] Scrape attempt ${attempt} failed:`, scrapeError);
-              if (attempt < 3) {
-                console.log(`[API] Waiting 30s before retry...`);
-                await new Promise(resolve => setTimeout(resolve, 30000));
-              }
+            if (scrapedData.length > 0) {
+              console.log(`[API] Found ${scrapedData.length} results on attempt ${attempt}`);
+              break;
             }
-          }
-          
-        } catch (browserError) {
-          console.error('[API] Browser launch failed:', browserError);
-          // ถ้า browser launch ไม่สำเร็จ ให้ข้ามไป import ข้อมูลที่มีอยู่แล้ว
-          console.log('[API] Skipping scrape, proceeding with import only');
-        } finally {
-          if (browser) {
-            try {
-              await browser.close();
-            } catch (closeError) {
-              console.error('[API] Error closing browser:', closeError);
+            
+            if (attempt < 3) {
+              console.log(`[API] No results found, waiting 30s before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 30000));
+            }
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`[API] Scrape attempt ${attempt} failed:`, errorMessage);
+            if (attempt < 3) {
+              console.log(`[API] Waiting 30s before retry...`);
+              await new Promise(resolve => setTimeout(resolve, 30000));
             }
           }
         }
+        
+      } catch (browserError) {
+        console.error('[API] Browser launch failed:', browserError);
+        // ถ้า browser launch ไม่สำเร็จ ให้ข้ามไป import ข้อมูลที่มีอยู่แล้ว
+        console.log('[API] Skipping scrape, proceeding with import only');
+      } finally {
+        if (browser) {
+          try {
+            await browser.close();
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[API] Error closing browser:', errorMessage);
+          }
+        }
+      }
       
       // ขั้นตอนที่ 2: บันทึกข้อมูลลง lottery_api_results
       if (scrapedData.length > 0) {
@@ -458,8 +459,9 @@ export async function POST(request: NextRequest) {
           // สร้าง notification toast
           try {
             await createLotteryImportToast(scrapedData);
-          } catch (toastError) {
-            console.error('[API] Error creating toast:', toastError);
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[API] Error creating toast:', errorMessage);
           }
         }
       }
@@ -472,8 +474,9 @@ export async function POST(request: NextRequest) {
           draw_time,
           lottery_sub_type_id
         );
-      } catch (importError) {
-        console.error('[API] Error during import:', importError);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[API] Error during import:', errorMessage);
         // ไม่ throw error เพราะ scrape อาจสำเร็จแล้ว
       }
       
@@ -495,11 +498,12 @@ export async function POST(request: NextRequest) {
           draw_time,
           lottery_sub_type_id
         );
-      } catch (importError) {
-        console.error('[API] Error during import_only:', importError);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('[API] Error during import_only:', errorMessage);
         return NextResponse.json({ 
           error: 'Import failed',
-          details: importError instanceof Error ? importError.message : 'Unknown error'
+          details: errorMessage
         }, { status: 500 });
       }
       
