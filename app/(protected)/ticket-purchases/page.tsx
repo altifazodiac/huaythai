@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -33,7 +34,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { PrinterIcon, Trash2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, Edit } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { th } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -52,6 +53,133 @@ import { DirectionProvider } from "@radix-ui/react-direction";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { handlePrint, fetchTicketPurchase } from "@/lib/lottery-print";
+
+// Import additional types and functions from lottery-print
+interface TicketDisplayItem {
+  subType: {
+    lottery_sub_type_id: number;
+    sub_type_name: string;
+    payout_rate: number;
+  };
+  payout: {
+    id: number;
+    lottery_sub_type_id: number;
+    digit_number: number;
+    type_number: string;
+    price_paid: number;
+  };
+  numbers: string[];
+  amount: number;
+}
+
+interface PrintLotteryTicketItem {
+  id: string;
+  numbers: string[];
+  amount: number;
+  lottery_sub_types: {
+    lottery_sub_type_id: number;
+    sub_type_name: string;
+    payout_rate: number;
+  };
+  lottery_sub_number: {
+    id: number;
+    lottery_sub_type_id: number;
+    digit_number: number;
+    type_number: string;
+    price_paid: number;
+  };
+}
+
+// Enhanced createGroups function from lottery-print.tsx
+const createEnhancedGroups = (ticketItems: TicketDisplayItem[], preferredOrderMap: Record<number, string[]> = {}) => {
+  const allTypeLabels: Record<number, string[]> = {};
+
+  // Build type labels mapping
+  ticketItems.forEach(item => {
+    const label = item.payout.type_number || "-";
+    if (!allTypeLabels[item.payout.digit_number]) allTypeLabels[item.payout.digit_number] = [];
+    if (!allTypeLabels[item.payout.digit_number].includes(label)) {
+      allTypeLabels[item.payout.digit_number].push(label);
+    }
+  });
+
+  // Order labels for specific digit numbers using preferredOrderMap from DB
+  Object.keys(allTypeLabels).forEach(digitStr => {
+    const digit = Number(digitStr);
+    const labels = allTypeLabels[digit];
+    let ordered: string[] = [...labels];
+    // กำหนด fallback order ตาม digit
+    let fallback: string[] = [];
+    if (digit === 2) fallback = ["บน", "ล่าง"];
+    else if (digit === 3 || digit === 4) fallback = ["บน", "โต๊ด"];
+    else if (digit === 1) fallback = ["วิ่งบน", "วิ่งล่าง"];
+    
+    // ใช้ preferredOrderMap ถ้ามีและครบ
+    if (preferredOrderMap[digit] && preferredOrderMap[digit].length >= fallback.length) {
+      ordered = preferredOrderMap[digit].filter(l => labels.includes(l));
+      labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
+    } else if (fallback.length > 0) {
+      ordered = fallback.filter(l => labels.includes(l));
+      labels.forEach(l => { if (!ordered.includes(l)) ordered.push(l); });
+    }
+    allTypeLabels[digit] = ordered;
+
+    // หลังจาก allTypeLabels[digit] = ordered; ให้แน่ใจว่า typeOrder มีครบ
+    if (digit === 2) {
+      allTypeLabels[digit] = ["บน", "ล่าง"];
+    }
+    if (digit === 3) {
+      allTypeLabels[digit] = ["บน", "โต๊ด"];
+    }
+    if (digit === 4) {
+      allTypeLabels[digit] = ["บน", "โต๊ด"];
+    }
+    if (digit === 1) {
+      allTypeLabels[digit] = ["วิ่งบน", "วิ่งล่าง"];
+    }
+  });
+
+  // สร้าง groups ใหม่
+  const groups: Map<string, Grouped> = new Map();
+
+  // 1. สร้าง mapping: {digit, number} => {typeLabel: amount}
+  const numberMap: Record<string, { digit: number, number: string, amounts: Record<string, number> }> = {};
+
+  ticketItems.forEach(item => {
+    const digit = item.payout.digit_number;
+    const label = item.payout.type_number;
+    item.numbers.forEach(num => {
+      const key = `${digit}|${num}`;
+      if (!numberMap[key]) {
+        numberMap[key] = { digit, number: num, amounts: {} };
+      }
+      numberMap[key].amounts[label] = item.amount;
+    });
+  });
+
+  // 2. Group by digit + typeOrder + amounts signature
+  Object.values(numberMap).forEach(({ digit, number, amounts }) => {
+    const typeOrder = allTypeLabels[digit];
+    // signature เช่น "10|30" (เช่น บน 10 ล่าง 30)
+    // ปรับ amountsSignature ให้แสดง 0 ถ้าไม่มีการสั่งซื้อ label นั้น
+    const amountsSignature = typeOrder.map(label => amounts[label] !== undefined ? amounts[label] : 0).join('|');
+    const key = `${digit}|${typeOrder.join(",")}|${amountsSignature}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        digit_number: digit,
+        numbers: [],
+        typeLabels: typeOrder,
+        amounts: Object.fromEntries(typeOrder.map((lab, idx) => [lab, amounts[lab] !== undefined ? amounts[lab] : 0])),
+        typeOrder: typeOrder,
+      });
+    }
+    const group = groups.get(key)!;
+    if (!group.numbers.includes(number)) group.numbers.push(number);
+  });
+
+  return groups;
+};
 
 // Interfaces
 interface LotterySubType {
@@ -79,7 +207,7 @@ interface LotteryTicketItem {
 }
 
 interface LotteryTicket {
-  id: number;
+  id: string;
   user_id: string;
   username?: string;
   draw_date: string;
@@ -95,8 +223,8 @@ interface LotteryTicket {
 }
 
 interface StatusChangeHistory {
-  id: number;
-  ticket_id: number;
+  id: string;
+  ticket_id: string;
   user_id: string;
   old_status: string;
   new_status: string;
@@ -112,12 +240,12 @@ interface Grouped {
   typeOrder: string[];
 }
 
-// Fetch Tickets Function
+// FIXED: Fetch Tickets Function
 const fetchTickets = async (
   supabase: any,
   user: any,
   role: string,
-  filters: { billNumber: string; drawDate: string; status: string; username: string },
+  filters: { billNumber: string; startDate: string; endDate: string; status: string; username: string; lotterySubTypeId: string; },
   page: number,
   pageSize: number,
   showDeleted: boolean = false
@@ -159,8 +287,11 @@ const fetchTickets = async (
   if (filters.billNumber) {
     query = query.ilike("bill_number", `%${filters.billNumber}%`);
   }
-  if (filters.drawDate) {
-    query = query.eq("draw_date", filters.drawDate);
+  if (filters.startDate) {
+    query = query.gte("draw_date", filters.startDate);
+  }
+  if (filters.endDate) {
+    query = query.lte("draw_date", filters.endDate);
   }
   if (filters.status && filters.status !== "all") {
     query = query.eq("status", filters.status);
@@ -168,36 +299,75 @@ const fetchTickets = async (
   if (filters.username && role === "admin") {
     query = query.ilike("username", `%${filters.username}%`);
   }
+  if (filters.lotterySubTypeId && filters.lotterySubTypeId !== 'all') {
+    query = query.eq('lottery_ticket_items.lottery_sub_type_id', filters.lotterySubTypeId)
+  }
 
   const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  if (error) {
+    console.error("Error fetching tickets:", error);
+    throw error;
+  }
+
+  // FIXED: Ensure proper data structure and calculate totals
+  const processedData = (data || []).map((ticket: any) => ({
+    ...ticket,
+    // FIXED: Ensure payout_amount is properly initialized
+    payout_amount: ticket.payout_amount || 0,
+    // FIXED: Ensure lottery_ticket_items is array
+    lottery_ticket_items: ticket.lottery_ticket_items || [],
+    // FIXED: Recalculate total_amount if needed
+    total_amount: ticket.total_amount || 
+      (ticket.lottery_ticket_items || []).reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0)
+  }));
+
+  console.log("Processed ticket data:", processedData); // Debug log
+  return processedData;
 };
 
-// Fetch Status History Function
-const fetchStatusHistory = async (supabase: any, ticketId: number) => {
+// FIXED: Fetch Status History Function
+const fetchStatusHistory = async (supabase: any, ticketId: string) => {
   const { data, error } = await supabase
     .from("status_change_history")
     .select(`
       *,
-      profiles:user_id(username)
+      profiles!user_id(name)
     `)
     .eq("ticket_id", ticketId)
     .order("changed_at", { ascending: false });
   
-  if (error) throw error;
-  return data || [];
+  if (error) {
+    console.error("Error fetching status history:", error);
+    return [];
+  }
+  
+  // FIXED: Process status history data
+  return (data || []).map((item: any) => ({
+    ...item,
+    username: item.profiles?.name || "ไม่ทราบ"
+  }));
 };
 
-// Columns Definition
+// FIXED: Columns Definition
 const createColumns = (
   onPrintClick: (billNumber: string) => Promise<void>,
   setDeletingTicket: (ticket: LotteryTicket | null) => void,
   setDeleteDialogOpen: (open: boolean) => void,
   onRestoreClick: (ticket: LotteryTicket) => Promise<void>,
   showDeleted: boolean,
-  onEditStatusClick: (ticket: LotteryTicket) => void
+  onEditStatusClick: (ticket: LotteryTicket) => void,
+  role: string
 ): ColumnDef<LotteryTicket>[] => [
+   // FIXED: Add username column for admin
+   ...(role === "admin" ? [{
+    accessorKey: "username",
+    header: "ผู้ใช้",
+    cell: ({ row }: { row: Row<LotteryTicket> }) => (
+      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        {row.original.username || "ไม่ระบุ"}
+      </span>
+    ),
+  }] : []),
   {
     accessorKey: "bill_number",
     header: ({ column }: { column: any }) => (
@@ -211,7 +381,7 @@ const createColumns = (
     ),
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
       <div className={`font-medium ${row.original.deleted_at ? "text-gray-400 line-through" : ""}`}>
-        {row.original.bill_number}
+        {row.original.bill_number || "ไม่ระบุ"}
         {row.original.deleted_at && <span className="ml-2 text-xs text-red-500">(ลบแล้ว)</span>}
       </div>
     ),
@@ -219,22 +389,32 @@ const createColumns = (
   {
     accessorKey: "sub_type_name",
     header: "ประเภทหวย",
-    cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
-        {row.original.lottery_ticket_items[0]?.lottery_sub_types?.sub_type_name || "-"}
-      </span>
-    ),
+    cell: ({ row }: { row: Row<LotteryTicket> }) => {
+      // FIXED: Get all unique lottery types from ticket items
+      const uniqueTypes = [...new Set(
+        row.original.lottery_ticket_items
+          ?.map(item => item.lottery_sub_types?.sub_type_name)
+          .filter(Boolean) || []
+      )];
+      
+      return (
+        <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+          {uniqueTypes.length > 0 ? uniqueTypes.join(", ") : "ไม่ระบุ"}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "bill_name",
     header: "ชื่อบิล",
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
       <span className={row.original.deleted_at ? "text-gray-400" : ""}>
-        {row.original.bill_name || "-"}
+        {row.original.bill_name || "ไม่ระบุ"}
       </span>
     ),
     enableHiding: true,
   },
+ 
   {
     accessorKey: "draw_date",
     header: ({ column }: { column: any }) => (
@@ -248,7 +428,7 @@ const createColumns = (
     ),
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
       <span className={row.original.deleted_at ? "text-gray-400" : ""}>
-        {`${format(new Date(row.original.draw_date), "d MMM yyyy", { locale: th })} ${row.original.draw_time}`}
+        {`${format(new Date(row.original.draw_date), "d MMM yyyy", { locale: th })} ${row.original.draw_time || ""}`}
       </span>
     ),
   },
@@ -277,11 +457,20 @@ const createColumns = (
   {
     accessorKey: "total_amount",
     header: "ยอดรวม (฿)",
-    cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
-        {(row.original.total_amount ?? 0).toLocaleString()}
-      </span>
-    ),
+    cell: ({ row }: { row: Row<LotteryTicket> }) => {
+      // FIXED: Calculate total amount correctly
+      const calculatedTotal = row.original.lottery_ticket_items?.reduce((sum, item) => {
+        return sum + (parseFloat(item.amount?.toString() || "0"));
+      }, 0) || 0;
+      
+      const displayAmount = row.original.total_amount || calculatedTotal;
+      
+      return (
+        <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+          {displayAmount.toLocaleString()}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "payout_amount",
@@ -303,8 +492,8 @@ const createColumns = (
         cancelled: row.original.deleted_at ? "text-gray-400" : "text-red-600",
       };
       const statusText: Record<string, string> = {
-        confirmed: "ยืนยันแล้ว",
-        pending: "รอดำเนินการ",
+        confirmed: "จ่ายเงินแล้ว",
+        pending: "รอจ่ายเงิน",
         cancelled: "ยกเลิก",
       };
       return <span className={statusStyles[status] || "text-gray-600"}>{statusText[status] || status}</span>;
@@ -312,7 +501,7 @@ const createColumns = (
   },
   {
     id: "actions",
-    header: "การดำเนินการ",
+    header: "ชำระเงิน",
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
       <div className="flex gap-2">
         {!row.original.deleted_at ? (
@@ -372,22 +561,24 @@ export default function LotteryPurchasePage() {
   const [role, setRole] = useState<string>("user");
   const [filters, setFilters] = useState({
     billNumber: "",
-    drawDate: "",
+    startDate: "",
+    endDate: "",
     status: "",
     username: "",
+    lotterySubTypeId: "",
   });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState<LotteryTicket | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showDeleted, setShowDeleted] = useState(false);
   const [statusEditDialogOpen, setStatusEditDialogOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<LotteryTicket | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
   const [statusHistory, setStatusHistory] = useState<StatusChangeHistory[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState<Set<number>>(new Set());
+  const [loadingHistory, setLoadingHistory] = useState<Set<string>>(new Set());
 
   // Fetch user data
   React.useEffect(() => {
@@ -415,6 +606,39 @@ export default function LotteryPurchasePage() {
     };
     fetchUserRole();
   }, [user, supabase]);
+
+  // React Query for fetching all users (for admin dropdown)
+  const { data: users = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["all_users"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .order("name", { ascending: true });
+      if (error) {
+        toast.error("ไม่สามารถโหลดรายชื่อผู้ใช้ได้: " + error.message);
+        return [];
+      }
+      return data;
+    },
+    enabled: role === "admin",
+  });
+
+  // React Query for fetching all lottery sub-types
+  const { data: lotterySubTypes = [] } = useQuery<{ lottery_sub_type_id: number; sub_type_name: string; }[]>({
+    queryKey: ["lottery_sub_types"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lottery_sub_types")
+        .select("lottery_sub_type_id, sub_type_name")
+        .order("sub_type_name", { ascending: true });
+      if (error) {
+        toast.error("ไม่สามารถโหลดประเภทหวยได้: " + error.message);
+        return [];
+      }
+      return data;
+    },
+  });
 
   // React Query for fetching tickets
   const { data: tickets = [], isLoading, refetch } = useQuery<LotteryTicket[]>({
@@ -528,62 +752,32 @@ export default function LotteryPurchasePage() {
     }
   };
 
-  // Group Bet Details
-  const createGroups = (ticketItems: LotteryTicketItem[]) => {
-    const allTypeLabels: Record<number, string[]> = {};
-    ticketItems.forEach((item) => {
-      const label = item.lottery_sub_number.type_number || "-";
-      if (!allTypeLabels[item.lottery_sub_number.digit_number]) {
-        allTypeLabels[item.lottery_sub_number.digit_number] = [];
-      }
-      if (!allTypeLabels[item.lottery_sub_number.digit_number].includes(label)) {
-        allTypeLabels[item.lottery_sub_number.digit_number].push(label);
-      }
-    });
+  const handleDateShortcut = (period: 'today' | 'month' | 'year') => {
+    const today = new Date();
+    let start = '';
+    let end = '';
 
-    Object.keys(allTypeLabels).forEach((digit) => {
-      if ([3, 4].includes(Number(digit))) {
-        const labels = allTypeLabels[Number(digit)];
-        allTypeLabels[Number(digit)] = ["เต็ง", "โต๊ด"].filter((l) => labels.includes(l)).length > 0 ? ["เต็ง", "โต๊ด"] : labels;
-      } else if (Number(digit) === 2) {
-        const labels = allTypeLabels[Number(digit)];
-        allTypeLabels[Number(digit)] = ["บน", "ล่าง"].filter((l) => labels.includes(l)).length > 0 ? ["บน", "ล่าง"] : labels;
-      }
-    });
-
-    const groups: Map<string, Grouped> = new Map();
-    ticketItems.forEach((item) => {
-      const digit = item.lottery_sub_number.digit_number;
-      const labelOrder = allTypeLabels[digit] || [item.lottery_sub_number.type_number || "-"];
-      const amountsArr = labelOrder.map((lab) => {
-        const found = ticketItems.find(
-          (t) =>
-            t.lottery_sub_number.digit_number === digit &&
-            t.lottery_sub_number.type_number === lab &&
-            t.numbers.join(",") === item.numbers.join(",")
-        );
-        return found ? found.amount : 0;
-      });
-      const key = `${digit}|${labelOrder.join(",")}|${amountsArr.join(",")}`;
-      if (!groups.has(key)) {
-        groups.set(key, {
-          digit_number: digit,
-          numbers: [],
-          typeLabels: labelOrder,
-          amounts: Object.fromEntries(labelOrder.map((lab, idx) => [lab, amountsArr[idx]])),
-          typeOrder: labelOrder,
-        });
-      }
-      const group = groups.get(key)!;
-      item.numbers.forEach((num) => {
-        if (!group.numbers.includes(num)) group.numbers.push(num);
-      });
-    });
-    return groups;
+    if (period === 'today') {
+      start = format(today, 'yyyy-MM-dd');
+      end = format(today, 'yyyy-MM-dd');
+    } else if (period === 'month') {
+      start = format(startOfMonth(today), 'yyyy-MM-dd');
+      end = format(endOfMonth(today), 'yyyy-MM-dd');
+    } else if (period === 'year') {
+      start = format(startOfYear(today), 'yyyy-MM-dd');
+      end = format(endOfYear(today), 'yyyy-MM-dd');
+        }
+        
+    setFilters(prev => ({ ...prev, startDate: start, endDate: end }));
   };
 
-  // Load status history when row is expanded
-  const handleRowExpand = async (ticketId: number) => {
+  // Enhanced row expand function with complete ticket data
+  const [enhancedTicketData, setEnhancedTicketData] = useState<Record<string, {
+    groups: Map<string, Grouped>;
+    items: PrintLotteryTicketItem[];
+  }>>({});
+
+  const handleRowExpand = async (ticketId: string) => {
     setExpandedRows((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(ticketId)) {
@@ -591,12 +785,48 @@ export default function LotteryPurchasePage() {
         return newSet;
       } else {
         newSet.add(ticketId);
-        // Load status history when expanding
-        if (!loadingHistory.has(ticketId)) {
+        
+        // Load enhanced ticket data if not already loaded
+        if (!enhancedTicketData[ticketId] && !loadingHistory.has(ticketId)) {
           setLoadingHistory(prev => new Set(prev).add(ticketId));
+          
+          // Find the ticket to get bill_number
+          const ticket = tickets.find(t => t.id === ticketId);
+          if (ticket) {
+            // Load complete ticket data using fetchTicketPurchase
+            fetchTicketPurchase({ bill_number: ticket.bill_number, supabase })
+              .then(purchaseData => {
+                if (purchaseData) {
+                  // Transform to TicketDisplayItem format
+                  const displayItems: TicketDisplayItem[] = purchaseData.items.map(item => ({
+                    subType: item.lottery_sub_types,
+                    payout: item.lottery_sub_number,
+                    numbers: item.numbers,
+                    amount: item.amount,
+                  }));
+                  
+                  // Create enhanced groups
+                  const groups = createEnhancedGroups(displayItems);
+                  
+                  // Store enhanced data
+                  setEnhancedTicketData(prev => ({
+                    ...prev,
+                    [ticketId]: {
+                      groups,
+                      items: purchaseData.items
+                    }
+                  }));
+                }
+              })
+              .catch(error => {
+                console.error("Error loading enhanced ticket data:", error);
+              });
+          }
+          
+          // Load status history
           fetchStatusHistory(supabase, ticketId)
             .then(history => {
-              setStatusHistory(history);
+              setStatusHistory(prev => prev.filter(h => h.ticket_id !== ticketId).concat(history));
             })
             .catch(error => {
               console.error("Error loading status history:", error);
@@ -614,7 +844,7 @@ export default function LotteryPurchasePage() {
     });
   };
 
-  // TanStack Table
+  // TanStack Table - FIXED: Pass role parameter
   const table = useReactTable({
     data: tickets,
     columns: createColumns(
@@ -627,7 +857,8 @@ export default function LotteryPurchasePage() {
         setEditingTicket(ticket);
         setNewStatus("");
         setStatusEditDialogOpen(true);
-      }
+      },
+      role
     ),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -674,12 +905,46 @@ export default function LotteryPurchasePage() {
                       onChange={(e) => setFilters({ ...filters, billNumber: e.target.value })}
                       className="w-40"
                     />
+                    <div className="flex items-center gap-2">
                     <Input
                       type="date"
-                      value={filters.drawDate}
-                      onChange={(e) => setFilters({ ...filters, drawDate: e.target.value })}
+                        value={filters.startDate}
+                        onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
                       className="w-40"
+                        title="จากวันที่"
                     />
+                      <span>-</span>
+                      <Input
+                        type="date"
+                        value={filters.endDate}
+                        onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                        className="w-40"
+                        title="ถึงวันที่"
+                      />
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="sm" onClick={() => handleDateShortcut('today')}>วันนี้</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDateShortcut('month')}>เดือนนี้</Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDateShortcut('year')}>ปีนี้</Button>
+                    </div>
+                    <Select
+                      value={filters.lotterySubTypeId}
+                      onValueChange={(value) => setFilters({ ...filters, lotterySubTypeId: value })}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="ประเภทหวย" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <ScrollArea className="h-72">
+                          <SelectItem value="all">หวยทั้งหมด</SelectItem>
+                          {lotterySubTypes.map((type) => (
+                            <SelectItem key={type.lottery_sub_type_id} value={type.lottery_sub_type_id.toString()}>
+                              {type.sub_type_name}
+                            </SelectItem>
+                          ))}
+                        </ScrollArea>
+                      </SelectContent>
+                    </Select>
                     <Select
                       value={filters.status}
                       onValueChange={(value) => setFilters({ ...filters, status: value })}
@@ -689,22 +954,34 @@ export default function LotteryPurchasePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">ทั้งหมด</SelectItem>
-                        <SelectItem value="confirmed">ยืนยันแล้ว</SelectItem>
-                        <SelectItem value="pending">รอดำเนินการ</SelectItem>
+                        <SelectItem value="confirmed">จ่ายเงินแล้ว</SelectItem>
+                        <SelectItem value="pending">รอจ่ายเงิน</SelectItem>
                         <SelectItem value="cancelled">ยกเลิก</SelectItem>
                       </SelectContent>
                     </Select>
                     {role === "admin" && (
-                      <Input
-                        placeholder="ค้นหาชื่อผู้ใช้"
+                      <Select
                         value={filters.username}
-                        onChange={(e) => setFilters({ ...filters, username: e.target.value })}
-                        className="w-40"
-                      />
+                        onValueChange={(value) => setFilters({ ...filters, username: value === 'all' ? '' : value })}
+                      >
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="เลือกผู้ใช้" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <ScrollArea className="h-72">
+                            <SelectItem value="all">ผู้ใช้ทั้งหมด</SelectItem>
+                            {users.map((u) => (
+                              <SelectItem key={u.id} value={u.name}>
+                                {u.name}
+                              </SelectItem>
+                            ))}
+                          </ScrollArea>
+                        </SelectContent>
+                      </Select>
                     )}
                     <Button
                       variant="outline"
-                      onClick={() => setFilters({ billNumber: "", drawDate: "", status: "all", username: "" })}
+                      onClick={() => setFilters({ billNumber: "", startDate: "", endDate: "", status: "", username: "", lotterySubTypeId: "" })}
                     >
                       ล้างตัวกรอง
                     </Button>
@@ -789,7 +1066,7 @@ export default function LotteryPurchasePage() {
                                 onClick={() => {
                                   handleRowExpand(row.original.id);
                                 }}
-                                className="cursor-pointer"
+                                className="cursor-pointer hover:bg-muted/50"
                               >
                                 {row.getVisibleCells().map((cell) => (
                                   <TableCell key={cell.id}>
@@ -819,60 +1096,86 @@ export default function LotteryPurchasePage() {
                                         transition={{ duration: 0.3, delay: 0.1 }}
                                       >
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                          {/* Bet Details */}
+                                          {/* Enhanced Bet Details */}
                                           <div>
                                             <h4 className="text-sm font-semibold mb-2">
                                               รายละเอียดการแทง
                                             </h4>
-                                            {Array.from(
-                                              createGroups(row.original.lottery_ticket_items).values()
-                                            ).map((group, idx) => (
-                                              <div key={idx} className="flex gap-4 mb-2">
-                                                <div className="w-24">
-                                                  <div className="text-xs">
-                                                    {group.digit_number} ตัว
-                                                  </div>
-                                                  <div className="text-xs text-primary">
-                                                    {group.typeLabels.join(" x ")}
-                                                  </div>
-                                                  <div className="text-xs">
-                                                    {group.typeLabels
-                                                      .map(
-                                                        (label: string) =>
-                                                          group.amounts[label] || 0
-                                                      )
-                                                      .join(" x ")}
-                                                  </div>
-                                                  <div className="text-xs text-muted-foreground">
-                                                    รวม{" "}
-                                                    {group.typeLabels
-                                                      .reduce(
-                                                        (sum: number, label: string) =>
-                                                          sum +
-                                                          (group.amounts[label] || 0) *
-                                                            group.numbers.length,
-                                                        0
-                                                      )
-                                                      .toLocaleString()}{" "}
-                                                    ฿
-                                                  </div>
-                                                </div>
-                                                <div className="flex-1">
-                                                  <div className="text-xs bg-background p-2 rounded border border-border">
-                                                    {group.numbers
-                                                      .map((num) =>
-                                                        typeof num === "string"
-                                                          ? num.replace(/[\[\]"]+/g, "") // ลบ [, ], "
-                                                          : num
-                                                      )
-                                                      .join("  ")}
-                                                  </div>
-                                                </div>
+                                            {loadingHistory.has(row.original.id) && !enhancedTicketData[row.original.id] ? (
+                                              <div className="flex items-center justify-center py-8">
+                                                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                                                <span className="text-sm text-muted-foreground">กำลังโหลดข้อมูลที่ครบถ้วน...</span>
                                               </div>
-                                            ))}
+                                            ) : enhancedTicketData[row.original.id] ? (
+                                              <div>
+                                                {/* Enhanced ticket summary */}
+                                                <div className="mb-4 p-3 border rounded-lg bg-blue-50 border-blue-200">
+                                                  <div className="text-sm font-medium text-blue-800 mb-2">
+                                                    ข้อมูลที่ครบถ้วน - {enhancedTicketData[row.original.id].items.length > 0 ? 
+                                                      enhancedTicketData[row.original.id].items[0].lottery_sub_types.sub_type_name : 
+                                                      'ไม่ระบุประเภท'}
+                                                  </div>
+                                                  <div className="text-xs text-blue-600">
+                                                    ยอดรวมทั้งหมด: {Array.from(enhancedTicketData[row.original.id].groups.values())
+                                                      .reduce((total, group) => {
+                                                        return total + group.typeOrder.reduce((sum, label) => {
+                                                          return sum + (group.amounts[label] ?? 0) * group.numbers.length;
+                                                        }, 0);
+                                                      }, 0).toFixed(0)} ฿
+                                                  </div>
+                                                </div>
+                                                {/* Enhanced groups */}
+                                                {Array.from(enhancedTicketData[row.original.id].groups.values()).map((group, idx) => (
+                                                <div key={idx} className="mb-4 p-3 border rounded-lg bg-background">
+                                                  <div className="flex gap-4">
+                                                    <div className="w-32 flex-shrink-0">
+                                                      <div className="text-sm font-medium text-primary">
+                                                        {group.digit_number} ตัว
+                                                      </div>
+                                                      <div className="text-xs text-muted-foreground mt-1">
+                                                          {group.typeOrder.join('  ')}
+                                                      </div>
+                                                        <div className="text-xs mt-1">
+                                                          {group.typeOrder.map((label: string) => 
+                                                            (group.amounts[label] ?? 0).toFixed(0)
+                                                          ).join(' x ')}
+                                                      </div>
+                                                      <div className="text-xs text-green-600 font-medium mt-2 pt-1 border-t">
+                                                          รวม: {(group.typeOrder
+                                                          .reduce((sum: number, label: string) => {
+                                                            return sum + (group.amounts[label] || 0);
+                                                            }, 0) * group.numbers.length)
+                                                          .toFixed(0)} ฿
+                                                      </div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                      <div className="text-xs text-muted-foreground mb-1">
+                                                        ตัวเลขที่แทง ({group.numbers.length} ตัว):
+                                                      </div>
+                                                      <div className="text-sm bg-muted p-2 rounded border">
+                                                          <div className="flex flex-wrap gap-2">
+                                                        {group.numbers
+                                                          .map((num: string) => num.toString().padStart(group.digit_number, '0'))
+                                                              .map((num: string) => (
+                                                                <span key={num} className="inline-block bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+                                                                  {num}
+                                                                </span>
+                                                              ))}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <div className="text-sm text-muted-foreground py-4 text-center">
+                                                ไม่มีรายละเอียดการแทง
+                                              </div>
+                                            )}
                                           </div>
 
-                                          {/* Status History */}
+                                          {/* FIXED: Status History */}
                                           <div>
                                             <h4 className="text-sm font-semibold mb-2">
                                               ประวัติการเปลี่ยนแปลงสถานะ
@@ -881,43 +1184,49 @@ export default function LotteryPurchasePage() {
                                               <div className="flex items-center justify-center py-4">
                                                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                                               </div>
-                                            ) : statusHistory.length > 0 ? (
-                                              <div className="space-y-2">
-                                                {statusHistory.map((history) => (
-                                                  <div key={history.id} className="text-xs bg-background p-2 rounded border border-border">
-                                                    <div className="flex justify-between items-start">
-                                                      <div>
-                                                        <span className="font-medium">
-                                                          {history.old_status === "pending" ? "รอดำเนินการ" :
-                                                           history.old_status === "confirmed" ? "ยืนยันแล้ว" :
-                                                           history.old_status === "cancelled" ? "ยกเลิก" : history.old_status}
-                                                        </span>
-                                                        <span className="mx-2">→</span>
-                                                        <span className={`font-medium ${
-                                                          history.new_status === "confirmed" ? "text-green-600" :
-                                                          history.new_status === "cancelled" ? "text-red-600" : ""
-                                                        }`}>
-                                                          {history.new_status === "pending" ? "รอดำเนินการ" :
-                                                           history.new_status === "confirmed" ? "ยืนยันแล้ว" :
-                                                           history.new_status === "cancelled" ? "ยกเลิก" : history.new_status}
-                                                        </span>
-                                                      </div>
-                                                      <div className="text-muted-foreground">
-                                                        {format(new Date(history.changed_at), "d MMM yyyy HH:mm", { locale: th })}
-                                                      </div>
-                                                    </div>
-                                                    {history.username && (
-                                                      <div className="text-muted-foreground mt-1">
-                                                        โดย: {history.username}
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                ))}
-                                              </div>
                                             ) : (
-                                              <div className="text-xs text-muted-foreground py-2">
-                                                ไม่มีประวัติการเปลี่ยนแปลงสถานะ
-                                              </div>
+                                              (() => {
+                                                const ticketHistory = statusHistory.filter(h => h.ticket_id === row.original.id);
+                                                return ticketHistory.length > 0 ? (
+                                                  <div className="space-y-2">
+                                                    {ticketHistory.map((history) => (
+                                                      <div key={history.id} className="text-xs bg-background p-3 rounded border">
+                                                        <div className="flex justify-between items-start">
+                                                          <div>
+                                                            <span className="font-medium">
+                                                              {history.old_status === "pending" ? "รอจ่ายเงิน" :
+                                                               history.old_status === "confirmed" ? "จ่ายเงินแล้ว" :
+                                                               history.old_status === "cancelled" ? "ยกเลิก" : history.old_status}
+                                                            </span>
+                                                            <span className="mx-2 text-muted-foreground">→</span>
+                                                            <span className={`font-medium ${
+                                                              history.new_status === "confirmed" ? "text-green-600" :
+                                                              history.new_status === "cancelled" ? "text-red-600" : 
+                                                              "text-blue-600"
+                                                            }`}>
+                                                              {history.new_status === "pending" ? "รอจ่ายเงิน" :
+                                                               history.new_status === "confirmed" ? "จ่ายเงินแล้ว" :
+                                                               history.new_status === "cancelled" ? "ยกเลิก" : history.new_status}
+                                                            </span>
+                                                          </div>
+                                                          <div className="text-muted-foreground text-right">
+                                                            {format(new Date(history.changed_at), "d MMM yyyy HH:mm", { locale: th })}
+                                                          </div>
+                                                        </div>
+                                                        {history.username && (
+                                                          <div className="text-muted-foreground mt-1">
+                                                            โดย: {history.username}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                ) : (
+                                                  <div className="text-xs text-muted-foreground py-4 text-center">
+                                                    ไม่มีประวัติการเปลี่ยนแปลงสถานะ
+                                                  </div>
+                                                );
+                                              })()
                                             )}
                                           </div>
                                         </div>
@@ -1029,7 +1338,7 @@ export default function LotteryPurchasePage() {
                         เลขบิล: <span className="font-bold">{editingTicket?.bill_number}</span>
                       </div>
                       <div className="mb-2">
-                        สถานะปัจจุบัน: <span className="font-bold text-yellow-600">รอดำเนินการ</span>
+                        สถานะปัจจุบัน: <span className="font-bold text-yellow-600">รอจ่ายเงิน</span>
                       </div>
                       <div className="mb-2">
                         เปลี่ยนเป็น:
@@ -1043,7 +1352,7 @@ export default function LotteryPurchasePage() {
                         <SelectValue placeholder="เลือกสถานะใหม่" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="confirmed">ยืนยันแล้ว</SelectItem>
+                        <SelectItem value="confirmed">จ่ายเงินแล้ว</SelectItem>
                         <SelectItem value="cancelled">ยกเลิก</SelectItem>
                       </SelectContent>
                     </Select>

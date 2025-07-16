@@ -167,7 +167,7 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
     // First get all confirmed tickets
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount')
+      .select('id, draw_date')
       .eq('status', 'confirmed');
     
     if (drawDate) {
@@ -188,6 +188,7 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
       .select(`
         ticket_id,
         lottery_sub_type_id,
+        amount,
         lottery_sub_types!inner(
           lottery_sub_type_id,
           sub_type_name,
@@ -202,7 +203,6 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
     const groupedData = (ticketItems || []).reduce((acc: any, item: any) => {
       const subTypeId = item.lottery_sub_type_id;
       const subType = item.lottery_sub_types;
-      const ticket = tickets?.find((t: any) => t.id === item.ticket_id);
       
       if (!acc[subTypeId]) {
         acc[subTypeId] = {
@@ -219,10 +219,8 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
       
       acc[subTypeId].total_bills.add(item.ticket_id);
       acc[subTypeId].total_numbers += 1;
-      if (ticket) {
-        acc[subTypeId].total_purchase_amount += Number(ticket.total_amount || 0);
-        acc[subTypeId].net_profit_loss += Number(ticket.total_amount || 0);
-      }
+      acc[subTypeId].total_purchase_amount += Number(item.amount || 0);
+      acc[subTypeId].net_profit_loss += Number(item.amount || 0);
       
       return acc;
     }, {});

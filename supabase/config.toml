@@ -92,16 +92,6 @@ enable_confirmations = false
 # Template for sending a confirmation message when a user signs up with a phone number.
 template = "Your code is {{ .Code }}"
 
-[edge_runtime]
-# Port to use for the Edge Runtime.
-port = 54325
-# Configure one of the supported pooler modes: `transaction`, `session`.
-pool_mode = "transaction"
-# How many server connections to allow per user/database pair.
-default_pool_size = 15
-# Maximum number of client connections allowed.
-max_client_conn = 100
-
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin`, `notion`, `twitch`,
 # `twitter`, `slack`, `spotify`, `workos`, `zoom`.
