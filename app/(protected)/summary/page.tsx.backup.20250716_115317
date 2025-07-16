@@ -47,7 +47,6 @@ interface LotteryTypeSummary {
   lottery_sub_type_id: number;
   sub_type_name: string;
   country_origin: string;
-  lottery_type_detail: string;
   total_bills: number;
   total_numbers: number;
   total_purchase_amount: number;
@@ -61,12 +60,10 @@ interface BillSummary {
   user_name: string;
   sub_type_name: string;
   country_origin: string;
-  lottery_type_detail: string;
   total_amount: number;
   total_payout: number;
   net_profit_loss: number;
   numbers_count: number;
-  items_count: number;
   status: string;
 }
 
@@ -246,7 +243,6 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
 const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?: number): Promise<BillSummary[]> => {
   try {
     console.log('Fetching bill summary with params:', { drawDate, lotteryTypeId });
-    console.log("Attempting to use enhanced get_bill_summary RPC...");
     
     // Try RPC function first
     const params: any = {};
@@ -597,8 +593,6 @@ const LotterySummaryPage: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>ประเภทหวย</TableHead>
-                  <TableHead>รายละเอียดประเภท</TableHead>
-                  <TableHead className="text-right">จำนวน Items</TableHead>
                   <TableHead>ประเทศ</TableHead>
                   <TableHead className="text-right">จำนวนบิล</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
@@ -669,8 +663,6 @@ const LotterySummaryPage: React.FC = () => {
                   <TableHead>วันที่</TableHead>
                   <TableHead>ผู้ซื้อ</TableHead>
                   <TableHead>ประเภทหวย</TableHead>
-                  <TableHead>รายละเอียดประเภท</TableHead>
-                  <TableHead className="text-right">จำนวน Items</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
                   <TableHead className="text-right">ยอดซื้อ</TableHead>
                   <TableHead className="text-right">ยอดจ่าย</TableHead>
@@ -737,8 +729,6 @@ const LotterySummaryPage: React.FC = () => {
                 <TableRow>
                   <TableHead>บิล</TableHead>
                   <TableHead>ประเภทหวย</TableHead>
-                  <TableHead>รายละเอียดประเภท</TableHead>
-                  <TableHead className="text-right">จำนวน Items</TableHead>
                   <TableHead>จำนวนหลัก</TableHead>
                   <TableHead>ประเภท</TableHead>
                   <TableHead>เลข</TableHead>
