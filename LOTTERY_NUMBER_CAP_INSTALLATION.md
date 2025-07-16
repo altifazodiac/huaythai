@@ -13,7 +13,24 @@
 
 ## 🚀 ขั้นตอนการติดตั้ง
 
-### ตัวเลือกที่ 1: ใช้ Node.js (แนะนำ)
+### ตัวเลือกที่ 1: ใช้ Supabase Dashboard (แนะนำ - ง่ายที่สุด)
+
+1. **เปิด Supabase Dashboard**
+   - เข้าไปที่ https://supabase.com/dashboard
+   - เลือกโปรเจคของคุณ
+
+2. **เปิด SQL Editor**
+   - ไปที่ SQL Editor ในเมนูด้านซ้าย
+
+3. **รัน Migration Script**
+   - คัดลอกเนื้อหาจากไฟล์ `run-migrations-supabase-sql.sql`
+   - วางใน SQL Editor
+   - กดปุ่ม "Run" หรือ Ctrl+Enter
+
+4. **ตรวจสอบผลลัพธ์**
+   - รันไฟล์ `check-migration-status-supabase.sql` เพื่อตรวจสอบสถานะ
+
+### ตัวเลือกที่ 2: ใช้ Node.js บน VPS
 
 ```bash
 # ให้สิทธิ์การรัน script
@@ -23,7 +40,7 @@ chmod +x run-migrations-simple.sh
 ./run-migrations-simple.sh
 ```
 
-### ตัวเลือกที่ 2: ใช้ Supabase CLI
+### ตัวเลือกที่ 3: ใช้ Supabase CLI
 
 ```bash
 # ให้สิทธิ์การรัน script
@@ -33,7 +50,7 @@ chmod +x run-migrations-vps-supabase.sh
 ./run-migrations-vps-supabase.sh
 ```
 
-### ตัวเลือกที่ 3: ใช้ curl
+### ตัวเลือกที่ 4: ใช้ curl
 
 ```bash
 # ให้สิทธิ์การรัน script
@@ -43,7 +60,7 @@ chmod +x run-migrations-vps-curl.sh
 ./run-migrations-vps-curl.sh
 ```
 
-### ตัวเลือกที่ 4: รันด้วย Node.js โดยตรง
+### ตัวเลือกที่ 5: รันด้วย Node.js โดยตรง
 
 ```bash
 # ติดตั้ง dependencies (ถ้ายังไม่ได้ติดตั้ง)
@@ -55,14 +72,20 @@ node run-migrations-vps-node.js
 
 ## 🔧 การตรวจสอบสถานะ
 
-### ตรวจสอบ Migration
+### ตรวจสอบผ่าน Supabase Dashboard (แนะนำ)
+
+1. เปิด SQL Editor ใน Supabase Dashboard
+2. คัดลอกเนื้อหาจากไฟล์ `check-migration-status-supabase.sql`
+3. รัน script เพื่อดูสถานะ
+
+### ตรวจสอบ Migration ด้วย Node.js
 
 ```bash
-# ตรวจสอบว่าการเปลี่ยนแปลงสำเร็จหรือไม่
-psql $DATABASE_URL -f check-migration-status.sql
+# ตรวจสอบสถานะ
+node check-migration-status.js
 ```
 
-### ตรวจสอบด้วย Node.js
+### ตรวจสอบด้วย Node.js โดยตรง
 
 ```bash
 # สร้าง script ตรวจสอบ
@@ -178,10 +201,23 @@ GROUP BY number_cap_action;
 ## 🔍 การแก้ไขปัญหา
 
 ### ปัญหา: ไม่พบ psql
-**วิธีแก้**: ใช้ Node.js script แทน
+**วิธีแก้**: ใช้ Supabase Dashboard หรือ Node.js script
 
 ### ปัญหา: ไม่พบ supabase CLI
-**วิธีแก้**: ใช้ Node.js script หรือติดตั้ง supabase CLI
+**วิธีแก้**: ใช้ Supabase Dashboard หรือ Node.js script
 
 ### ปัญหา: Environment variables ไม่ครบ
-**วิธีแก้**: ตรวจสอบ .env file และ environment variables 
+**วิธีแก้**: ใช้ Supabase Dashboard (ไม่ต้องใช้ environment variables)
+
+### ปัญหา: Migration ล้มเหลว
+**วิธีแก้**: 
+1. ตรวจสอบ error message
+2. รัน script ตรวจสอบสถานะ
+3. ลองรันใหม่หรือใช้ Supabase Dashboard
+
+## 📝 ขั้นตอนหลัง Migration
+
+1. **รีสตาร์ท application server**
+2. **ทดสอบระบบเลขอั้น**
+3. **สร้างรายการใหม่เพื่อทดสอบ**
+4. **ตรวจสอบข้อมูลในฐานข้อมูล** 

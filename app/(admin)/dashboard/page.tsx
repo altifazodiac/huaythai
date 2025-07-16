@@ -192,7 +192,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            แดشบอร์ดผู้ดูแลระบบ
+            แดชบอร์ดผู้ดูแลระบบ
           </h1>
           <p className="text-muted-foreground">
             ภาพรวมข้อมูลการขายหวยและสถิติต่างๆ
