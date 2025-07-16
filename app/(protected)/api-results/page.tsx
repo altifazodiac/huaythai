@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Search, ChevronRight, Loader2, BarChart3, History } from "lucide-react";
+import { Calendar, Search, ChevronRight, Loader2, BarChart3, History, RefreshCw } from "lucide-react";
 import { countryFlagImg } from "@/lib/utils/flags";
 import { format, isSameDay } from "date-fns";
 import { createClient } from '@supabase/supabase-js';
@@ -21,6 +21,9 @@ import {
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { DirectionProvider } from "@radix-ui/react-direction";
 import { supabase } from "@/lib/supabase/supabaseClient";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { reloadLotteryResults } from "./actions";
 
 
 // --- Unchanged Logic & Utility Functions ---
@@ -111,6 +114,7 @@ export default function LotteryResultsPage() {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<any | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [reloadLoading, setReloadLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -226,6 +230,25 @@ export default function LotteryResultsPage() {
     ...Object.keys(grouped).filter(g => !countryOrder.includes(g)).sort(),
   ];
 
+  // --- ฟังก์ชัน reload ผลหวย ---
+  const handleReload = async () => {
+    setReloadLoading(true);
+    try {
+      const result = await reloadLotteryResults();
+      if (result.success) {
+        toast.success("รีโหลดผลหวยสำเร็จ! กำลังรีเฟรชข้อมูล...");
+        // The page will revalidate, no need to force reload.
+      } else {
+        toast.error(result.message || "เกิดข้อผิดพลาดในการรีโหลดผลหวย");
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      toast.error(message);
+    } finally {
+      setReloadLoading(false);
+    }
+  };
+
   // --- NEW UI STRUCTURE ---
   return (
     <DirectionProvider dir="ltr">
@@ -252,6 +275,18 @@ export default function LotteryResultsPage() {
                         </Breadcrumb>
                     </div>
                     <div className="ml-auto flex items-center gap-2">
+                      {/* ปุ่ม Reload */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="px-2 py-1 h-9 flex items-center gap-1 text-xs text-red-700 border-red-300 dark:text-red-200 dark:border-red-700 bg-white dark:bg-red-950 hover:bg-red-100 dark:hover:bg-red-900"
+                        onClick={handleReload}
+                        disabled={reloadLoading}
+                        title="รีโหลดผลหวย (ดึงผลหวยใหม่จากแหล่งข้อมูล)"
+                      >
+                        {reloadLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
+                        <span className="hidden sm:inline">รีโหลด</span>
+                      </Button>
                       {/* Debug Info */}
                       <div className="hidden md:flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
                         <span>ข้อมูล: {allAliases.length} รายการ</span>

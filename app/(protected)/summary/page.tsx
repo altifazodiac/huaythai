@@ -30,12 +30,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useUserRole } from "@/hooks/use-user-role";
 import { countryFlagImg } from "@/lib/utils/flags";
 import { Badge } from "@/components/ui/badge";
 
 // Comprehensive interfaces for detailed lottery analysis
 interface DailySummary {
   draw_date: string;
+  user_id: string;
+  user_name: string;
   total_bills: number;
   total_numbers: number;
   total_purchase_amount: number;
@@ -84,42 +87,40 @@ interface NumberDetail {
 // Comprehensive data fetching functions using authenticated Supabase client
 const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
   try {
-    // Try RPC function first
-    const { data, error } = await supabase.rpc('get_daily_lottery_summary');
-    if (!error && data) {
-      return data;
-    }
-    
-    // Fallback to direct SQL query
-    console.log('RPC function failed, using direct query fallback');
-    
-    // Get all confirmed tickets
+    // Get all confirmed tickets with user_id
     const { data: tickets, error: ticketError } = await supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount')
+      .select('id, draw_date, total_amount, user_id')
       .eq('status', 'confirmed');
-    
     if (ticketError) throw ticketError;
-    
-    if (!tickets || tickets.length === 0) {
-      return [];
-    }
-    
+    if (!tickets || tickets.length === 0) return [];
+
+    // Get user profiles
+    const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name')
+      .in('id', userIds);
+    if (profileError) throw profileError;
+
     // Get ticket items to count total numbers
     const ticketIds = tickets.map((t: any) => t.id);
     const { data: ticketItems, error: itemError } = await supabase
       .from('lottery_ticket_items')
       .select('ticket_id')
       .in('ticket_id', ticketIds);
-    
     if (itemError) throw itemError;
-    
-    // Group by draw_date and calculate totals
+
+    // Group by draw_date + user_id
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
-      const date = ticket.draw_date;
-      if (!acc[date]) {
-        acc[date] = {
-          draw_date: date,
+      if (!ticket.user_id) return acc;
+      const key = `${ticket.draw_date}__${ticket.user_id}`;
+      if (!acc[key]) {
+        const profile = profiles?.find((p: any) => p.id === ticket.user_id);
+        acc[key] = {
+          draw_date: ticket.draw_date,
+          user_id: ticket.user_id,
+          user_name: profile?.name || 'ไม่ระบุ',
           total_bills: 0,
           total_numbers: 0,
           total_purchase_amount: 0,
@@ -127,26 +128,25 @@ const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
           net_profit_loss: 0
         };
       }
-      acc[date].total_bills += 1;
-      acc[date].total_purchase_amount += Number(ticket.total_amount || 0);
-      acc[date].net_profit_loss += Number(ticket.total_amount || 0);
+      acc[key].total_bills += 1;
+      acc[key].total_purchase_amount += Number(ticket.total_amount || 0);
+      acc[key].net_profit_loss += Number(ticket.total_amount || 0);
       return acc;
     }, {});
-    
+
     // Add total_numbers count
     (ticketItems || []).forEach((item: any) => {
       const ticket = tickets.find((t: any) => t.id === item.ticket_id);
-      if (ticket) {
-        const date = ticket.draw_date;
-        if (groupedData[date]) {
-          groupedData[date].total_numbers += 1;
+      if (ticket && ticket.user_id) {
+        const key = `${ticket.draw_date}__${ticket.user_id}`;
+        if (groupedData[key]) {
+          groupedData[key].total_numbers += 1;
         }
       }
     });
     return Object.values(groupedData).sort((a: any, b: any) =>
       new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime()
     ) as DailySummary[];
-    
   } catch (err) {
     console.error('Error in fetchDailySummary:', err);
     throw err;
@@ -155,14 +155,8 @@ const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
 
 const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promise<LotteryTypeSummary[]> => {
   try {
-    // Try RPC function first
-    const { data, error } = await supabase.rpc('get_lottery_type_summary', { p_draw_date: drawDate });
-    if (!error && data) {
-      return data;
-    }
-    
-    // Fallback to direct SQL query
-    console.log('RPC function failed, using direct query fallback');
+    // Use direct SQL query since RPC function doesn't exist
+    console.log('Using direct query for lottery type summary');
     
     // First get all confirmed tickets
     let ticketQuery = supabase
@@ -213,15 +207,19 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
           total_numbers: 0,
           total_purchase_amount: 0,
           total_payout: 0,
-          net_profit_loss: 0
+          net_profit_loss: 0,
+          processed_tickets: new Set() // Track processed tickets to avoid double counting
         };
       }
       
       acc[subTypeId].total_bills.add(item.ticket_id);
       acc[subTypeId].total_numbers += 1;
-      if (ticket) {
+      
+      // Only add ticket amount once per ticket, not per item
+      if (ticket && !acc[subTypeId].processed_tickets.has(ticket.id)) {
         acc[subTypeId].total_purchase_amount += Number(ticket.total_amount || 0);
         acc[subTypeId].net_profit_loss += Number(ticket.total_amount || 0);
+        acc[subTypeId].processed_tickets.add(ticket.id);
       }
       
       return acc;
@@ -229,8 +227,14 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
     
     // Convert Sets to counts and return array
     return Object.values(groupedData).map((item: any) => ({
-      ...item,
-      total_bills: item.total_bills.size
+      lottery_sub_type_id: item.lottery_sub_type_id,
+      sub_type_name: item.sub_type_name,
+      country_origin: item.country_origin,
+      total_bills: item.total_bills.size,
+      total_numbers: item.total_numbers,
+      total_purchase_amount: item.total_purchase_amount,
+      total_payout: item.total_payout,
+      net_profit_loss: item.net_profit_loss
     })).sort((a: any, b: any) => 
       Number(b.total_purchase_amount) - Number(a.total_purchase_amount)
     );
@@ -240,26 +244,12 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
   }
 };
 
-const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?: number): Promise<BillSummary[]> => {
+const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?: number, userId?: string): Promise<BillSummary[]> => {
   try {
-    console.log('Fetching bill summary with params:', { drawDate, lotteryTypeId });
+    console.log('Fetching bill summary with params:', { drawDate, lotteryTypeId, userId });
     
-    // Try RPC function first
-    const params: any = {};
-    if (drawDate) params.p_draw_date = drawDate;
-    if (lotteryTypeId) params.p_lottery_type_id = lotteryTypeId;
-    
-    const { data, error } = await supabase.rpc('get_bill_summary', params);
-    
-    // Always filter only confirmed status, even if RPC returns more
-    if (!error && data) {
-      const filtered = (data as BillSummary[]).filter((b: BillSummary) => b.status === 'confirmed');
-      console.log('Received bill summary data:', filtered);
-      return filtered;
-    }
-    
-    // Fallback to direct SQL query
-    console.log('RPC function failed, using direct query fallback');
+    // Use direct SQL query since RPC function doesn't exist
+    console.log('Using direct query for bill summary');
     
     // Get tickets (force confirmed only)
     let ticketQuery = supabase
@@ -269,6 +259,11 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
     
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    }
+    
+    // Filter by user_id if provided (for admin filtering)
+    if (userId && userId !== 'all') {
+      ticketQuery = ticketQuery.eq('user_id', userId);
     }
     
     const { data: tickets, error: ticketError } = await ticketQuery;
@@ -406,14 +401,8 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
 
 const fetchNumberDetails = async (supabase: any, billNumber?: string): Promise<NumberDetail[]> => {
   try {
-    // Try RPC function first
-    const { data, error } = await supabase.rpc('get_number_details', { p_bill_number: billNumber });
-    if (!error && data) {
-      return data;
-    }
-    
-    // Fallback to direct SQL query
-    console.log('RPC function failed, using direct query fallback');
+    // Use direct SQL query since RPC function doesn't exist
+    console.log('Using direct query for number details');
     
     // Get tickets
     let ticketQuery = supabase
@@ -481,8 +470,26 @@ const fetchNumberDetails = async (supabase: any, billNumber?: string): Promise<N
   }
 };
 
+// Function to fetch users for admin dropdown
+const fetchUsers = async (supabase: any): Promise<{ id: string; name: string; phone: string }[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, name, phone')
+      .order('name');
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (err) {
+    console.error('Error fetching users:', err);
+    return [];
+  }
+};
+
 const LotterySummaryPage: React.FC = () => {
   const { supabase, user } = useAuth();
+  const { role } = useUserRole();
   const [activeTab, setActiveTab] = useState('daily');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -492,12 +499,14 @@ const LotterySummaryPage: React.FC = () => {
   const [lotteryTypeSummary, setLotteryTypeSummary] = useState<LotteryTypeSummary[]>([]);
   const [billSummary, setBillSummary] = useState<BillSummary[]>([]);
   const [numberDetails, setNumberDetails] = useState<NumberDetail[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; phone: string }[]>([]);
 
   // Filter states
   const todayStr = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [selectedLotteryType, setSelectedLotteryType] = useState<number | null>(null);
   const [selectedBillNumber, setSelectedBillNumber] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
  
   useRequireAuth();
@@ -516,14 +525,20 @@ const LotterySummaryPage: React.FC = () => {
       const [dailyData, typeData, billData, numberData] = await Promise.all([
         fetchDailySummary(supabase),
         fetchLotteryTypeSummary(supabase, selectedDate || undefined),
-        fetchBillSummary(supabase, selectedDate || undefined, selectedLotteryType || undefined),
+        fetchBillSummary(supabase, selectedDate || undefined, selectedLotteryType || undefined, selectedUserId === 'all' ? undefined : selectedUserId || undefined),
         fetchNumberDetails(supabase, selectedBillNumber || undefined)
-      ]);
+      ] as const);
       
-      setDailySummary(dailyData);
-      setLotteryTypeSummary(typeData);
-      setBillSummary(billData);
-      setNumberDetails(numberData);
+      setDailySummary(dailyData as DailySummary[]);
+      setLotteryTypeSummary(typeData as LotteryTypeSummary[]);
+      setBillSummary(billData as BillSummary[]);
+      setNumberDetails(numberData as NumberDetail[]);
+      
+      // Fetch users separately for admin
+      if (role === 'admin') {
+        const usersData = await fetchUsers(supabase);
+        setUsers(usersData);
+      }
     } catch (err) {
       console.error('Data loading error:', err);
       setError('ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง');
@@ -539,7 +554,7 @@ const LotterySummaryPage: React.FC = () => {
       loadData();
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [selectedDate, selectedLotteryType, selectedBillNumber]);
+  }, [selectedDate, selectedLotteryType, selectedBillNumber, selectedUserId]);
 
   // Format currency in Thai Baht
   const formatCurrency = (amount: number) => {
@@ -564,6 +579,7 @@ const LotterySummaryPage: React.FC = () => {
     setSelectedDate('');
     setSelectedLotteryType(null);
     setSelectedBillNumber('');
+    setSelectedUserId('all');
     setSearchTerm('');
   };
 
@@ -581,6 +597,7 @@ const LotterySummaryPage: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  {role === 'admin' && <TableHead>ผู้ใช้</TableHead>}
                   <TableHead>วันที่</TableHead>
                   <TableHead className="text-right">จำนวนบิล</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
@@ -593,7 +610,7 @@ const LotterySummaryPage: React.FC = () => {
                 <AnimatePresence>
                   {dailySummary.map((item, index) => (
                     <motion.tr 
-                      key={item.draw_date}
+                      key={item.draw_date + '__' + (item.user_id || '')}
                       layout
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -605,6 +622,13 @@ const LotterySummaryPage: React.FC = () => {
                         setActiveTab('types');
                       }}
                     >
+                      {role === 'admin' && (
+                        <TableCell className="max-w-[150px]">
+                          <div className="truncate" title={item.user_name}>
+                            {item.user_name || 'ไม่ระบุ'}
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium">
                         {formatDate(item.draw_date)}
                       </TableCell>
@@ -701,10 +725,11 @@ const LotterySummaryPage: React.FC = () => {
           <CardTitle className="flex items-center gap-2">
             <Receipt className="h-5 w-5" />
             สรุปตามบิล
-            {(selectedDate || selectedLotteryType) && (
+            {(selectedDate || selectedLotteryType || (selectedUserId && selectedUserId !== 'all')) && (
               <span className="text-sm font-normal text-muted-foreground">
                 - {selectedDate && formatDate(selectedDate)}
                 {selectedLotteryType && ` (ประเภทหวย ID: ${selectedLotteryType})`}
+                {selectedUserId && selectedUserId !== 'all' && ` (ผู้ใช้: ${users.find(u => u.id === selectedUserId)?.name || selectedUserId})`}
               </span>
             )}
           </CardTitle>
@@ -724,7 +749,6 @@ const LotterySummaryPage: React.FC = () => {
                 <TableRow>
                   <TableHead>เลขที่บิล</TableHead>
                   <TableHead>วันที่</TableHead>
-                  <TableHead>ผู้ซื้อ</TableHead>
                   <TableHead>ประเภทหวย</TableHead>
                   <TableHead>ประเทศ</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
@@ -736,10 +760,11 @@ const LotterySummaryPage: React.FC = () => {
               <TableBody>
                 {billSummary.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       ไม่พบข้อมูลบิล
                       {selectedDate && <div className="text-xs mt-1">สำหรับวันที่: {formatDate(selectedDate)}</div>}
                       {selectedLotteryType && <div className="text-xs mt-1">ประเภทหวย ID: {selectedLotteryType}</div>}
+                      {selectedUserId && selectedUserId !== 'all' && <div className="text-xs mt-1">ผู้ใช้: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}</div>}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -760,7 +785,6 @@ const LotterySummaryPage: React.FC = () => {
                       >
                         <TableCell className="font-medium">{item.bill_number}</TableCell>
                         <TableCell>{formatDate(item.draw_date)}</TableCell>
-                        <TableCell>{item.user_name || 'ไม่ระบุ'}</TableCell>
                         <TableCell className="max-w-[200px]">
                           <div className="truncate" title={item.sub_type_name}>
                             {item.sub_type_name}
@@ -928,7 +952,7 @@ const LotterySummaryPage: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
                       <div>
                         <label className="block text-sm font-medium mb-2">วันที่</label>
                         <Input
@@ -958,6 +982,24 @@ const LotterySummaryPage: React.FC = () => {
                           className="w-full"
                         />
                       </div>
+                      {role === 'admin' && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">ผู้ใช้</label>
+                          <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="เลือกผู้ใช้" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">ทั้งหมด</SelectItem>
+                              {users.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>
+                                  {user.name} ({user.phone})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                       <div className="flex items-end">
                         <Button onClick={clearFilters} variant="outline" className="w-full">
                           <X className="h-4 w-4 mr-2" />
