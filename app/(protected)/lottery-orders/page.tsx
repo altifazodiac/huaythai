@@ -40,6 +40,10 @@ interface Order {
   amount?: number;
   pricePaid?: number;
   totalPaid?: number;
+  // เพิ่มอัตราจ่ายรางวัลที่ปรับแล้วสำหรับเลขอั้น
+  effectivePrizeRate?: number;
+  // เพิ่มสถานะเลขอั้น
+  numberCapStatus?: { action: 'close' | 'half'; reason: string } | null;
 };
 
 // Lottery data interfaces (similar to LotteryTicketPage)
@@ -454,7 +458,9 @@ const LotteryOrderPage = () => {
             category: 'three',
             prizeId: -1,
             pattern: 'ตอง',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0, // จะถูกกำหนดใหม่ตอน assign prizeId
+            numberCapStatus: null
           });
         }
         break;
@@ -471,7 +477,9 @@ const LotteryOrderPage = () => {
                 category: 'three',
                 prizeId: -1,
                 pattern: 'เลขหาม',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
             }
           }
@@ -490,7 +498,9 @@ const LotteryOrderPage = () => {
                 category: 'three',
                 prizeId: -1,
                 pattern: 'เบิ้ลหน้า',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
             }
           }
@@ -509,7 +519,9 @@ const LotteryOrderPage = () => {
                 category: 'three',
                 prizeId: -1,
                 pattern: 'เบิ้ลหลัง',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
             }
           }
@@ -532,7 +544,9 @@ const LotteryOrderPage = () => {
                 category: 'three',
                 prizeId: -1,
                 pattern: 'เบิ้ลพี่น้อง',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
 
               newOrders.push({
@@ -541,7 +555,9 @@ const LotteryOrderPage = () => {
                 category: 'three',
                 prizeId: -1,
                 pattern: 'เบิ้ลพี่น้อง',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
             }
           }
@@ -559,7 +575,9 @@ const LotteryOrderPage = () => {
             category: 'three',
             prizeId: -1,
             pattern: 'ชุดเรียง',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0,
+            numberCapStatus: null
           });
 
           // เรียงจากมากไปน้อย
@@ -571,7 +589,9 @@ const LotteryOrderPage = () => {
               category: 'three',
               prizeId: -1,
               pattern: 'ชุดเรียง',
-              isSpecialPattern: true
+              isSpecialPattern: true,
+              effectivePrizeRate: 0,
+              numberCapStatus: null
             });
           }
         }
@@ -582,7 +602,9 @@ const LotteryOrderPage = () => {
           category: 'three',
           prizeId: -1,
           pattern: 'ชุดเรียง',
-          isSpecialPattern: true
+          isSpecialPattern: true,
+          effectivePrizeRate: 0,
+          numberCapStatus: null
         });
         newOrders.push({
           id: Date.now() + 9,
@@ -590,7 +612,9 @@ const LotteryOrderPage = () => {
           category: 'three',
           prizeId: -1,
           pattern: 'ชุดเรียง',
-          isSpecialPattern: true
+          isSpecialPattern: true,
+          effectivePrizeRate: 0,
+          numberCapStatus: null
         });
         newOrders.push({
           id: Date.now() + 10,
@@ -598,7 +622,9 @@ const LotteryOrderPage = () => {
           category: 'three',
           prizeId: -1,
           pattern: 'ชุดเรียง',
-          isSpecialPattern: true
+          isSpecialPattern: true,
+          effectivePrizeRate: 0,
+          numberCapStatus: null
         });
         newOrders.push({
           id: Date.now() + 11,
@@ -606,7 +632,9 @@ const LotteryOrderPage = () => {
           category: 'three',
           prizeId: -1,
           pattern: 'ชุดเรียง',
-          isSpecialPattern: true
+          isSpecialPattern: true,
+          effectivePrizeRate: 0,
+          numberCapStatus: null
         });
         break;
     }
@@ -630,7 +658,9 @@ const LotteryOrderPage = () => {
               category: 'two',
               prizeId: -1,
               pattern: 'รูดหน้า',
-              isSpecialPattern: true
+              isSpecialPattern: true,
+              effectivePrizeRate: 0,
+              numberCapStatus: null
             });
           }
         }
@@ -647,7 +677,9 @@ const LotteryOrderPage = () => {
               category: 'two',
               prizeId: -1,
               pattern: 'รูดหลัง',
-              isSpecialPattern: true
+              isSpecialPattern: true,
+              effectivePrizeRate: 0,
+              numberCapStatus: null
             });
           }
         }
@@ -669,7 +701,9 @@ const LotteryOrderPage = () => {
                 category: 'two',
                 prizeId: -1,
                 pattern: '19 ประตู',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
             }
           }
@@ -685,7 +719,9 @@ const LotteryOrderPage = () => {
                 category: 'two',
                 prizeId: -1,
                 pattern: '19 ประตู',
-                isSpecialPattern: true
+                isSpecialPattern: true,
+                effectivePrizeRate: 0,
+                numberCapStatus: null
               });
             }
           }
@@ -702,7 +738,9 @@ const LotteryOrderPage = () => {
             category: 'two',
             prizeId: -1,
             pattern: 'เลขเบิ้ล',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0,
+            numberCapStatus: null
           });
         }
         break;
@@ -717,7 +755,9 @@ const LotteryOrderPage = () => {
             category: 'two',
             prizeId: -1,
             pattern: 'สองตัวต่ำ',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0,
+            numberCapStatus: null
           });
         }
         break;
@@ -732,7 +772,9 @@ const LotteryOrderPage = () => {
             category: 'two',
             prizeId: -1,
             pattern: 'สองตัวสูง',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0,
+            numberCapStatus: null
           });
         }
         break;
@@ -748,7 +790,9 @@ const LotteryOrderPage = () => {
               category: 'two',
               prizeId: -1,
               pattern: 'สองตัวคี่',
-              isSpecialPattern: true
+              isSpecialPattern: true,
+              effectivePrizeRate: 0,
+              numberCapStatus: null
             });
           }
         }
@@ -765,7 +809,9 @@ const LotteryOrderPage = () => {
               category: 'two',
               prizeId: -1,
               pattern: 'สองตัวคู่',
-              isSpecialPattern: true
+              isSpecialPattern: true,
+              effectivePrizeRate: 0,
+              numberCapStatus: null
             });
           }
         }
@@ -781,7 +827,9 @@ const LotteryOrderPage = () => {
             category: 'two',
             prizeId: -1,
             pattern: 'พี่น้อง',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0,
+            numberCapStatus: null
           });
         }
         break;
@@ -796,7 +844,9 @@ const LotteryOrderPage = () => {
             category: 'two',
             prizeId: -1,
             pattern: 'น้องพี่',
-            isSpecialPattern: true
+            isSpecialPattern: true,
+            effectivePrizeRate: 0,
+            numberCapStatus: null
           });
         }
         break;
@@ -844,6 +894,9 @@ const LotteryOrderPage = () => {
       const numbersToAdd = isReversed && !isTote ? getPermutations(inputNumber) : [inputNumber];
 
       numbersToAdd.forEach(num => {
+        let numberCapStatus = null;
+        let effectivePrizeRate = prize.prize_rate;
+
         // ตรวจสอบเลขอั้นสำหรับทุกประเภทหวย
         if (initialState.subType && selectedDrawDate) {
           let digitCount = 3;
@@ -862,7 +915,7 @@ const LotteryOrderPage = () => {
           
           console.log(`Checking number cap for: ${num} (${digitCount} digits, ${typeNumber})`);
           
-          // ใช้ฟังก์ชันตรวจสอบโดยตรงก่อน แล้วค่อย fallback ไป context
+          // ใช้ฟังก์ชันตรวจสอบเลขอั้น
           let numberStatus = getDirectNumberCapAction(num, digitCount, typeNumber, initialState.subType, drawDate);
           if (!numberStatus) {
             numberStatus = getUniversalNumberCapAction(num, digitCount, typeNumber, initialState.subType, drawDate);
@@ -874,10 +927,14 @@ const LotteryOrderPage = () => {
               blockedNumbers.push({ num, reason: numberStatus.reason });
               return; // ไม่เพิ่มเลขนี้
             } else if (numberStatus.action === 'half') {
-              toast.warning(`✂️ เลข ${num} อยู่ในระบบหารครึ่ง (${numberStatus.reason})`, { duration: 4000 });
+              // 🔧 แก้ไขใหม่: หารครึ่งรางวัลแทนการหารครึ่งราคาซื้อ
+              effectivePrizeRate = Math.floor(prize.prize_rate / 2);
+              numberCapStatus = numberStatus;
+              toast.warning(`✂️ เลข ${num} อยู่ในระบบหารครึ่งรางวัล (${numberStatus.reason})`, { duration: 4000 });
             }
           }
         }
+        
         newOrders.push({
           id: Date.now() + Math.random(),
           numbers: num,
@@ -885,6 +942,8 @@ const LotteryOrderPage = () => {
           prizeId: prize.id,
           pattern: prize.category === 'three' ? identifyThreeDigitPattern(num) : '',
           isSpecialPattern: false,
+          effectivePrizeRate,
+          numberCapStatus,
         });
       });
     });
@@ -1004,11 +1063,15 @@ const LotteryOrderPage = () => {
     if (!orderPrice) return 0;
     const amount = parseFloat(orderPrice.amount || '0');
 
-    // Find the order and its prize
+    // Find the order and use its effective prize rate
     const order = orders.find(o => o.id === orderId);
-    const prize = prizeInfo.find(p => p.id === order?.prizeId);
+    if (!order) return 0;
 
-    return amount * (prize?.prize_rate || 0);
+    // 🔧 แก้ไขใหม่: ใช้ effectivePrizeRate แทน prize_rate
+    // effectivePrizeRate จะเป็นอัตราที่ปรับแล้วสำหรับเลขอั้น
+    const effectiveRate = order.effectivePrizeRate || 0;
+    
+    return amount * effectiveRate;
   };
 
   // Calculates the total cost to be paid by summing up all amounts.
@@ -1053,33 +1116,9 @@ const LotteryOrderPage = () => {
       targetIds.forEach(orderId => {
         const order = orders.find(o => o.id === orderId);
         if (order) {
-          // ตรวจสอบเลขอั้นสำหรับทุกประเภทหวย
-          let finalPrice = price;
-          if (initialState.subType && selectedDrawDate) {
-            const prize = prizeInfo.find(p => p.id === order.prizeId);
-            if (prize) {
-              let digitCount = 3;
-              let typeNumber = 'บน';
-              
-              if (prize.category === 'three') {
-                digitCount = 3;
-                typeNumber = prize.display_name.includes('โต๊ด') ? 'โต๊ด' : 'บน';
-              } else if (prize.category === 'two') {
-                digitCount = 2;
-                typeNumber = prize.display_name.includes('ล่าง') ? 'ล่าง' : 'บน';
-              } else if (prize.category === 'run') {
-                digitCount = 1;
-                typeNumber = prize.display_name.includes('ล่าง') ? 'วิ่งล่าง' : 'วิ่งบน';
-              }
-              
-              const drawDate = selectedDrawDate.toISOString().split('T')[0];
-              const numberStatus = getUniversalNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
-
-              if (numberStatus?.action === 'half') {
-                finalPrice = Math.floor(price / 2);
-              }
-            }
-          }
+          // 🔧 แก้ไขใหม่: ไม่หารครึ่งราคาซื้อ ให้ลูกค้าจ่ายเต็มราคา
+          // เพราะได้ปรับอัตราจ่ายรางวัลไปแล้วใน handleAddOrder
+          const finalPrice = price;
 
           newPrices[orderId] = {
             originalAmount: price.toString(),
@@ -1098,35 +1137,9 @@ const LotteryOrderPage = () => {
 
   // ฟังก์ชันตรวจสอบสถานะเลขอั้นของรายการ (Universal for all lottery types)
   const getOrderNumberStatus = (order: Order) => {
-    if (!initialState.subType || !selectedDrawDate) return null;
-    
-    // Determine digit count and type based on order category and prize info
-    const prizeData = prizeInfo.find(p => p.id === order.prizeId);
-    if (!prizeData) return null;
-    
-    let digitCount = 3;
-    let typeNumber = 'บน';
-    
-    if (prizeData.category === 'three') {
-      digitCount = 3;
-      typeNumber = prizeData.display_name.includes('โต๊ด') ? 'โต๊ด' : 'บน';
-    } else if (prizeData.category === 'two') {
-      digitCount = 2;
-      typeNumber = prizeData.display_name.includes('ล่าง') ? 'ล่าง' : 'บน';
-    } else if (prizeData.category === 'run') {
-      digitCount = 1;
-      typeNumber = prizeData.display_name.includes('ล่าง') ? 'วิ่งล่าง' : 'วิ่งบน';
-    }
-    
-    const drawDate = selectedDrawDate.toISOString().split('T')[0];
-    
-    // ใช้ฟังก์ชันตรวจสอบโดยตรงก่อน แล้วค่อย fallback ไป context
-    let numberStatus = getDirectNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
-    if (!numberStatus) {
-      numberStatus = getUniversalNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
-    }
-    
-    return numberStatus;
+    // 🔧 แก้ไขใหม่: ใช้ข้อมูลจาก order.numberCapStatus โดยตรง
+    // ไม่ต้องไปตรวจสอบใหม่ทุกครั้ง เพราะได้เก็บไว้ตอนสร้าง order แล้ว
+    return order.numberCapStatus || null;
   };
 
   const renderInputBoxes = () => {
@@ -1251,7 +1264,7 @@ const LotteryOrderPage = () => {
     toast.info('กำลังบันทึกรายการ...');
   
     try {
-      // ปรับปรุงการเตรียมข้อมูลให้ตรงกับ RPC function
+      // ปรับปรุงการเตรียมข้อมูลให้ตรงกับ RPC function และรองรับระบบเลขอั้น
       const itemsToInsert = selectedOrders.map(order => {
         const prices = orderPrices[order.id];
         const finalAmount = prices?.amount || '0';
@@ -1269,6 +1282,9 @@ const LotteryOrderPage = () => {
           numbers: [order.numbers], // เก็บเป็น array ของ string
           amount: finalAmount,
           original_amount: originalAmount,
+          effective_prize_rate: order.effectivePrizeRate || prize.prize_rate,
+          number_cap_action: order.numberCapStatus?.action || null,
+          number_cap_status: order.numberCapStatus || null,
         };
       });
   
@@ -1329,6 +1345,55 @@ const LotteryOrderPage = () => {
     } else {
       setSelectedOrderIds(new Set());
     }
+  };
+
+  // ฟังก์ชันปรับปรุง effectivePrizeRate และ numberCapStatus สำหรับ orders ใหม่
+  const updateOrderWithPrizeAndCapStatus = (order: Order, prizeId: number): Order => {
+    const prize = prizeInfo.find(p => p.id === prizeId);
+    if (!prize) return order;
+
+    let numberCapStatus = null;
+    let effectivePrizeRate = prize.prize_rate;
+
+    // ตรวจสอบเลขอั้นเช่นเดียวกับใน handleAddOrder
+    if (initialState.subType && selectedDrawDate) {
+      let digitCount = 3;
+      let typeNumber = 'บน';
+      
+      if (prize.category === 'three') {
+        digitCount = 3;
+        typeNumber = prize.display_name.includes('โต๊ด') ? 'โต๊ด' : 'บน';
+      } else if (prize.category === 'two') {
+        digitCount = 2;
+        typeNumber = prize.display_name.includes('ล่าง') ? 'ล่าง' : 'บน';
+      } else if (prize.category === 'run') {
+        digitCount = 1;
+        typeNumber = prize.display_name.includes('ล่าง') ? 'วิ่งล่าง' : 'วิ่งบน';
+      }
+      
+      const drawDate = selectedDrawDate.toISOString().split('T')[0];
+      
+      // ใช้ฟังก์ชันตรวจสอบเลขอั้น
+      let numberStatus = getDirectNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
+      if (!numberStatus) {
+        numberStatus = getUniversalNumberCapAction(order.numbers, digitCount, typeNumber, initialState.subType, drawDate);
+      }
+      
+      if (numberStatus) {
+        if (numberStatus.action === 'half') {
+          effectivePrizeRate = Math.floor(prize.prize_rate / 2);
+          numberCapStatus = numberStatus;
+        }
+        // ไม่ต้องจัดการกับ 'close' เพราะจะไม่เพิ่มเลขนี้อยู่แล้ว
+      }
+    }
+
+    return {
+      ...order,
+      prizeId,
+      effectivePrizeRate,
+      numberCapStatus,
+    };
   };
 
   return (
@@ -1587,7 +1652,7 @@ const LotteryOrderPage = () => {
                                                 <del className="text-xs text-gray-500 mx-1">{orderPrices[order.id]?.originalAmount}</del>
                                               )}
                                             <div className="w-10 text-xs h-6 flex items-center justify-center font-medium text-gray-500">
-                                              x{(prize.prize_rate || 0).toLocaleString()}
+                                              x{(order.effectivePrizeRate || 0).toLocaleString()}
                                             </div>
                                             <div className="w-14 text-xs h-6 flex items-center justify-center font-medium text-red-500">
                                                     {calculatePotentialWinnings(order.id).toLocaleString()}
@@ -1745,7 +1810,8 @@ const LotteryOrderPage = () => {
                                 const prize = prizeInfo.find(p => p.id === prizeId);
                                 if (!prize || prize.category !== 'three') return;
                                 generatedOrders.forEach(order => {
-                                  newOrders.push({ ...order, id: Date.now() + Math.random(), prizeId: prize.id });
+                                  const updatedOrder = updateOrderWithPrizeAndCapStatus(order, prize.id);
+                                  newOrders.push({ ...updatedOrder, id: Date.now() + Math.random() });
                                 });
                               });
                               setOrders(prev => [...prev, ...newOrders]);
@@ -1790,7 +1856,8 @@ const LotteryOrderPage = () => {
                                   const prize = prizeInfo.find(p => p.id === prizeId);
                                   if (!prize || prize.category !== 'two') return;
                                   generated.forEach(order => {
-                                    newOrders.push({ ...order, id: Date.now() + Math.random(), prizeId: prize.id });
+                                    const updatedOrder = updateOrderWithPrizeAndCapStatus(order, prize.id);
+                                    newOrders.push({ ...updatedOrder, id: Date.now() + Math.random() });
                                   });
                                 });
                                 setOrders(prev => [...prev, ...newOrders]);
@@ -1863,9 +1930,10 @@ const LotteryOrderPage = () => {
                                       selectedPrizeIds.forEach(prizeId => {
                                         const prize = prizeInfo.find(p => p.id === prizeId);
                                         if (!prize || prize.category !== 'two') return;
-                                        generatedNumbers.forEach(order => {
-                                          newOrders.push({ ...order, id: Date.now() + Math.random(), prizeId: prize.id });
-                                        });
+                                                                      generatedNumbers.forEach(order => {
+                                const updatedOrder = updateOrderWithPrizeAndCapStatus(order, prize.id);
+                                newOrders.push({ ...updatedOrder, id: Date.now() + Math.random() });
+                              });
                                       });
                                       setOrders(prev => [...prev, ...newOrders]);
                                       toast.success('เพิ่มรายการสำเร็จ');
@@ -2047,9 +2115,10 @@ const LotteryOrderPage = () => {
                             selectedPrizeIds.forEach(prizeId => {
                               const prize = prizeInfo.find(p => p.id === prizeId);
                               if (!prize || prize.category !== 'three') return;
-                              generatedOrders.forEach(order => {
-                                newOrders.push({ ...order, id: Date.now() + Math.random(), prizeId: prize.id });
-                              });
+                                                          generatedOrders.forEach(order => {
+                              const updatedOrder = updateOrderWithPrizeAndCapStatus(order, prize.id);
+                              newOrders.push({ ...updatedOrder, id: Date.now() + Math.random() });
+                            });
                             });
                             setOrders(prev => [...prev, ...newOrders]);
                             setSelectedPattern('');
@@ -2094,7 +2163,8 @@ const LotteryOrderPage = () => {
                                 const prize = prizeInfo.find(p => p.id === prizeId);
                                 if (!prize || prize.category !== 'two') return;
                                 generated.forEach(order => {
-                                  newOrders.push({ ...order, id: Date.now() + Math.random(), prizeId: prize.id });
+                                  const updatedOrder = updateOrderWithPrizeAndCapStatus(order, prize.id);
+                                  newOrders.push({ ...updatedOrder, id: Date.now() + Math.random() });
                                 });
                               });
                               setOrders(prev => [...prev, ...newOrders]);
