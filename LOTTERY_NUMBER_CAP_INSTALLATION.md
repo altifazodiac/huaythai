@@ -13,24 +13,81 @@
 
 ## 🚀 ขั้นตอนการติดตั้ง
 
-### 1. รัน Migration บน VPS
+### ตัวเลือกที่ 1: ใช้ Node.js (แนะนำ)
 
 ```bash
 # ให้สิทธิ์การรัน script
-chmod +x run-migrations-vps.sh
+chmod +x run-migrations-simple.sh
 
 # รัน migration
-./run-migrations-vps.sh
+./run-migrations-simple.sh
 ```
 
-### 2. ตรวจสอบสถานะ Migration
+### ตัวเลือกที่ 2: ใช้ Supabase CLI
+
+```bash
+# ให้สิทธิ์การรัน script
+chmod +x run-migrations-vps-supabase.sh
+
+# รัน migration
+./run-migrations-vps-supabase.sh
+```
+
+### ตัวเลือกที่ 3: ใช้ curl
+
+```bash
+# ให้สิทธิ์การรัน script
+chmod +x run-migrations-vps-curl.sh
+
+# รัน migration
+./run-migrations-vps-curl.sh
+```
+
+### ตัวเลือกที่ 4: รันด้วย Node.js โดยตรง
+
+```bash
+# ติดตั้ง dependencies (ถ้ายังไม่ได้ติดตั้ง)
+npm install
+
+# รัน migration
+node run-migrations-vps-node.js
+```
+
+## 🔧 การตรวจสอบสถานะ
+
+### ตรวจสอบ Migration
 
 ```bash
 # ตรวจสอบว่าการเปลี่ยนแปลงสำเร็จหรือไม่
 psql $DATABASE_URL -f check-migration-status.sql
 ```
 
-### 3. ตรวจสอบผลลัพธ์
+### ตรวจสอบด้วย Node.js
+
+```bash
+# สร้าง script ตรวจสอบ
+node -e "
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+async function checkMigration() {
+  const { data, error } = await supabase
+    .from('lottery_ticket_items')
+    .select('effective_prize_rate, original_amount, number_cap_action, number_cap_status')
+    .limit(5);
+  
+  if (error) {
+    console.error('Error:', error);
+  } else {
+    console.log('Migration status:', data);
+  }
+}
+
+checkMigration();
+"
+```
+
+## 📊 ผลลัพธ์ที่คาดหวัง
 
 ควรเห็นผลลัพธ์ดังนี้:
 
@@ -100,6 +157,7 @@ GROUP BY number_cap_action;
 1. **ข้อมูลเก่า**: รายการเก่าจะมี `original_amount = amount` และ `effective_prize_rate = prize_rate`
 2. **การทดสอบ**: ทดสอบระบบกับเลขปกติก่อนใช้เลขอั้น
 3. **การสำรองข้อมูล**: สำรองฐานข้อมูลก่อนรัน migration
+4. **Environment Variables**: ตรวจสอบให้แน่ใจว่ามี environment variables ครบถ้วน
 
 ## 🎉 ผลลัพธ์ที่คาดหวัง
 
@@ -115,4 +173,15 @@ GROUP BY number_cap_action;
 1. ตรวจสอบ log ของ migration
 2. ตรวจสอบสถานะฐานข้อมูล
 3. ทดสอบกับข้อมูลตัวอย่าง
-4. ติดต่อทีมพัฒนา 
+4. ติดต่อทีมพัฒนา
+
+## 🔍 การแก้ไขปัญหา
+
+### ปัญหา: ไม่พบ psql
+**วิธีแก้**: ใช้ Node.js script แทน
+
+### ปัญหา: ไม่พบ supabase CLI
+**วิธีแก้**: ใช้ Node.js script หรือติดตั้ง supabase CLI
+
+### ปัญหา: Environment variables ไม่ครบ
+**วิธีแก้**: ตรวจสอบ .env file และ environment variables 
