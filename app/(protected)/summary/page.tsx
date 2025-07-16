@@ -167,7 +167,7 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
     // First get all confirmed tickets
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date')
+      .select('id, draw_date, total_amount')
       .eq('status', 'confirmed');
     
     if (drawDate) {
@@ -188,7 +188,6 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
       .select(`
         ticket_id,
         lottery_sub_type_id,
-        amount,
         lottery_sub_types!inner(
           lottery_sub_type_id,
           sub_type_name,
@@ -203,6 +202,7 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
     const groupedData = (ticketItems || []).reduce((acc: any, item: any) => {
       const subTypeId = item.lottery_sub_type_id;
       const subType = item.lottery_sub_types;
+      const ticket = tickets?.find((t: any) => t.id === item.ticket_id);
       
       if (!acc[subTypeId]) {
         acc[subTypeId] = {
@@ -219,8 +219,10 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
       
       acc[subTypeId].total_bills.add(item.ticket_id);
       acc[subTypeId].total_numbers += 1;
-      acc[subTypeId].total_purchase_amount += Number(item.amount || 0);
-      acc[subTypeId].net_profit_loss += Number(item.amount || 0);
+      if (ticket) {
+        acc[subTypeId].total_purchase_amount += Number(ticket.total_amount || 0);
+        acc[subTypeId].net_profit_loss += Number(ticket.total_amount || 0);
+      }
       
       return acc;
     }, {});
@@ -276,6 +278,7 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
     }
     
     if (!tickets || tickets.length === 0) {
+      console.log('No tickets found');
       return [];
     }
     
@@ -286,15 +289,20 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
       .select('id, name')
       .in('id', userIds);
     
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error('Error fetching profiles:', profileError);
+      throw profileError;
+    }
     
-    // Get ticket items
+    // Get ticket items with numbers and lottery sub types
     const ticketIds = tickets.map((t: any) => t.id);
     let itemQuery = supabase
       .from('lottery_ticket_items')
       .select(`
         ticket_id,
         lottery_sub_type_id,
+        numbers,
+        amount,
         lottery_sub_types!inner(
           lottery_sub_type_id,
           sub_type_name,
@@ -303,43 +311,92 @@ const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?
       `)
       .in('ticket_id', ticketIds);
     
+    // Apply lottery type filter if specified
     if (lotteryTypeId) {
       itemQuery = itemQuery.eq('lottery_sub_type_id', lotteryTypeId);
     }
     
     const { data: ticketItems, error: itemError } = await itemQuery;
-    if (itemError) throw itemError;
+    if (itemError) {
+      console.error('Error fetching ticket items:', itemError);
+      throw itemError;
+    }
     
-    // Group items by ticket_id
+    if (!ticketItems || ticketItems.length === 0) {
+      console.log('No ticket items found');
+      return [];
+    }
+    
+    // Group items by ticket_id and calculate comprehensive data
     const itemsByTicket = (ticketItems || []).reduce((acc: any, item: any) => {
       if (!acc[item.ticket_id]) {
-        acc[item.ticket_id] = [];
+        acc[item.ticket_id] = {
+          items: [],
+          totalNumbers: 0,
+          subTypes: new Set(),
+          subTypeNames: new Set(),
+          countries: new Set()
+        };
       }
-      acc[item.ticket_id].push(item);
+      
+      acc[item.ticket_id].items.push(item);
+      
+      // Count actual numbers (each item has an array of numbers)
+      if (item.numbers && Array.isArray(item.numbers)) {
+        acc[item.ticket_id].totalNumbers += item.numbers.length;
+      }
+      
+      // Collect unique sub types
+      acc[item.ticket_id].subTypes.add(item.lottery_sub_type_id);
+      acc[item.ticket_id].subTypeNames.add(item.lottery_sub_types?.sub_type_name || 'ไม่ระบุ');
+      acc[item.ticket_id].countries.add(item.lottery_sub_types?.country_origin || 'ไม่ระบุ');
+      
       return acc;
     }, {});
     
     // Transform data to match expected format
-    const transformedData = tickets.map((ticket: any) => {
-      const ticketItems = itemsByTicket[ticket.id] || [];
-      const profile = profiles?.find((p: any) => p.id === ticket.user_id);
-      const firstItem = ticketItems[0];
-      
-      return {
-        bill_number: ticket.bill_number,
-        draw_date: ticket.draw_date,
-        user_name: profile?.name || 'ไม่ระบุ',
-        sub_type_name: firstItem?.lottery_sub_types?.sub_type_name || 'ไม่ระบุ',
-        country_origin: firstItem?.lottery_sub_types?.country_origin || 'ไม่ระบุ',
-        total_amount: Number(ticket.total_amount || 0),
-        total_payout: 0, // Placeholder
-        net_profit_loss: Number(ticket.total_amount || 0), // Placeholder
-        numbers_count: ticketItems.length,
-        status: ticket.status
-      };
-    }).filter((b: BillSummary) => b.status === 'confirmed'); // filter again for safety
+    const transformedData = tickets
+      .map((ticket: any) => {
+        const ticketData = itemsByTicket[ticket.id];
+        
+        // Skip tickets with no items (after filtering)
+        if (!ticketData || ticketData.items.length === 0) {
+          return null;
+        }
+        
+        const profile = profiles?.find((p: any) => p.id === ticket.user_id);
+        
+        // Create comprehensive sub type name showing all types in the bill
+        const subTypeNamesArray = Array.from(ticketData.subTypeNames);
+        const countriesArray = Array.from(ticketData.countries);
+        
+        const subTypeName = subTypeNamesArray.length > 1 
+          ? `${subTypeNamesArray.join(', ')}`
+          : subTypeNamesArray[0] || 'ไม่ระบุ';
+          
+        const countryName = countriesArray.length > 1 
+          ? `${countriesArray.join(', ')}`
+          : countriesArray[0] || 'ไม่ระบุ';
+        
+        return {
+          bill_number: ticket.bill_number,
+          draw_date: ticket.draw_date,
+          user_name: profile?.name || 'ไม่ระบุ',
+          sub_type_name: subTypeName,
+          country_origin: countryName,
+          total_amount: Number(ticket.total_amount || 0),
+          total_payout: 0, // Placeholder - would need to calculate from winning results
+          net_profit_loss: Number(ticket.total_amount || 0), // Placeholder - would need to subtract payouts
+          numbers_count: ticketData.totalNumbers, // Now correctly counts actual numbers
+          status: ticket.status
+        };
+      })
+      .filter(Boolean) // Remove null entries
+      .filter((b: any) => b.status === 'confirmed'); // Ensure only confirmed bills
     
     console.log('Transformed bill summary data:', transformedData);
+    console.log('Items by ticket debug:', itemsByTicket);
+    
     return transformedData;
   } catch (err) {
     console.error('Error in fetchBillSummary:', err);
@@ -647,10 +704,18 @@ const LotterySummaryPage: React.FC = () => {
             {(selectedDate || selectedLotteryType) && (
               <span className="text-sm font-normal text-muted-foreground">
                 - {selectedDate && formatDate(selectedDate)}
-                {selectedLotteryType && ` (ID: ${selectedLotteryType})`}
+                {selectedLotteryType && ` (ประเภทหวย ID: ${selectedLotteryType})`}
               </span>
             )}
           </CardTitle>
+          <CardDescription>
+            ทั้งหมด {billSummary.length} รายการ
+            {billSummary.length > 0 && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                (รวมเลขทั้งหมด: {billSummary.reduce((sum, item) => sum + item.numbers_count, 0)} เลข)
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -661,6 +726,7 @@ const LotterySummaryPage: React.FC = () => {
                   <TableHead>วันที่</TableHead>
                   <TableHead>ผู้ซื้อ</TableHead>
                   <TableHead>ประเภทหวย</TableHead>
+                  <TableHead>ประเทศ</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
                   <TableHead className="text-right">ยอดซื้อ</TableHead>
                   <TableHead className="text-right">ยอดจ่าย</TableHead>
@@ -668,36 +734,59 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence>
-                  {billSummary.map((item, index) => (
-                    <motion.tr 
-                      key={item.bill_number}
-                      layout
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
-                      onClick={() => {
-                        setSelectedBillNumber(item.bill_number);
-                        setActiveTab('numbers');
-                      }}
-                    >
-                      <TableCell className="font-medium">{item.bill_number}</TableCell>
-                      <TableCell>{formatDate(item.draw_date)}</TableCell>
-                      <TableCell>{item.user_name || 'ไม่ระบุ'}</TableCell>
-                      <TableCell>{item.sub_type_name} ({item.country_origin})</TableCell>
-                      <TableCell className="text-right">{item.numbers_count.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(Number(item.total_amount))}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
-                      <TableCell className={`text-right font-semibold ${
-                        Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {formatCurrency(Number(item.net_profit_loss))}
-                      </TableCell>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
+                {billSummary.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      ไม่พบข้อมูลบิล
+                      {selectedDate && <div className="text-xs mt-1">สำหรับวันที่: {formatDate(selectedDate)}</div>}
+                      {selectedLotteryType && <div className="text-xs mt-1">ประเภทหวย ID: {selectedLotteryType}</div>}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <AnimatePresence>
+                    {billSummary.map((item, index) => (
+                      <motion.tr 
+                        key={item.bill_number}
+                        layout
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
+                        onClick={() => {
+                          setSelectedBillNumber(item.bill_number);
+                          setActiveTab('numbers');
+                        }}
+                      >
+                        <TableCell className="font-medium">{item.bill_number}</TableCell>
+                        <TableCell>{formatDate(item.draw_date)}</TableCell>
+                        <TableCell>{item.user_name || 'ไม่ระบุ'}</TableCell>
+                        <TableCell className="max-w-[200px]">
+                          <div className="truncate" title={item.sub_type_name}>
+                            {item.sub_type_name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[150px]">
+                          <div className="truncate" title={item.country_origin}>
+                            {item.country_origin}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-mono font-semibold text-blue-600">
+                            {item.numbers_count.toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(Number(item.total_amount))}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
+                        <TableCell className={`text-right font-semibold ${
+                          Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(Number(item.net_profit_loss))}
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                )}
               </TableBody>
             </Table>
           </div>
