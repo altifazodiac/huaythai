@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { reloadLotteryResults } from "./actions";
+import { Progress } from "@/components/ui/progress";
 
 
 // --- Unchanged Logic & Utility Functions ---

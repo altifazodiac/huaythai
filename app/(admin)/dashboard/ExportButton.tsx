@@ -141,7 +141,7 @@ export default function ExportButton({
           <DropdownMenuTrigger asChild>
             <Button
               variant={variant}
-              size={size}
+              size="sm"
               disabled={isExporting || !data.length}
               className="relative overflow-hidden"
             >
@@ -223,7 +223,7 @@ export default function ExportButton({
       ) : (
         <Button
           variant={variant}
-          size={size}
+          size="sm"
           onClick={singleExportHandler}
           disabled={isExporting || !data.length}
           className="relative overflow-hidden"

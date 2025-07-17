@@ -133,16 +133,16 @@ function isOpenNow(schedule: any): boolean {
 function dayOfWeekTH(days: string | null | undefined) {
   if (!days) return "";
   const arr = days.split(",").map(d => d.trim());
-  
+
   // Check for common patterns first
   if (arr.length === 5 && arr[0] === "Monday" && arr[4] === "Friday") return "จันทร์-ศุกร์";
   if (arr.length === 7 && arr.includes("Monday") && arr.includes("Sunday")) return "ทุกวัน";
-  
+
   const map: Record<string, string> = {
     Monday: "จันทร์", Tuesday: "อังคาร", Wednesday: "พุธ",
     Thursday: "พฤหัส", Friday: "ศุกร์", Saturday: "เสาร์", Sunday: "อาทิตย์"
   };
-  
+
   return arr.map(d => map[d] || d).join(", ");
 }
 
@@ -150,7 +150,7 @@ function dayOfWeekToEn(day: string | null | undefined): string {
   if (!day) {
     return "";
   }
-  
+
   if (day.includes("ของเดือน")) {
     return day;
   }
@@ -159,7 +159,7 @@ function dayOfWeekToEn(day: string | null | undefined): string {
   const englishDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const dayArray = day.split(",").map(d => d.trim());
   const isAlreadyEnglish = dayArray.every(d => englishDays.includes(d));
-  
+
   if (isAlreadyEnglish) {
     return day; // Already in English format, return as-is
   }
@@ -272,27 +272,27 @@ export default function LotteryTypeGrid({
     // ตรวจสอบว่าวันปัจจุบันเป็นวันที่ 1 หรือ 16 หรือไม่
     const today = currentDate.getDate();
     const isTargetDate = today === 1 || today === 16;
-    
+
     if (isTargetDate) {
       // ถ้าวันนี้เป็นวันที่ 1 หรือ 16 ให้นับเวลาแบบปกติ
       const targetDate = new Date(currentDate);
       // ตั้งค่าเวลาเปิดปิดตาม schedule
       const [hours, minutes] = schedule.open_time.split(':').map(Number);
       targetDate.setHours(hours, minutes, 0, 0);
-      
+
       const diff = targetDate.getTime() - currentDate.getTime();
       if (diff > 0) {
         const hours = Math.floor(diff / (1000 * 60 * 60));
         const minutes = Math.floor((diff / (1000 * 60)) % 60);
         const seconds = Math.floor((diff / 1000) % 60);
-        
+
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
       }
     }
-    
+
     // ถ้าไม่ใช่วันที่ 1 หรือ 16 หรือเวลาผ่านไปแล้ว ให้คำนวณจำนวนวันจนถึงวันที่ 1 หรือ 16 ถัดไป
     const nextTargetDate = new Date(currentDate);
-    
+
     // หาวันที่ 1 หรือ 16 ถัดไป
     if (today < 1) {
       nextTargetDate.setDate(1);
@@ -302,7 +302,7 @@ export default function LotteryTypeGrid({
       nextTargetDate.setMonth(nextTargetDate.getMonth() + 1);
       nextTargetDate.setDate(1);
     }
-    
+
     const diffDays = Math.ceil((nextTargetDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
     return `${diffDays} วัน`;
   }
@@ -320,12 +320,12 @@ export default function LotteryTypeGrid({
         if (filterOpen === false && isOpenNow(scheduleEn)) return false;
         return true;
       });
-      
+
       // เรียงลำดับ subTypes โดยเฉพาะสำหรับหวยยี่กี
-      const sortedSubTypes = group.type_name === "ยี่กี" 
+      const sortedSubTypes = group.type_name === "ยี่กี"
         ? sortYikiRounds(filteredSubTypes)
         : filteredSubTypes;
-      
+
       return {
         ...group,
         subTypes: sortedSubTypes,
@@ -333,7 +333,7 @@ export default function LotteryTypeGrid({
     });
 
     const desiredOrder = ['หวยไทย', 'หวยลาว', 'หวยฮานอย', 'หวยหุ้น', 'หวยออนไลน์'];
-    
+
     return processedGroups.sort((a, b) => {
       const indexA = desiredOrder.indexOf(a.type_name);
       const indexB = desiredOrder.indexOf(b.type_name);
@@ -405,11 +405,11 @@ export default function LotteryTypeGrid({
                       },
                       {
                         icon: <Clock className="w-3 h-3 mr-1" />,
-                        text: `เปิดรับ ${schedule?.open_time?.slice(0,5) || "-"} น.`,
+                        text: `เปิดรับ ${schedule?.open_time?.slice(0, 5) || "-"} น.`,
                       },
                       {
                         icon: <Clock className="w-3 h-3 mr-1" />,
-                        text: `ปิดรับ ${schedule?.close_time?.slice(0,5) || "-"} น.`,
+                        text: `ปิดรับ ${schedule?.close_time?.slice(0, 5) || "-"} น.`,
                       },
                     ];
 
@@ -471,6 +471,10 @@ export default function LotteryTypeGrid({
                                     className="w-full h-16 object-cover"
                                     loading="lazy"
                                     style={{ zIndex: 1, position: "relative" }}
+                                    onError={(e) => {
+                                      console.log(`Failed to load flag for ${sub.country_origin}`);
+                                      e.currentTarget.src = countryFlagImg("");
+                                    }}
                                   />
                                 </div>
                                 <div
@@ -481,7 +485,7 @@ export default function LotteryTypeGrid({
                                     xs:px-2 
                                   `}
                                 >
-                                 
+
                                   {sub.sub_type_name}
                                 </div>
                                 <div className="text-[0.7rem] mt-1 text-center mb-1 px-0 xs:px-2">
@@ -525,7 +529,7 @@ export default function LotteryTypeGrid({
                                       (() => {
                                         const today = new Date();
                                         const isSpecialLottery = schedule.day_of_week.includes('1') || schedule.day_of_week.includes('16');
-                                        
+
                                         if (isSpecialLottery) {
                                           return <div className="text-xs text-red-500">เหลืออีก {getSpecialCountdown(schedule, today)}</div>;
                                         } else if (today.getDate() === 1 || today.getDate() === 16) {

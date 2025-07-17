@@ -128,7 +128,7 @@ export default function UserChart({
           padding: 20,
           font: {
             size: 12,
-            weight: '500',
+            weight: 500,
           },
         },
       },
@@ -137,7 +137,7 @@ export default function UserChart({
         text: title,
         font: {
           size: 16,
-          weight: '600',
+          weight: 600,
         },
         padding: {
           top: 10,
@@ -190,7 +190,7 @@ export default function UserChart({
         ticks: {
           font: {
             size: 11,
-            weight: '500',
+            weight: 500,
           },
           padding: 10,
         },
@@ -199,7 +199,6 @@ export default function UserChart({
         beginAtZero: true,
         grid: {
           color: 'rgba(0, 0, 0, 0.1)',
-          drawBorder: false,
         },
         border: {
           display: false,
@@ -210,7 +209,7 @@ export default function UserChart({
           },
           font: {
             size: 11,
-            weight: '500',
+            weight: 500,
           },
           padding: 10,
         },

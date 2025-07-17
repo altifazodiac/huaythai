@@ -87,15 +87,15 @@ export default function LotteryTypePie({
           padding: 15,
           font: {
             size: 12,
-            weight: '500',
+            weight: 500,
           },
           generateLabels: (chart) => {
             const data = chart.data
             if (data.labels?.length && data.datasets.length) {
               return data.labels.map((label, i) => ({
                 text: label as string,
-                fillStyle: data.datasets[0].backgroundColor?.[i] as string,
-                strokeStyle: data.datasets[0].borderColor?.[i] as string,
+                fillStyle: (data.datasets[0].backgroundColor as string[])?.[i] as string,
+                strokeStyle: (data.datasets[0].borderColor as string[])?.[i] as string,
                 lineWidth: 2,
                 hidden: false,
                 index: i,

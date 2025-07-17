@@ -141,7 +141,7 @@ export default function RevenueChart({
           padding: 20,
           font: {
             size: 12,
-            weight: '500',
+            weight: 500,
           },
         },
       },
@@ -150,7 +150,7 @@ export default function RevenueChart({
         text: title,
         font: {
           size: 16,
-          weight: '600',
+          weight: 600,
         },
         padding: {
           top: 10,
@@ -199,7 +199,7 @@ export default function RevenueChart({
         ticks: {
           font: {
             size: 11,
-            weight: '500',
+            weight: 500,
           },
           padding: 10,
         },
@@ -208,7 +208,6 @@ export default function RevenueChart({
         beginAtZero: true,
         grid: {
           color: 'rgba(0, 0, 0, 0.1)',
-          drawBorder: false,
         },
         border: {
           display: false,
@@ -219,7 +218,7 @@ export default function RevenueChart({
           },
           font: {
             size: 11,
-            weight: '500',
+            weight: 500,
           },
           padding: 10,
         },
