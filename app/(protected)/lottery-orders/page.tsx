@@ -22,6 +22,7 @@ import { useNumberCap } from '@/lib/contexts/NumberCapContext';
 import NumberCapIndicator from '@/components/lottery/NumberCapIndicator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+
 // Define types for orders
 type OrderCategory = 'three' | 'two' | 'run';
 

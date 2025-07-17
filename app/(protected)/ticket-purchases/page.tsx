@@ -202,6 +202,10 @@ interface LotteryTicketItem {
   lottery_sub_number_id: number;
   numbers: string[];
   amount: number;
+  original_amount?: number;
+  effective_prize_rate?: number;
+  number_cap_action?: string;
+  number_cap_status?: any;
   lottery_sub_types: LotterySubType;
   lottery_sub_number: LotterySubNumber;
 }

@@ -31,7 +31,8 @@ import {
   Clock,
   Star,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Hash
 } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { format } from 'date-fns';
@@ -399,6 +400,79 @@ export default function AdminDashboard() {
               </Card>
             </motion.div>
           </div>
+
+          {/* Number Cap Performance Cards */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <motion.div variants={cardVariants}>
+              <Card className="relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-orange-600"></div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">ประหยัดจากเลขอั้น</CardTitle>
+                  <div className="p-2 bg-orange-100 rounded-full">
+                    <Target className="h-4 w-4 text-orange-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {formatCurrency(dashboardData.performance.numberCapSavings || 0)}
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Star className="h-3 w-3" />
+                    <span>ลดค่าจ่าย: {(dashboardData.performance.numberCapSavingsPercentage || 0).toFixed(1)}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+            
+            <motion.div variants={cardVariants}>
+              <Card className="relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-purple-600"></div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">รายการที่ใช้เลขอั้น</CardTitle>
+                  <div className="p-2 bg-purple-100 rounded-full">
+                    <Activity className="h-4 w-4 text-purple-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {(dashboardData.performance.numberCapAffectedTickets || 0).toLocaleString()}
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <Hash className="h-3 w-3" />
+                    <span>รายการ</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+            
+            <motion.div variants={cardVariants}>
+              <Card className="relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-indigo-600"></div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">เปรียบเทียบอัตราจ่าย</CardTitle>
+                  <div className="p-2 bg-indigo-100 rounded-full">
+                    <BarChart3 className="h-4 w-4 text-indigo-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">เดิม:</span>
+                      <span className="text-sm font-semibold text-red-600">
+                        {formatCurrency(dashboardData.performance.totalOriginalPayout || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground">ปัจจุบัน:</span>
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatCurrency(dashboardData.performance.totalPayout)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
           
           {/* Charts */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -537,7 +611,9 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {format(new Date(dashboardData.performance.bestPerformingDay), 'dd MMM', { locale: th })}
+                      {dashboardData.performance.bestPerformingDay 
+                        ? format(new Date(dashboardData.performance.bestPerformingDay), 'dd MMM', { locale: th })
+                        : '-'}
                     </div>
                     <div className="text-sm text-muted-foreground">วันที่ดีที่สุด</div>
                   </div>
@@ -632,11 +708,11 @@ export default function AdminDashboard() {
                   <Button 
                     variant="outline" 
                     className="h-24 flex flex-col items-center justify-center hover:bg-indigo-50"
-                    onClick={() => setSelectedDetail('recent')}
+                    onClick={() => setSelectedDetail('recent_wins')}
                   >
                     <Clock className="h-8 w-8 mb-2 text-indigo-600" />
-                    <span className="font-medium">กิจกรรมล่าสุด</span>
-                    <span className="text-xs text-muted-foreground">การทำรายการใหม่</span>
+                    <span className="font-medium">รางวัลล่าสุด</span>
+                    <span className="text-xs text-muted-foreground">การชนะล่าสุด</span>
                   </Button>
                 </div>
               </CardContent>
@@ -655,7 +731,7 @@ export default function AdminDashboard() {
             selectedDetail === 'users' ? 'ผู้ใช้งาน' : 
             selectedDetail === 'tickets' ? 'ตั๋ว' :
             selectedDetail === 'performance' ? 'ประสิทธิภาพ' :
-            selectedDetail === 'winnings' ? 'รางวัล' : 'กิจกรรมล่าสุด'
+            selectedDetail === 'winnings' ? 'รางวัล' : 'รางวัลล่าสุด'
           }`}
           subtitle={`ข้อมูลรายละเอียดช่วง ${dateRange === 'week' ? '7 วัน' : dateRange === 'month' ? '30 วัน' : '90 วัน'} ล่าสุด`}
           size="lg"
@@ -734,6 +810,33 @@ export default function AdminDashboard() {
                           {formatCurrency(activity.amount)}
                         </div>
                       )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {selectedDetail === 'recent_wins' && (
+              <div>
+                <h4 className="font-semibold mb-4 flex items-center">
+                  <Clock className="h-5 w-5 mr-2" />
+                  รางวัลล่าสุด
+                </h4>
+                <div className="space-y-3">
+                  {dashboardData.winning.recentWins.map((win, index) => (
+                    <div key={index} className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {win.user} ชนะรางวัลจากหวย {win.type}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {format(new Date(win.date), 'dd/MM/yyyy', { locale: th })} (บิล: {win.bill_number})
+                        </div>
+                      </div>
+                      <div className="font-bold text-green-600">
+                        {formatCurrency(win.amount)}
+                      </div>
                     </div>
                   ))}
                 </div>

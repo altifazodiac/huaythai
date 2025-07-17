@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/supabaseClient'
+import { calculateWinningsForItem, createResultsMap } from '@/lib/utils/lottery-utils'; // 🔧 **ใหม่**
 
 export interface DashboardData {
   users: {
@@ -21,7 +22,10 @@ export interface DashboardData {
       revenue: number;
       tickets: number;
       payout: number;
+      originalPayout: number;
       netProfit: number;
+      numberCapSavings: number;
+      avgTicketValue: number;
     }>;
     monthlyComparison: Array<{
       month: string;
@@ -67,8 +71,12 @@ export interface DashboardData {
   performance: {
     totalSales: number;
     totalPayout: number;
+    totalOriginalPayout: number;
     netProfit: number;
     profitMargin: number;
+    numberCapSavings: number;
+    numberCapSavingsPercentage: number;
+    numberCapAffectedTickets: number;
     bestPerformingDay: string;
     worstPerformingDay: string;
     averageDailySales: number;
@@ -103,6 +111,7 @@ export interface DashboardData {
       amount: number;
       type: string;
       user: string;
+      bill_number: string; // 🔧 **ใหม่**
     }>;
   };
 }
@@ -113,6 +122,9 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
     const daysBack = dateRange === 'week' ? 7 : dateRange === 'month' ? 30 : 90;
     const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
     
+    // 🔧 **ใหม่**: ดึงผลรางวัลและสร้าง Map
+    const resultsMap = await createResultsMap(supabase, startDate.toISOString());
+
     // 1. Enhanced Users Data
     const { data: users, count: totalUsers } = await supabase
       .from('profiles')
@@ -149,38 +161,115 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
     }
 
     // 2. Enhanced Revenue Data
-    const { data: revenueData } = await supabase
-      .from('credit_transactions')
-      .select('amount, created_at')
-      .eq('transaction_type', 'deposit')
+    const { data: ticketsRevenue } = await supabase
+      .from('lottery_tickets')
+      .select(`
+        id,
+        total_amount,
+        created_at,
+        draw_date,
+        status,
+        lottery_ticket_items!inner(
+          id,
+          amount,
+          original_amount,
+          effective_prize_rate,
+          number_cap_action,
+          number_cap_status,
+          lottery_sub_number!inner(price_paid),
+          lottery_sub_types!inner(sub_type_name)
+        ),
+        profiles!inner(name)
+      `)
       .gte('created_at', startDate.toISOString())
-    
-    const totalRevenue = revenueData?.reduce((sum, t) => sum + Number(t.amount), 0) || 0
+      .eq('status', 'confirmed');
 
-    // Daily revenue stats
-    const dailyRevenue = [];
+    // คำนวณรายได้และข้อมูลสถิติโดยใช้ effective_prize_rate
+    const revenueByDate: Record<string, number> = {};
+    const dailyRevenueStats = [];
+    let totalRevenue = 0;
+    let totalPayout = 0; // 🔧 **แก้ไข**: เปลี่ยนชื่อเป็น totalPayout
+    let totalOriginalPayout = 0; // 🔧 **แก้ไข**: เปลี่ยนชื่อเป็น totalOriginalPayout
+    let numberCapAffectedTickets = 0;
+    const recentWins: DashboardData['winning']['recentWins'] = [];
+
+
     for (let i = 0; i < daysBack; i++) {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+      const dateStr = date.toISOString().split('T')[0];
       
-      const { data: dayTickets } = await supabase
-        .from('lottery_tickets')
-        .select('total_amount')
-        .eq('status', 'confirmed')
-        .gte('draw_date', dayStart.toISOString().split('T')[0])
-        .lt('draw_date', dayEnd.toISOString().split('T')[0])
+      const dayTickets = ticketsRevenue?.filter(t => 
+        t.created_at.startsWith(dateStr)
+      ) || [];
       
-      const dayRevenue = dayTickets?.reduce((sum, t) => sum + Number(t.total_amount), 0) || 0;
+      const dayRevenue = dayTickets.reduce((sum, ticket) => sum + (ticket.total_amount || 0), 0);
+      const dayTicketCount = dayTickets.length;
       
-      dailyRevenue.push({
-        date: dayStart.toISOString().split('T')[0],
+      // 🔧 **ปรับปรุง**: คำนวณ Payout จากผลรางวัลจริง
+      let dayActualPayout = 0;
+      let dayOriginalPayout = 0;
+      let dayNumberCapCount = 0;
+      
+      dayTickets.forEach(ticket => {
+        if (ticket.lottery_ticket_items) {
+          ticket.lottery_ticket_items.forEach((item: any) => {
+            // คำนวณเงินรางวัลจริง
+            const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+            dayActualPayout += prize;
+
+            // คำนวณเงินรางวัลที่ควรจะเป็น (หากไม่มีเลขอั้น)
+            const originalRate = item.lottery_sub_number?.price_paid || 0;
+            const { prize: originalPrize } = calculateWinningsForItem({ ...item, effective_prize_rate: originalRate }, ticket.draw_date, resultsMap);
+            dayOriginalPayout += originalPrize;
+
+            if (item.number_cap_action) {
+              dayNumberCapCount++;
+            }
+
+            // เพิ่มลงใน recentWins
+            if (prize > 0 && recentWins.length < 10) {
+              recentWins.push({
+                date: ticket.draw_date,
+                amount: prize,
+                type: item.lottery_sub_types?.sub_type_name || 'N/A',
+                user: ticket.profiles?.name || 'N/A',
+                bill_number: ticket.bill_number,
+              });
+            }
+          });
+        }
+      });
+      
+      revenueByDate[dateStr] = dayRevenue;
+      totalRevenue += dayRevenue;
+      totalPayout += dayActualPayout; // ใช้ Payout จริง
+      totalOriginalPayout += dayOriginalPayout; // ใช้ Original Payout
+      numberCapAffectedTickets += dayNumberCapCount;
+      
+      dailyRevenueStats.push({
+        date: dateStr,
         revenue: dayRevenue,
-        tickets: dayTickets?.length || 0,
-        payout: Math.floor(dayRevenue * 0.1), // Placeholder
-        netProfit: Math.floor(dayRevenue * 0.9) // Placeholder
+        tickets: dayTicketCount,
+        payout: dayActualPayout, // ใช้ Payout จริง
+        originalPayout: dayOriginalPayout, // เก็บไว้เพื่อเปรียบเทียบ
+        netProfit: dayRevenue - dayActualPayout,
+        numberCapSavings: dayOriginalPayout - dayActualPayout, // เงินที่ประหยัดได้จากเลขอั้น
+        avgTicketValue: dayTicketCount > 0 ? dayRevenue / dayTicketCount : 0
       });
     }
+
+    // คำนวณเปอร์เซ็นต์การประหยัดจากเลขอั้น
+    const numberCapSavingsPercentage = totalOriginalPayout > 0 
+      ? ((totalOriginalPayout - totalPayout) / totalOriginalPayout) * 100 
+      : 0;
+
+    const bestPerformingDay = dailyRevenueStats.length > 0 
+      ? dailyRevenueStats.reduce((max, day) => day.revenue > max.revenue ? day : max, dailyRevenueStats[0])
+      : { date: '', revenue: 0 };
+    
+    const worstPerformingDay = dailyRevenueStats.length > 0
+      ? dailyRevenueStats.reduce((min, day) => day.revenue < min.revenue ? day : min, dailyRevenueStats[0])
+      : { date: '', revenue: 0 };
 
     // 3. Enhanced Tickets Data
     const { data: ticketsSold } = await supabase
@@ -249,7 +338,6 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
     }).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
 
     // 5. Performance Metrics
-    const totalPayout = 0; // Placeholder - would come from actual payout data
     const netProfit = totalSales - totalPayout;
     const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
 
@@ -312,8 +400,8 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
       revenue: {
         total: totalRevenue,
         growth: Math.random() * 20 - 10, // Placeholder
-        byDrawDate: {},
-        dailyRevenue: dailyRevenue.reverse(),
+        byDrawDate: revenueByDate,
+        dailyRevenue: dailyRevenueStats.reverse(),
         monthlyComparison: [] // Placeholder
       },
       tickets: {
@@ -321,7 +409,7 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
         sales: totalSales,
         pending: totalTicketsPending,
         growthRate: ticketGrowthRate,
-        dailyStats: dailyRevenue.map(d => ({
+        dailyStats: dailyRevenueStats.map(d => ({
           date: d.date,
           sold: d.tickets,
           revenue: d.revenue,
@@ -335,18 +423,17 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
         performance: [] // Placeholder
       },
       performance: {
-        totalSales: totalSales,
-        totalPayout: totalPayout,
-        netProfit: netProfit,
-        profitMargin: profitMargin,
-        bestPerformingDay: dailyRevenue.reduce((best, day) => 
-          day.revenue > best.revenue ? day : best, dailyRevenue[0] || { date: '', revenue: 0 }
-        ).date,
-        worstPerformingDay: dailyRevenue.reduce((worst, day) => 
-          day.revenue < worst.revenue ? day : worst, dailyRevenue[0] || { date: '', revenue: 0 }
-        ).date,
-        averageDailySales: dailyRevenue.length > 0 ? 
-          dailyRevenue.reduce((sum, day) => sum + day.revenue, 0) / dailyRevenue.length : 0
+        totalSales: totalRevenue,
+        totalPayout: totalPayout, // ใช้ payout จริง
+        totalOriginalPayout: totalOriginalPayout, // เก็บไว้เพื่อเปรียบเทียบ
+        netProfit: totalRevenue - totalPayout,
+        profitMargin: totalRevenue > 0 ? ((totalRevenue - totalPayout) / totalRevenue) * 100 : 0,
+        numberCapSavings: totalOriginalPayout - totalPayout, // เงินที่ประหยัดได้
+        numberCapSavingsPercentage,
+        numberCapAffectedTickets,
+        bestPerformingDay: bestPerformingDay.date,
+        worstPerformingDay: worstPerformingDay.date,
+        averageDailySales: totalRevenue / daysBack,
       },
       recentActivities: formattedActivities,
       credit: {
@@ -356,13 +443,13 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
         dailyTransactions: [] // Placeholder
       },
       winning: {
-        total: totalWinningBills,
-        totalPrize: totalPrizePaid,
-        averagePrize: averagePrize,
-        payoutRate: totalSales > 0 ? (totalPrizePaid / totalSales) * 100 : 0,
+        total: totalWinningBills || 0,
+        totalPrize: totalPayout, // ใช้ Payout จริง
+        averagePrize: totalWinningBills > 0 ? totalPayout / totalWinningBills : 0,
+        payoutRate: totalRevenue > 0 ? (totalPayout / totalRevenue) * 100 : 0,
         largestWin: largestWin,
-        recentWins: [] // Placeholder
-      }
+        recentWins: recentWins.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      },
     };
   } catch (error) {
     console.error('Error fetching dashboard data:', error);

@@ -1,6 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { createClient, SupabaseClient  } from "@supabase/supabase-js";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import { motion, easeInOut } from 'framer-motion';
 import { MdContentPaste } from "react-icons/md";
@@ -13,10 +12,12 @@ import {
   DrawerDescription,
   DrawerClose,
 } from "@/components/ui/drawer";
-import { CheckCircle2, Edit3 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { CheckCircle2, Edit3, Save, ClipboardPaste, Loader2 } from "lucide-react";
 // Shadcn/UI Components - Ensure these paths are correct for your project
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/contexts/AuthContext"; // 🔧 **ใหม่**: นำเข้า useAuth
 
 // --- TypeScript Interfaces ---
 interface LotteryTypeDetail {
@@ -259,7 +261,7 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
 
 // --- Main Page Component ---
 export default function LotteryResultsPage() {
-  const [supabase] = useState(() => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!));
+  const { supabase } = useAuth(); // 🔧 **แก้ไข**: ใช้ supabase จาก AuthContext
   const [lotteryTypeDetails, setLotteryTypeDetails] = useState<Record<number, LotteryTypeDetail>>({});
   const [groupedSchedules, setGroupedSchedules] = useState<Record<string, GroupedScheduleInfo>>({});
   const [resultInputs, setResultInputs] = useState<{ [scheduleId: number]: any }>({});
@@ -268,9 +270,14 @@ export default function LotteryResultsPage() {
   const [pageIsLoading, setPageIsLoading] = useState(true);
   const [saveInProgressForScheduleId, setSaveInProgressForScheduleId] = useState<number | null>(null);
  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [isBulkPasteOpen, setIsBulkPasteOpen] = useState(false);
+  const [bulkPasteText, setBulkPasteText] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    if (!supabase) return; // 🔧 **ใหม่**: รอให้ supabase พร้อมใช้งาน
+
     const fetchLotteryTypes = async (): Promise<Record<number, LotteryTypeDetail>> => {
       const { data, error } = await supabase.from('lottery_types').select('lottery_type_id, type_name, description');
       if (error) { console.error("Error fetching lottery types:", error.message); return {}; }
@@ -281,12 +288,6 @@ export default function LotteryResultsPage() {
     };
 
       const fetchSchedulesAndGroup = async (fetchedLotteryTypes: Record<number, LotteryTypeDetail>): Promise<Record<string, GroupedScheduleInfo> | null> => {
-        const todayForComparison = new Date();
-        todayForComparison.setHours(0, 0, 0, 0);
-        const selectedDateObj = new Date(selectedDate);
-        selectedDateObj.setHours(0, 0, 0, 0);
-        const isViewingToday = selectedDateObj.getTime() === todayForComparison.getTime();
-        const nowTime = format(new Date(), "HH:mm");
         const selectedDayOfWeek = format(new Date(selectedDate), 'EEEE');
 
         const { data: fetchedSchedulesData, error: schedulesError } = await supabase.from('drawing_schedules').select('schedule_id, draw_time, frequency_unit, day_of_week, lottery_sub_types(lottery_sub_type_id, sub_type_name, lottery_type_id)').eq('is_active', true);
@@ -294,11 +295,11 @@ export default function LotteryResultsPage() {
         if (!fetchedSchedulesData || fetchedSchedulesData.length === 0) { setGroupedSchedules({}); return null; }
 
       const fetchedSchedules = fetchedSchedulesData as any[];
+      // 🔧 **ปรับปรุง**: ลบ timeCondition เพื่อแสดงทุกรอบของวันที่เลือก
       const filteredSchedules: Schedule[] = fetchedSchedules.filter((sch: any) => {
         if (!sch.draw_time || !sch.lottery_sub_types || sch.lottery_sub_types.length === 0) return false;
-            const timeCondition = isViewingToday ? nowTime >= sch.draw_time : true;
-            if (sch.frequency_unit === 'day') return timeCondition;
-            if (sch.frequency_unit === 'week' && Array.isArray(sch.day_of_week) && sch.day_of_week.includes(selectedDayOfWeek)) return timeCondition;
+            if (sch.frequency_unit === 'day') return true;
+            if (sch.frequency_unit === 'week' && Array.isArray(sch.day_of_week) && sch.day_of_week.includes(selectedDayOfWeek)) return true;
         return false;
         }).map(sch => ({ ...sch, lottery_sub_types: Array.isArray(sch.lottery_sub_types) ? sch.lottery_sub_types : [sch.lottery_sub_types].filter(Boolean) as ScheduleSubType[] }));
 
@@ -391,15 +392,28 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
   }, [supabase, selectedDate]);
 
 
+  // 🔧 **ปรับปรุง**: Debounce การคำนวณผลอัตโนมัติ
   const handleInputChange = (scheduleId: number, key: string, value: string) => {
-    setResultInputs(prev => {
-      const scheduleSpecificInputs = prev[scheduleId] ? { ...prev[scheduleId] } : {};
-      const isMultiValuePrize = key === '3_โต๊ด' || key === '1_วิ่งบน' || key === '1_วิ่งล่าง';
+    // อัปเดต UI ทันทีเพื่อความลื่นไหล
+    setResultInputs(prev => ({
+      ...prev,
+      [scheduleId]: {
+        ...prev[scheduleId],
+        [key]: isMultiValuePrize(key) ? value.replace(/[^0-9,]/g, '') : value.replace(/\D/g, "")
+      }
+    }));
+    
+    // Debounce ส่วนการคำนวณผลอัตโนมัติ
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
 
-      // สำหรับ multi-value, รับค่าที่อาจมี comma, สำหรับ single-value, เอาเฉพาะตัวเลข
-      scheduleSpecificInputs[key] = isMultiValuePrize ? value.replace(/[^0-9,]/g, '') : value.replace(/\D/g, "");
-
+    debounceTimeoutRef.current = setTimeout(() => {
+      setResultInputs(prev => {
+        const scheduleSpecificInputs = { ...prev[scheduleId] };
       const sanitizedMainValue = scheduleSpecificInputs[key];
+        
+        if (!sanitizedMainValue) return prev;
 
       if (key === "3_บน") {
         if (sanitizedMainValue.length === 3) {
@@ -420,7 +434,10 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
       }
       return { ...prev, [scheduleId]: scheduleSpecificInputs };
     });
+    }, 300); // delay 300ms
   };
+
+  const isMultiValuePrize = (key: string) => key === '3_โต๊ด' || key === '1_วิ่งบน' || key === '1_วิ่งล่าง';
 
    const handleSave = async (sch: Schedule): Promise<boolean> => {
     if (!sch.lottery_sub_types || sch.lottery_sub_types.length === 0) {
@@ -459,6 +476,85 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
     setSuccessfullySavedSchedules(prev => new Set(prev).add(sch.schedule_id));
       return true;
   };
+  
+  // 🔧 **ใหม่**: ฟังก์ชันบันทึกทั้งหมด
+  const handleSaveAll = async () => {
+    setIsSavingAll(true);
+    toast.info("กำลังเริ่มบันทึกผลรางวัลทั้งหมด...");
+
+    const schedulesToSave = Object.values(groupedSchedules)
+      .flatMap(group => group.schedules)
+      .filter(sch => 
+        resultInputs[sch.schedule_id] && 
+        Object.values(resultInputs[sch.schedule_id]).some(val => val) && // มีการกรอกข้อมูล
+        !successfullySavedSchedules.has(sch.schedule_id) // ยังไม่ได้บันทึก
+      );
+
+    if (schedulesToSave.length === 0) {
+      toast.info("ไม่พบรายการที่กรอกผลไว้และยังไม่ได้บันทึก");
+      setIsSavingAll(false);
+      return;
+    }
+
+    const savePromises = schedulesToSave.map(sch => handleSave(sch));
+    const results = await Promise.all(savePromises);
+
+    const successfulSaves = results.filter(res => res).length;
+    const failedSaves = results.length - successfulSaves;
+
+    if (successfulSaves > 0) {
+      toast.success(`บันทึกผลสำเร็จ ${successfulSaves} รายการ`);
+    }
+    if (failedSaves > 0) {
+      toast.error(`บันทึกผลล้มเหลว ${failedSaves} รายการ`);
+    }
+
+    setIsSavingAll(false);
+  };
+
+  // 🔧 **ใหม่**: ฟังก์ชันจัดการการวางผลแบบชุด
+  const handleApplyBulkPaste = () => {
+    const lines = bulkPasteText.trim().split('\n');
+    const allSchedulesByName: Record<string, Schedule> = {};
+    Object.values(groupedSchedules).flatMap(g => g.schedules).forEach(sch => {
+      const subTypeName = sch.lottery_sub_types?.[0]?.sub_type_name;
+      if (subTypeName) {
+        allSchedulesByName[subTypeName.toLowerCase().trim()] = sch;
+      }
+    });
+
+    let appliedCount = 0;
+    let notFoundCount = 0;
+    const notFoundNames: string[] = [];
+
+    lines.forEach(line => {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 3) return;
+
+      const subTypeName = parts[0].toLowerCase().trim();
+      const top3 = parts[1];
+      const bottom2 = parts[2];
+
+      const targetSchedule = allSchedulesByName[subTypeName];
+      
+      if (targetSchedule) {
+        handleInputChange(targetSchedule.schedule_id, '3_บน', top3);
+        handleInputChange(targetSchedule.schedule_id, '2_ล่าง', bottom2);
+        appliedCount++;
+      } else {
+        notFoundCount++;
+        notFoundNames.push(parts[0]);
+      }
+    });
+
+    toast.info(`นำเข้าผลสำเร็จ ${appliedCount} รายการ`, {
+      description: notFoundCount > 0 ? `ไม่พบชื่อหวย ${notFoundCount} รายการ: ${notFoundNames.join(', ')}` : "ทุกรายการถูกนำเข้าเรียบร้อย",
+    });
+
+    setIsBulkPasteOpen(false);
+    setBulkPasteText("");
+  };
+
   
   const handleEditSchedule = (scheduleId: number) => {
     setSuccessfullySavedSchedules(prev => {
@@ -524,10 +620,45 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 bg-slate-50 min-h-screen">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-slate-700">กรอกผลรางวัล</h1>
           <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="ml-2 w-[140px] h-9 text-xs border-slate-300" max={format(new Date(), "yyyy-MM-dd")} />
+        </div>
+        {/* 🔧 **ใหม่**: ปุ่มควบคุมใหม่ */}
+        <div className="flex items-center gap-2">
+          <Dialog open={isBulkPasteOpen} onOpenChange={setIsBulkPasteOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                <ClipboardPaste className="w-4 h-4" />
+                <span>วางผลแบบชุด</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>วางผลรางวัลแบบชุด</DialogTitle>
+                <DialogDescription>
+                  วางผลรางวัลโดยใช้รูปแบบ: <b>ชื่อหวย 3ตัวบน 2ตัวล่าง</b> (แต่ละรายการขึ้นบรรทัดใหม่)
+                  <br/>
+                  ตัวอย่าง: <b>ลาวสตาร์ 123 45</b>
+                </DialogDescription>
+              </DialogHeader>
+              <Textarea
+                placeholder="วางข้อมูลที่นี่..."
+                value={bulkPasteText}
+                onChange={(e) => setBulkPasteText(e.target.value)}
+                rows={10}
+              />
+              <DialogFooter>
+                <Button onClick={handleApplyBulkPaste}>นำเข้าผลรางวัล</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Button onClick={handleSaveAll} disabled={isSavingAll} size="sm" className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
+            {isSavingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>บันทึกทั้งหมด</span>
+          </Button>
         </div>
       </div>
       

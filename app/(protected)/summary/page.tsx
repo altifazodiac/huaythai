@@ -34,6 +34,14 @@ import { useUserRole } from "@/hooks/use-user-role";
 import { countryFlagImg } from "@/lib/utils/flags";
 import { Badge } from "@/components/ui/badge";
 
+// 🔧 **ปรับปรุง**: เพิ่ม Interface สำหรับผลรางวัล
+interface LotteryResult {
+  draw_date: string;
+  lottery_sub_type_id: number;
+  prize_code: string;
+  winning_number: string;
+}
+
 // Comprehensive interfaces for detailed lottery analysis
 interface DailySummary {
   draw_date: string;
@@ -79,124 +87,145 @@ interface NumberDetail {
   numbers: string[];
   amount: number;
   price_paid: number;
+  effective_prize_rate?: number;
+  number_cap_action?: string;
+  number_cap_status?: any;
   is_winning: boolean;
   payout_amount: number;
   winning_numbers?: string;
+  matched_number?: string;
 }
 
-// Comprehensive data fetching functions using authenticated Supabase client
-const fetchDailySummary = async (supabase: any): Promise<DailySummary[]> => {
+// 🔧 **ใหม่**: ฟังก์ชันกลางสำหรับคำนวณรางวัล
+const calculateWinningsForItem = (
+  item: any,
+  ticketDrawDate: string,
+  resultsMap: Record<string, LotteryResult>
+): { prize: number; isWinning: boolean; winningNumberDisplay?: string, matchedNumber?: string } => {
+  if (!item.lottery_sub_number || !item.numbers) {
+    return { prize: 0, isWinning: false };
+  }
+
+  const { digit_number, type_number, price_paid } = item.lottery_sub_number;
+
+  let prizeCodePattern = '';
+  if (type_number === 'โต๊ด') prizeCodePattern = `${digit_number} ตัวโต๊ด`;
+  else if (type_number === 'บน') prizeCodePattern = `${digit_number} ตัวบน`;
+  else if (type_number === 'ล่าง') prizeCodePattern = `${digit_number} ตัวล่าง`;
+  else if (type_number === 'วิ่งบน') prizeCodePattern = 'วิ่งบน';
+  else if (type_number === 'วิ่งล่าง') prizeCodePattern = 'วิ่งล่าง';
+
+  const resultMapKey = `${ticketDrawDate}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
+  const matchingResult = resultsMap[resultMapKey];
+
+  if (!matchingResult || !matchingResult.winning_number) {
+    return { prize: 0, isWinning: false };
+  }
+
+  let matchedNumbers: string[] = [];
+  
+  if (type_number === 'โต๊ด') {
+    const winningSet = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    matchedNumbers = item.numbers.filter((num: string) => winningSet.has(num));
+  } else if (type_number === 'วิ่งบน' || type_number === 'วิ่งล่าง') {
+    const winningDigits = new Set(matchingResult.winning_number.split(',').join(''));
+    item.numbers.forEach((num: string) => {
+      for (const digit of num) {
+        if (winningDigits.has(digit)) {
+          matchedNumbers.push(num);
+          break;
+        }
+      }
+    });
+  } else {
+    matchedNumbers = item.numbers.filter((num: string) => num === matchingResult.winning_number);
+  }
+
+  if (matchedNumbers.length > 0) {
+    const effectiveRate = item.effective_prize_rate ?? price_paid ?? 0;
+    const prize = parseFloat(item.amount.toString()) * parseFloat(String(effectiveRate)) * matchedNumbers.length;
+    return { 
+      prize, 
+      isWinning: true, 
+      winningNumberDisplay: matchingResult.winning_number, 
+      matchedNumber: matchedNumbers.join(', ')
+    };
+  }
+
+  return { prize: 0, isWinning: false };
+};
+
+
+// 🔧 **ปรับปรุง**: แก้ไขฟังก์ชันดึงข้อมูลสรุปทั้งหมด
+const fetchDailySummary = async (supabase: any, resultsMap: Record<string, LotteryResult>): Promise<DailySummary[]> => {
   try {
-    // Get all confirmed tickets with user_id
     const { data: tickets, error: ticketError } = await supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount, user_id')
+      .select('id, draw_date, total_amount, user_id, lottery_ticket_items(*, lottery_sub_number(*))')
       .eq('status', 'confirmed');
     if (ticketError) throw ticketError;
     if (!tickets || tickets.length === 0) return [];
 
-    // Get user profiles
     const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
     if (profileError) throw profileError;
+    const profilesMap = new Map(profiles.map((p: {id: string, name: string}) => [p.id, p.name]));
 
-    // Get ticket items to count total numbers
-    const ticketIds = tickets.map((t: any) => t.id);
-    const { data: ticketItems, error: itemError } = await supabase
-      .from('lottery_ticket_items')
-      .select('ticket_id')
-      .in('ticket_id', ticketIds);
-    if (itemError) throw itemError;
-
-    // Group by draw_date + user_id
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
       if (!ticket.user_id) return acc;
       const key = `${ticket.draw_date}__${ticket.user_id}`;
       if (!acc[key]) {
-        const profile = profiles?.find((p: any) => p.id === ticket.user_id);
         acc[key] = {
           draw_date: ticket.draw_date,
           user_id: ticket.user_id,
-          user_name: profile?.name || 'ไม่ระบุ',
+          user_name: profilesMap.get(ticket.user_id) || 'ไม่ระบุ',
           total_bills: 0,
           total_numbers: 0,
           total_purchase_amount: 0,
           total_payout: 0,
-          net_profit_loss: 0
         };
       }
+
+      let ticketPayout = 0;
+      (ticket.lottery_ticket_items || []).forEach((item: any) => {
+        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+        ticketPayout += prize;
+        acc[key].total_numbers += (item.numbers || []).length;
+      });
+      
       acc[key].total_bills += 1;
       acc[key].total_purchase_amount += Number(ticket.total_amount || 0);
-      acc[key].net_profit_loss += Number(ticket.total_amount || 0);
+      acc[key].total_payout += ticketPayout;
       return acc;
     }, {});
 
-    // Add total_numbers count
-    (ticketItems || []).forEach((item: any) => {
-      const ticket = tickets.find((t: any) => t.id === item.ticket_id);
-      if (ticket && ticket.user_id) {
-        const key = `${ticket.draw_date}__${ticket.user_id}`;
-        if (groupedData[key]) {
-          groupedData[key].total_numbers += 1;
-        }
-      }
-    });
-    return Object.values(groupedData).sort((a: any, b: any) =>
-      new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime()
-    ) as DailySummary[];
+    return Object.values(groupedData).map((summary: any) => ({
+      ...summary,
+      net_profit_loss: summary.total_purchase_amount - summary.total_payout
+    })).sort((a: any, b: any) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime());
   } catch (err) {
     console.error('Error in fetchDailySummary:', err);
     throw err;
   }
 };
 
-const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promise<LotteryTypeSummary[]> => {
+const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string, LotteryResult>, drawDate?: string): Promise<LotteryTypeSummary[]> => {
   try {
-    // Use direct SQL query since RPC function doesn't exist
-    console.log('Using direct query for lottery type summary');
-    
-    // First get all confirmed tickets
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount')
+      .select('id, draw_date, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
       .eq('status', 'confirmed');
-    
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
     }
-    
     const { data: tickets, error: ticketError } = await ticketQuery;
     if (ticketError) throw ticketError;
     
-    // Then get ticket items for these tickets
-    const ticketIds = tickets?.map((t: any) => t.id) || [];
-    if (ticketIds.length === 0) {
-      return [];
-    }
-    
-    const { data: ticketItems, error: itemError } = await supabase
-      .from('lottery_ticket_items')
-      .select(`
-        ticket_id,
-        lottery_sub_type_id,
-        lottery_sub_types!inner(
-          lottery_sub_type_id,
-          sub_type_name,
-          country_origin
-        )
-      `)
-      .in('ticket_id', ticketIds);
-    
-    if (itemError) throw itemError;
-    
-    // Group by lottery_sub_type_id and calculate totals
-    const groupedData = (ticketItems || []).reduce((acc: any, item: any) => {
+    const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
+      (ticket.lottery_ticket_items || []).forEach((item: any) => {
       const subTypeId = item.lottery_sub_type_id;
       const subType = item.lottery_sub_types;
-      const ticket = tickets?.find((t: any) => t.id === item.ticket_id);
+        if (!subType) return;
       
       if (!acc[subTypeId]) {
         acc[subTypeId] = {
@@ -207,246 +236,102 @@ const fetchLotteryTypeSummary = async (supabase: any, drawDate?: string): Promis
           total_numbers: 0,
           total_purchase_amount: 0,
           total_payout: 0,
-          net_profit_loss: 0,
-          processed_tickets: new Set() // Track processed tickets to avoid double counting
-        };
-      }
+          };
+        }
+        
+        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
       
-      acc[subTypeId].total_bills.add(item.ticket_id);
-      acc[subTypeId].total_numbers += 1;
-      
-      // Only add ticket amount once per ticket, not per item
-      if (ticket && !acc[subTypeId].processed_tickets.has(ticket.id)) {
-        acc[subTypeId].total_purchase_amount += Number(ticket.total_amount || 0);
-        acc[subTypeId].net_profit_loss += Number(ticket.total_amount || 0);
-        acc[subTypeId].processed_tickets.add(ticket.id);
-      }
-      
+        acc[subTypeId].total_bills.add(ticket.id);
+        acc[subTypeId].total_numbers += (item.numbers || []).length;
+        acc[subTypeId].total_purchase_amount += Number(item.amount || 0);
+        acc[subTypeId].total_payout += prize;
+      });
       return acc;
     }, {});
     
-    // Convert Sets to counts and return array
     return Object.values(groupedData).map((item: any) => ({
-      lottery_sub_type_id: item.lottery_sub_type_id,
-      sub_type_name: item.sub_type_name,
-      country_origin: item.country_origin,
+      ...item,
       total_bills: item.total_bills.size,
-      total_numbers: item.total_numbers,
-      total_purchase_amount: item.total_purchase_amount,
-      total_payout: item.total_payout,
-      net_profit_loss: item.net_profit_loss
-    })).sort((a: any, b: any) => 
-      Number(b.total_purchase_amount) - Number(a.total_purchase_amount)
-    );
+      net_profit_loss: item.total_purchase_amount - item.total_payout,
+    })).sort((a: any, b: any) => b.total_purchase_amount - a.total_purchase_amount);
   } catch (err) {
     console.error('Error in fetchLotteryTypeSummary:', err);
     throw err;
   }
 };
 
-const fetchBillSummary = async (supabase: any, drawDate?: string, lotteryTypeId?: number, userId?: string): Promise<BillSummary[]> => {
+const fetchBillSummary = async (supabase: any, resultsMap: Record<string, LotteryResult>, drawDate?: string, lotteryTypeId?: number, userId?: string): Promise<BillSummary[]> => {
   try {
-    console.log('Fetching bill summary with params:', { drawDate, lotteryTypeId, userId });
-    
-    // Use direct SQL query since RPC function doesn't exist
-    console.log('Using direct query for bill summary');
-    
-    // Get tickets (force confirmed only)
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, bill_number, draw_date, total_amount, status, user_id')
+      .select('id, bill_number, draw_date, total_amount, status, user_id, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
       .eq('status', 'confirmed');
     
-    if (drawDate) {
-      ticketQuery = ticketQuery.eq('draw_date', drawDate);
-    }
-    
-    // Filter by user_id if provided (for admin filtering)
-    if (userId && userId !== 'all') {
-      ticketQuery = ticketQuery.eq('user_id', userId);
-    }
+    if (drawDate) ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    if (userId && userId !== 'all') ticketQuery = ticketQuery.eq('user_id', userId);
+    if (lotteryTypeId) ticketQuery = ticketQuery.eq('lottery_ticket_items.lottery_sub_type_id', lotteryTypeId);
     
     const { data: tickets, error: ticketError } = await ticketQuery;
-    if (ticketError) {
-      console.error('Error in get_bill_summary fallback query:', ticketError);
-      throw ticketError;
-    }
+    if (ticketError) throw ticketError;
+    if (!tickets || tickets.length === 0) return [];
     
-    if (!tickets || tickets.length === 0) {
-      console.log('No tickets found');
-      return [];
-    }
-    
-    // Get user profiles
     const userIds = [...new Set(tickets.map((t: any) => t.user_id))];
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
+    if (profileError) throw profileError;
+    const profilesMap = new Map(profiles.map((p: {id: string, name: string}) => [p.id, p.name]));
     
-    if (profileError) {
-      console.error('Error fetching profiles:', profileError);
-      throw profileError;
-    }
-    
-    // Get ticket items with numbers and lottery sub types
-    const ticketIds = tickets.map((t: any) => t.id);
-    let itemQuery = supabase
-      .from('lottery_ticket_items')
-      .select(`
-        ticket_id,
-        lottery_sub_type_id,
-        numbers,
-        amount,
-        lottery_sub_types!inner(
-          lottery_sub_type_id,
-          sub_type_name,
-          country_origin
-        )
-      `)
-      .in('ticket_id', ticketIds);
-    
-    // Apply lottery type filter if specified
-    if (lotteryTypeId) {
-      itemQuery = itemQuery.eq('lottery_sub_type_id', lotteryTypeId);
-    }
-    
-    const { data: ticketItems, error: itemError } = await itemQuery;
-    if (itemError) {
-      console.error('Error fetching ticket items:', itemError);
-      throw itemError;
-    }
-    
-    if (!ticketItems || ticketItems.length === 0) {
-      console.log('No ticket items found');
-      return [];
-    }
-    
-    // Group items by ticket_id and calculate comprehensive data
-    const itemsByTicket = (ticketItems || []).reduce((acc: any, item: any) => {
-      if (!acc[item.ticket_id]) {
-        acc[item.ticket_id] = {
-          items: [],
-          totalNumbers: 0,
-          subTypes: new Set(),
-          subTypeNames: new Set(),
-          countries: new Set()
-        };
-      }
+    const transformedData = tickets.map((ticket: any) => {
+      const subTypeNames = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.sub_type_name).filter(Boolean))];
+      const countries = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.country_origin).filter(Boolean))];
       
-      acc[item.ticket_id].items.push(item);
-      
-      // Count actual numbers (each item has an array of numbers)
-      if (item.numbers && Array.isArray(item.numbers)) {
-        acc[item.ticket_id].totalNumbers += item.numbers.length;
-      }
-      
-      // Collect unique sub types
-      acc[item.ticket_id].subTypes.add(item.lottery_sub_type_id);
-      acc[item.ticket_id].subTypeNames.add(item.lottery_sub_types?.sub_type_name || 'ไม่ระบุ');
-      acc[item.ticket_id].countries.add(item.lottery_sub_types?.country_origin || 'ไม่ระบุ');
-      
-      return acc;
-    }, {});
-    
-    // Transform data to match expected format
-    const transformedData = tickets
-      .map((ticket: any) => {
-        const ticketData = itemsByTicket[ticket.id];
-        
-        // Skip tickets with no items (after filtering)
-        if (!ticketData || ticketData.items.length === 0) {
-          return null;
-        }
-        
-        const profile = profiles?.find((p: any) => p.id === ticket.user_id);
-        
-        // Create comprehensive sub type name showing all types in the bill
-        const subTypeNamesArray = Array.from(ticketData.subTypeNames);
-        const countriesArray = Array.from(ticketData.countries);
-        
-        const subTypeName = subTypeNamesArray.length > 1 
-          ? `${subTypeNamesArray.join(', ')}`
-          : subTypeNamesArray[0] || 'ไม่ระบุ';
-          
-        const countryName = countriesArray.length > 1 
-          ? `${countriesArray.join(', ')}`
-          : countriesArray[0] || 'ไม่ระบุ';
+      let totalPayout = 0;
+      let totalNumbers = 0;
+      (ticket.lottery_ticket_items || []).forEach((item: any) => {
+        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+        totalPayout += prize;
+        totalNumbers += (item.numbers || []).length;
+      });
         
         return {
           bill_number: ticket.bill_number,
           draw_date: ticket.draw_date,
-          user_name: profile?.name || 'ไม่ระบุ',
-          sub_type_name: subTypeName,
-          country_origin: countryName,
+        user_name: profilesMap.get(ticket.user_id) || 'ไม่ระบุ',
+        sub_type_name: subTypeNames.join(', '),
+        country_origin: countries.join(', '),
           total_amount: Number(ticket.total_amount || 0),
-          total_payout: 0, // Placeholder - would need to calculate from winning results
-          net_profit_loss: Number(ticket.total_amount || 0), // Placeholder - would need to subtract payouts
-          numbers_count: ticketData.totalNumbers, // Now correctly counts actual numbers
+        total_payout: totalPayout,
+        net_profit_loss: Number(ticket.total_amount || 0) - totalPayout,
+        numbers_count: totalNumbers,
           status: ticket.status
         };
-      })
-      .filter(Boolean) // Remove null entries
-      .filter((b: any) => b.status === 'confirmed'); // Ensure only confirmed bills
+    }).filter(Boolean);
     
-    console.log('Transformed bill summary data:', transformedData);
-    console.log('Items by ticket debug:', itemsByTicket);
-    
-    return transformedData;
+    return transformedData as BillSummary[];
   } catch (err) {
     console.error('Error in fetchBillSummary:', err);
     throw err;
   }
 };
 
-const fetchNumberDetails = async (supabase: any, billNumber?: string): Promise<NumberDetail[]> => {
+const fetchNumberDetails = async (supabase: any, resultsMap: Record<string, LotteryResult>, billNumber?: string): Promise<NumberDetail[]> => {
   try {
-    // Use direct SQL query since RPC function doesn't exist
-    console.log('Using direct query for number details');
+    if (!billNumber) return [];
     
-    // Get tickets
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, bill_number')
-      .eq('status', 'confirmed');
-    
-    if (billNumber) {
-      ticketQuery = ticketQuery.eq('bill_number', billNumber);
-    }
+      .select('id, bill_number, draw_date, lottery_ticket_items!inner(*, lottery_sub_number(*))')
+      .eq('status', 'confirmed')
+      .eq('bill_number', billNumber);
     
     const { data: tickets, error: ticketError } = await ticketQuery;
     if (ticketError) throw ticketError;
+    if (!tickets || tickets.length === 0) return [];
     
-    if (!tickets || tickets.length === 0) {
-      return [];
-    }
-    
-    // Get ticket items for these tickets
-    const ticketIds = tickets.map((t: any) => t.id);
-    const { data: ticketItems, error: itemError } = await supabase
-      .from('lottery_ticket_items')
-      .select(`
-        id,
-        ticket_id,
-        numbers,
-        amount,
-        lottery_sub_number_id,
-        lottery_sub_number!inner(
-          id,
-          digit_number,
-          type_number,
-          price_paid
-        )
-      `)
-      .in('ticket_id', ticketIds);
-    
-    if (itemError) throw itemError;
-    
-    // Transform data to match expected format
     const transformedData: NumberDetail[] = [];
-    (ticketItems || []).forEach((item: any) => {
-      const ticket = tickets.find((t: any) => t.id === item.ticket_id);
-      if (ticket) {
+    (tickets || []).forEach((ticket: any) => {
+      (ticket.lottery_ticket_items || []).forEach((item: any) => {
+        const { prize, isWinning, winningNumberDisplay, matchedNumber } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+
         transformedData.push({
           id: item.id,
           bill_number: ticket.bill_number,
@@ -456,11 +341,14 @@ const fetchNumberDetails = async (supabase: any, billNumber?: string): Promise<N
           numbers: item.numbers,
           amount: Number(item.amount || 0),
           price_paid: Number(item.lottery_sub_number.price_paid || 0),
-          is_winning: false, // Placeholder
-          payout_amount: 0, // Placeholder
-          winning_numbers: undefined // Placeholder
+          effective_prize_rate: item.effective_prize_rate,
+          number_cap_action: item.number_cap_action,
+          is_winning: isWinning,
+          payout_amount: prize,
+          winning_numbers: winningNumberDisplay,
+          matched_number: matchedNumber,
         });
-      }
+      });
     });
     
     return transformedData;
@@ -500,6 +388,7 @@ const LotterySummaryPage: React.FC = () => {
   const [billSummary, setBillSummary] = useState<BillSummary[]>([]);
   const [numberDetails, setNumberDetails] = useState<NumberDetail[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string; phone: string }[]>([]);
+  const [resultsMap, setResultsMap] = useState<Record<string, LotteryResult>>({}); // 🔧 ใหม่
 
   // Filter states
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -517,16 +406,27 @@ const LotterySummaryPage: React.FC = () => {
     loadData();
   }, [supabase]);
 
+  // 🔧 **ปรับปรุง**: แยกฟังก์ชัน loadData ออกมา
   const loadData = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
+      const { data: resultsData, error: resultsError } = await supabase.from('lottery_results').select('*');
+      if (resultsError) throw resultsError;
+      
+      const newResultsMap: Record<string, LotteryResult> = (resultsData || []).reduce((acc, res) => {
+        const key = `${res.draw_date}|${res.lottery_sub_type_id}|${res.prize_code}`;
+        acc[key] = res;
+        return acc;
+      }, {});
+      setResultsMap(newResultsMap);
+
       const [dailyData, typeData, billData, numberData] = await Promise.all([
-        fetchDailySummary(supabase),
-        fetchLotteryTypeSummary(supabase, selectedDate || undefined),
-        fetchBillSummary(supabase, selectedDate || undefined, selectedLotteryType || undefined, selectedUserId === 'all' ? undefined : selectedUserId || undefined),
-        fetchNumberDetails(supabase, selectedBillNumber || undefined)
+        fetchDailySummary(supabase, newResultsMap),
+        fetchLotteryTypeSummary(supabase, newResultsMap, selectedDate || undefined),
+        fetchBillSummary(supabase, newResultsMap, selectedDate || undefined, selectedLotteryType || undefined, selectedUserId === 'all' ? undefined : selectedUserId || undefined),
+        fetchNumberDetails(supabase, newResultsMap, selectedBillNumber || undefined)
       ] as const);
       
       setDailySummary(dailyData as DailySummary[]);
@@ -534,7 +434,6 @@ const LotterySummaryPage: React.FC = () => {
       setBillSummary(billData as BillSummary[]);
       setNumberDetails(numberData as NumberDetail[]);
       
-      // Fetch users separately for admin
       if (role === 'admin') {
         const usersData = await fetchUsers(supabase);
         setUsers(usersData);
@@ -568,6 +467,7 @@ const LotterySummaryPage: React.FC = () => {
 
   // Format date in Thai locale
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('th-TH', {
       year: 'numeric',
       month: 'long',
@@ -838,15 +738,12 @@ const LotterySummaryPage: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>บิล</TableHead>
                   <TableHead>ประเภทหวย</TableHead>
-                  <TableHead>จำนวนหลัก</TableHead>
-                  <TableHead>ประเภท</TableHead>
-                  <TableHead>เลข</TableHead>
+                  <TableHead>เลขที่ซื้อ</TableHead>
                   <TableHead className="text-right">ยอดซื้อ</TableHead>
                   <TableHead className="text-right">อัตราจ่าย</TableHead>
-                  <TableHead className="text-center">ถูกรางวัล</TableHead>
-                  <TableHead className="text-right">ยอดจ่าย</TableHead>
+                  <TableHead className="text-center">ผล</TableHead>
+                  <TableHead className="text-right">รางวัล</TableHead>
                   <TableHead>เลขที่ออก</TableHead>
                 </TableRow>
               </TableHeader>
@@ -862,28 +759,37 @@ const LotterySummaryPage: React.FC = () => {
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                       className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${item.is_winning ? 'bg-green-100 dark:bg-green-900/50' : ''}`}
                     >
-                      <TableCell className="font-medium">{item.bill_number}</TableCell>
                       <TableCell>{item.lottery_type_name}</TableCell>
-                      <TableCell className="text-center">{item.digit_number}</TableCell>
-                      <TableCell>{item.type_number}</TableCell>
                       <TableCell className="font-mono">{item.numbers.join(', ')}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(item.amount))}</TableCell>
-                      <TableCell className="text-right">{item.price_paid}x</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span className={item.number_cap_action ? "line-through text-gray-400" : ""}>
+                            {item.price_paid}x
+                          </span>
+                          {item.number_cap_action && (
+                            <span className="text-red-600 font-bold">{item.effective_prize_rate}x</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">
                         {item.is_winning ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            ถูก
-                          </span>
+                          <Badge variant="default" className="bg-green-600">ถูก</Badge>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            ไม่ถูก
-                          </span>
+                          <Badge variant="outline">ไม่ถูก</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-semibold">
+                      <TableCell className="text-right font-semibold text-green-600">
                         {item.is_winning ? formatCurrency(Number(item.payout_amount)) : '-'}
                       </TableCell>
-                      <TableCell className="font-mono">{item.winning_numbers || '-'}</TableCell>
+                      <TableCell className="font-mono">
+                         {item.is_winning ? (
+                           <div className="flex flex-col">
+                             <span>{item.winning_numbers}</span>
+                             <span className="text-xs text-green-700">({item.matched_number}*)</span>
+                           </div>
+                         ) : '-'}
+                      </TableCell>
                     </motion.tr>
                   ))}
                 </AnimatePresence>

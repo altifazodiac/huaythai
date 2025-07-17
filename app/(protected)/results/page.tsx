@@ -52,6 +52,10 @@ interface LotteryTicketItem {
   lottery_sub_number_id: number;
   numbers: string[];
   amount: number;
+  original_amount?: number;
+  effective_prize_rate?: number;
+  number_cap_action?: string;
+  number_cap_status?: any;
   lottery_sub_types: LotterySubType;
   lottery_sub_number: LotterySubNumber;
 }
@@ -105,7 +109,8 @@ export default function LotteryTicketResultsPage() {
         const { data: ticketsData, error: ticketsError } = await supabase
           .from("lottery_tickets")
           .select(`*,
-            lottery_ticket_items:lottery_ticket_items(*,
+            lottery_ticket_items:lottery_ticket_items(
+              *,
               lottery_sub_types:lottery_sub_types(lottery_sub_type_id,sub_type_name),
               lottery_sub_number:lottery_sub_number(id,lottery_sub_type_id,digit_number,type_number,price_paid)
             )
@@ -230,8 +235,10 @@ export default function LotteryTicketResultsPage() {
           }
           
           if (matchedNumbers.length > 0) {
-            // Calculate prize: amount_bet * price_paid_per_baht * matched_count
-            const prize = parseFloat(item.amount.toString()) * parseFloat(item.lottery_sub_number.price_paid.toString()) * matchedNumbers.length;
+            // 🔧 แก้ไขใหม่: ใช้ effective_prize_rate แทน price_paid ในการคำนวณรางวัล
+            // Calculate prize: amount_bet * effective_prize_rate * matched_count
+            const effectiveRate = item.effective_prize_rate || item.lottery_sub_number.price_paid || 0;
+            const prize = parseFloat(item.amount.toString()) * parseFloat(effectiveRate.toString()) * matchedNumbers.length;
             totalPrize += prize;
             winItems.push({
               ...item,
@@ -338,7 +345,7 @@ export default function LotteryTicketResultsPage() {
                 <CardContent className="p-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-medium text-gray-600 dark:text-gray-300">รางวัลทั้งหมด</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">รางวัลทั้งหมด</p>
                       <p className="text-base font-bold text-gray-900 dark:text-gray-100">{filteredTickets.length}</p>
                     </div>
                     <div className="p-1 bg-blue-100 dark:bg-blue-900 rounded-full">
@@ -353,7 +360,7 @@ export default function LotteryTicketResultsPage() {
                 <CardContent className="p-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-medium text-gray-600 dark:text-gray-300">ยอดรวมรางวัล</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">ยอดรวมรางวัล</p>
                       <p className="text-base font-bold text-green-600 dark:text-green-400">{totalPrize.toLocaleString()} ฿</p>
                     </div>
                     <div className="p-1 bg-green-100 dark:bg-green-900 rounded-full">
@@ -368,7 +375,7 @@ export default function LotteryTicketResultsPage() {
                 <CardContent className="p-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-medium text-gray-600 dark:text-gray-300">รอจ่าย</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">รอจ่าย</p>
                       <p className="text-base font-bold text-orange-600 dark:text-orange-400">
                         {filteredTickets.filter(win => {
                           const billInfo = winningBills.find(b => b.bill_number === win.bill_number);
@@ -388,7 +395,7 @@ export default function LotteryTicketResultsPage() {
                 <CardContent className="p-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[10px] font-medium text-gray-600 dark:text-gray-300">จ่ายแล้ว</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">จ่ายแล้ว</p>
                       <p className="text-base font-bold text-blue-600 dark:text-blue-400">
                         {filteredTickets.filter(win => {
                           const billInfo = winningBills.find(b => b.bill_number === win.bill_number);
@@ -520,7 +527,7 @@ export default function LotteryTicketResultsPage() {
                                       <h3 className="font-bold text-xs">
                                         {win.items[0]?.lottery_sub_types?.sub_type_name || 'หวย'}
                                       </h3>
-                                      <p className="text-blue-100 text-[10px]">
+                                      <p className="text-blue-100 text-sm">
                                         บิล: {win.bill_number} | {win.bill_name || '-'}
                                       </p>
                                     </div>
@@ -532,13 +539,13 @@ export default function LotteryTicketResultsPage() {
                                         +{win.sum.toLocaleString()} ฿
                                       </span>
                                     </div>
-                                    <p className="text-blue-100 text-[10px]">
+                                    <p className="text-blue-100 text-sm">
                                       งวด: {format(new Date(win.draw_date), 'd MMM yy', { locale: th })}
                                     </p>
                                   </div>
                                 </div>
                                 <div className="flex items-center justify-between mt-1">
-                                  <div className="flex items-center gap-1 text-[10px]">
+                                  <div className="flex items-center gap-1 text-sm">
                                     <FaCalendarAlt className="text-blue-200 text-xs" />
                                     <span className="text-blue-100">
                                       ซื้อ: {format(new Date(win.items[0]?.result?.created_at || win.draw_date), 'd MMM yy', { locale: th })}
@@ -607,7 +614,7 @@ export default function LotteryTicketResultsPage() {
                                         <FaCheckCircle className="text-xs" />
                                         <span>จ่ายแล้ว</span>
                                         {paidAtThai && (
-                                          <span className="text-green-100 text-[10px] ml-1">
+                                          <span className="text-green-100 text-sm ml-1">
                                             {paidAtThai}
                                           </span>
                                         )}
@@ -624,13 +631,13 @@ export default function LotteryTicketResultsPage() {
                                 <Table>
                                   <TableHeader>
                                     <TableRow className="bg-gray-50 dark:bg-slate-800 h-7">
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">รางวัล</TableHead>
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">เลขที่ออก</TableHead>
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">เลขที่ซื้อถูก</TableHead>
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">ประเภท</TableHead>
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">ราคาจ่าย</TableHead>
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">จำนวนเงินที่ซื้อ</TableHead>
-                                      <TableHead className="h-7 px-1 text-[10px] font-semibold text-gray-700 dark:text-gray-200">รางวัลที่ได้</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">รางวัล</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">เลขที่ออก</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">เลขที่ซื้อถูก</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">ประเภท</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">ราคาจ่าย</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">จำนวนเงินที่ซื้อ</TableHead>
+                                      <TableHead className="h-7 px-1 text-sm font-semibold text-gray-700 dark:text-gray-200">รางวัลที่ได้</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
@@ -652,42 +659,58 @@ export default function LotteryTicketResultsPage() {
                                           transition={{ duration: 0.3, delay: idx2 * 0.03 }}
                                           className="hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors h-7"
                                         >
-                                          <TableCell className="p-1 text-[10px]">
+                                          <TableCell className="p-1 text-sm">
                                             <div className="flex items-center">
                                               {icon}
-                                              <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-semibold px-1 py-0.5 text-[10px]">
+                                              <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 font-semibold px-1 py-0.5 text-sm">
                                                 {item.prize_code}
                                               </Badge>
                                             </div>
                                           </TableCell>
-                                          <TableCell className="p-1 text-[10px]">
+                                          <TableCell className="p-1 text-sm">
                                             {isTod || isWing ? (
-                                              <Badge className="bg-purple-500 dark:bg-purple-800 text-white px-1 py-0.5 text-[10px]">
+                                              <Badge className="bg-purple-500 dark:bg-purple-800 text-white px-1 py-0.5 text-sm">
                                                 {matchedNumbers.join(', ')}
                                               </Badge>
                                             ) : (
-                                              <Badge className="bg-purple-500 dark:bg-purple-800 text-white px-1 py-0.5 text-[10px]">
+                                              <Badge className="bg-purple-500 dark:bg-purple-800 text-white px-1 py-0.5 text-sm">
                                                 {item.result.winning_number}
                                               </Badge>
                                             )}
                                           </TableCell>
-                                          <TableCell className="p-1 text-[10px]">
+                                          <TableCell className="p-1 text-sm">
                                             <span className="text-purple-600 dark:text-purple-300 font-bold">
                                               {item.winning_number}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="p-1 text-[10px]">
-                                            <Badge variant="secondary" className="px-1 py-0.5 text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200">
+                                          <TableCell className="p-1 text-sm">
+                                            <Badge variant="secondary" className="px-1 py-0.5 text-sm bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200">
                                               {item.lottery_sub_number?.type_number || '-'}
                                             </Badge>
                                           </TableCell>
-                                          <TableCell className="font-medium p-1 text-[10px]">
-                                            {item.lottery_sub_number?.price_paid || '-'}
+                                          <TableCell className="font-medium p-1 text-sm">
+                                            {/* 🔧 แสดง effective_prize_rate พร้อมข้อมูลเลขอั้น */}
+                                            <div className="flex items-center gap-1">
+                                              <span className={item.number_cap_action ? "line-through text-gray-400" : ""}>
+                                                {item.lottery_sub_number?.price_paid || '-'}
+                                              </span>
+                                              {item.effective_prize_rate && item.effective_prize_rate !== item.lottery_sub_number?.price_paid && (
+                                                <>
+                                                  <span className="text-red-500">→</span>
+                                                  <span className="text-red-600 font-bold">{item.effective_prize_rate}</span>
+                                                  {item.number_cap_action === 'half' && (
+                                                    <span className="text-xs bg-orange-100 text-orange-700 px-1 rounded" title="หารครึ่งรางวัล">
+                                                      ✂️
+                                                    </span>
+                                                  )}
+                                                </>
+                                              )}
+                                            </div>
                                           </TableCell>
-                                          <TableCell className="font-medium p-1 text-[10px]">
+                                          <TableCell className="font-medium p-1 text-sm">
                                             {item.amount?.toLocaleString()} ฿
                                           </TableCell>
-                                          <TableCell className="p-1 text-[10px]">
+                                          <TableCell className="p-1 text-sm">
                                             <div className="flex items-center text-green-600 dark:text-green-400 font-bold">
                                               <FaMoneyBillWave className="mr-1 text-xs" />
                                               +{item.prize.toLocaleString()} ฿

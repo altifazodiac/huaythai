@@ -68,8 +68,15 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { useIsMobile } from '@/hooks/use-mobile';
+import { createResultsMap, calculateWinningsForItem } from '@/lib/utils/lottery-utils';
 
 // Enhanced interfaces for lottery report summary
+interface LotteryResult {
+  draw_date: string;
+  lottery_sub_type_id: number;
+  prize_code: string;
+  winning_number: string;
+}
 interface LotteryTransactionData {
   id: string;
   draw_date: string;
@@ -167,63 +174,55 @@ const cardVariants = {
 };
 
 // Enhanced data fetching function
-const fetchLotteryReportData = async (supabase: any, startDate?: string, endDate?: string): Promise<LotteryTransactionData[]> => {
+const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, LotteryResult>, startDate?: string, endDate?: string): Promise<LotteryTransactionData[]> => {
   try {
     let query = supabase
       .from('lottery_tickets')
-      .select(`
-        id,
-        draw_date,
-        purchase_date,
-        total_amount,
-        status,
-        deleted_at,
-        user_id,
-        bill_number,
-        profiles!inner(
-          name,
-          percent
-        ),
-        lottery_ticket_items(count)
-      `)
-      .order('draw_date', { ascending: false });
+      .select('*, lottery_ticket_items(*, lottery_sub_number(*)), profiles(name)')
+      .eq('status', 'confirmed');
 
     if (startDate) query = query.gte('draw_date', startDate);
     if (endDate) query = query.lte('draw_date', endDate);
 
     const { data: tickets, error } = await query;
     if (error) throw error;
-    if (!tickets || tickets.length === 0) return [];
 
-    return tickets.map((ticket: any) => {
-      const totalPurchase = Number(ticket.total_amount || 0);
-      const totalReward = 0; // Would be calculated from actual winnings
-      const commissionPercentage = Number(ticket.profiles?.percent || 0);
-      const commissionAmount = (totalPurchase * commissionPercentage) / 100;
-      const remainingBalance = totalPurchase - totalReward - commissionAmount;
-      const profitLoss = totalPurchase - totalReward - commissionAmount;
+    return (tickets || []).map((ticket: any) => {
+      let total_reward_amount = 0;
+      (ticket.lottery_ticket_items || []).forEach((item: any) => {
+        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+        total_reward_amount += prize;
+      });
+      
+      const total_purchase_amount = Number(ticket.total_amount || 0);
+      const profit_loss = total_purchase_amount - total_reward_amount;
+      
+      // คำนวณ commission และอื่นๆ
+      const commission_percentage = ticket.profiles?.commission_percentage || 0;
+      const commission_amount = total_purchase_amount * (commission_percentage / 100);
+      const remaining_balance = profit_loss - commission_amount;
 
       return {
         id: ticket.id,
         draw_date: ticket.draw_date,
-        purchase_date: ticket.purchase_date,
-        user_name: ticket.profiles?.name || '',
+        purchase_date: ticket.created_at,
+        user_name: ticket.profiles?.name || 'ไม่ระบุ',
         user_id: ticket.user_id,
-        total_purchase_amount: totalPurchase,
-        total_reward_amount: totalReward,
-        commission_percentage: commissionPercentage,
-        commission_amount: commissionAmount,
-        remaining_balance: remainingBalance,
-        profit_loss: profitLoss,
+        total_purchase_amount,
+        total_reward_amount,
+        commission_percentage,
+        commission_amount,
+        remaining_balance,
+        profit_loss,
         bill_count: 1,
-        ticket_count: ticket.lottery_ticket_items?.[0]?.count || 0,
+        ticket_count: (ticket.lottery_ticket_items || []).length,
         status: ticket.status,
-        deleted_at: ticket.deleted_at,
+        deleted_at: ticket.deleted_at
       };
     });
   } catch (err) {
     console.error('Error fetching lottery report data:', err);
-    throw err;
+    return [];
   }
 };
 
@@ -292,7 +291,12 @@ const LotteryReportSummaryPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchLotteryReportData(supabase, selectedDate);
+      const startDate = selectedDate || undefined;
+      const endDate = selectedDate || undefined;
+
+      const resultsMap = await createResultsMap(supabase, startDate || new Date(0).toISOString());
+      const data = await fetchLotteryReportData(supabase, resultsMap, startDate, endDate);
+      
       setReportData(data);
 
       // Group data by date first, then by user

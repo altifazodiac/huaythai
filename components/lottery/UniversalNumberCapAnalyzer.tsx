@@ -312,7 +312,7 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
       toast.error(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการเพิ่มเลขอั้น');
     }
   };
-  
+
   const clearManagedNumbers = async () => {
     if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างรายการจัดการทั้งหมด?')) {
       try {
@@ -405,10 +405,10 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
     >
     <Card className="m-2 md:m-4">
         <CardHeader className="flex flex-row items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4">
                 <div className="bg-red-100 p-2 rounded-lg"><BarChart3 className="h-6 w-6 text-red-600" /></div>
-                <div>
-                    <h1 className="text-xl font-bold text-gray-900">ระบบจัดการเลขอั้น</h1>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">ระบบจัดการเลขอั้น</h1>
                     <p className="text-sm text-gray-600">{lotterySubType?.sub_type_name} • {lotterySubType?.country_origin}</p>
                 </div>
             </div>
@@ -416,28 +416,28 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
         </CardHeader>
         <CardContent>
             <div className="flex flex-wrap gap-4 items-center justify-between mb-4">
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-gray-500" /><label className="text-sm font-medium">วันที่:</label>
-                        <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-40" disabled={testMode || loading} />
-                    </div>
-                    <div className="flex items-center gap-2">
+              <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-40" disabled={testMode || loading} />
+            </div>
+            <div className="flex items-center gap-2">
                         <AlertTriangle className="h-4 w-4 text-orange-500" /><label className="text-sm font-medium">เกณฑ์ (%):</label>
-                        <Input type="number" value={riskThreshold} onChange={(e) => setRiskThreshold(Number(e.target.value))} className="w-20" min="1" max="100" disabled={loading} />
-                    </div>
+              <Input type="number" value={riskThreshold} onChange={(e) => setRiskThreshold(Number(e.target.value))} className="w-20" min="1" max="100" disabled={loading} />
+            </div>
                     <Button onClick={() => { if (!testMode) fetchSalesAnalysis(); }} disabled={loading || testMode}>
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}วิเคราะห์ใหม่
-                    </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button onClick={() => setShowManualAdd(prev => !prev)} variant="outline" size="sm">
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+              <Button onClick={() => setShowManualAdd(prev => !prev)} variant="outline" size="sm">
                         <Plus className="mr-2 h-4 w-4" />เพิ่มเลขด้วยตนเอง
-                    </Button>
+              </Button>
                     <Button onClick={() => { setTestMode(prev => !prev); if(testMode) { setSelectedNumbers([]); toast.info("ออกจากโหมดทดสอบ"); } }} variant="outline" className={testMode ? "bg-orange-50 text-orange-700" : ""}>
-                        {testMode ? "ออกจากโหมดทดสอบ" : "ทดสอบ"}
-                    </Button>
-                </div>
-            </div>
+                {testMode ? "ออกจากโหมดทดสอบ" : "ทดสอบ"}
+              </Button>
+          </div>
+      </div>
             
             <AnimatePresence>
             {showManualAdd && (
@@ -489,11 +489,11 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                 </motion.div>
             )}
             </AnimatePresence>
-
-            {testMode && <div className="bg-orange-50 border border-orange-200 text-orange-700 rounded-lg p-3 text-sm flex items-center gap-2"><AlertTriangle className="h-5 w-5" /><span>กำลังแสดงข้อมูลตัวอย่างสำหรับทดสอบระบบ</span></div>}
-            {loading && <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /> <span className="ml-2">กำลังวิเคราะห์ข้อมูล...</span></div>}
-            
-            {!loading && analysis && (
+      
+      {testMode && <div className="bg-orange-50 border border-orange-200 text-orange-700 rounded-lg p-3 text-sm flex items-center gap-2"><AlertTriangle className="h-5 w-5" /><span>กำลังแสดงข้อมูลตัวอย่างสำหรับทดสอบระบบ</span></div>}
+      {loading && <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /> <span className="ml-2">กำลังวิเคราะห์ข้อมูล...</span></div>}
+      
+      {!loading && analysis && (
                 <motion.div
                     key="analysis-results"
                     variants={containerVariants}
@@ -523,35 +523,35 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                          {filteredManagedNumbers.length > 0 ? (
                             <Card className="mt-4">
                                 <CardContent className="pt-4">
-                                    <div className="overflow-x-auto">
-                                      <table className="w-full text-sm">
-                                        <thead><tr className="border-b"><th className="text-left p-2">หมายเลข</th><th className="text-left p-2">ประเภท</th><th className="text-left p-2">การจัดการ</th><th className="text-left p-2">เหตุผล</th><th className="text-left p-2">ที่มา</th><th className="text-center p-2">จัดการ</th></tr></thead>
-                                        <tbody>
-                                          {filteredManagedNumbers.map((managed, index) => (
-                                            <tr key={index} className="border-b hover:bg-green-50">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b"><th className="text-left p-2">หมายเลข</th><th className="text-left p-2">ประเภท</th><th className="text-left p-2">การจัดการ</th><th className="text-left p-2">เหตุผล</th><th className="text-left p-2">ที่มา</th><th className="text-center p-2">จัดการ</th></tr></thead>
+                    <tbody>
+                      {filteredManagedNumbers.map((managed, index) => (
+                        <tr key={index} className="border-b hover:bg-green-50">
                                               <td className="p-2 font-mono font-bold">{managed.number}</td><td className="p-2">{managed.digit_count} ตัว{managed.type_number}</td>
-                                              <td className="p-2"><Badge variant={managed.action === 'half' ? 'outline' : 'destructive'}>{managed.action === 'half' ? <><Scissors className="h-3 w-3 mr-1" />หารครึ่ง</> : <><Ban className="h-3 w-3 mr-1" />ปิดรับ</>}</Badge></td>
+                          <td className="p-2"><Badge variant={managed.action === 'half' ? 'outline' : 'destructive'}>{managed.action === 'half' ? <><Scissors className="h-3 w-3 mr-1" />หารครึ่ง</> : <><Ban className="h-3 w-3 mr-1" />ปิดรับ</>}</Badge></td>
                                               <td className="p-2 text-sm text-gray-600">{managed.reason}</td><td className="p-2"><Badge variant={managed.is_manual ? 'secondary' : 'outline'}>{managed.is_manual ? 'ด้วยตนเอง' : 'วิเคราะห์'}</Badge></td>
-                                              <td className="p-2 text-center"><Button size="sm" variant="ghost" onClick={() => removeManagedNumberFromContext(`${managed.number}-${managed.digit_count}-${managed.type_number}`)}>ลบ</Button></td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                    <div className="flex justify-between items-center mt-4">
-                                      <div className="text-sm text-gray-600">รวม: หารครึ่ง {filteredManagedNumbers.filter(m => m.action === 'half').length} เลข, ปิดรับ {filteredManagedNumbers.filter(m => m.action === 'close').length} เลข</div>
-                                      <div className="flex gap-2"><Button onClick={exportManagedNumbers} variant="outline" size="sm">ส่งออก CSV</Button><Button onClick={clearManagedNumbers} variant="outline" size="sm">ล้างทั้งหมด</Button></div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                          <td className="p-2 text-center"><Button size="sm" variant="ghost" onClick={() => removeManagedNumberFromContext(`${managed.number}-${managed.digit_count}-${managed.type_number}`)}>ลบ</Button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-gray-600">รวม: หารครึ่ง {filteredManagedNumbers.filter(m => m.action === 'half').length} เลข, ปิดรับ {filteredManagedNumbers.filter(m => m.action === 'close').length} เลข</div>
+                  <div className="flex gap-2"><Button onClick={exportManagedNumbers} variant="outline" size="sm">ส่งออก CSV</Button><Button onClick={clearManagedNumbers} variant="outline" size="sm">ล้างทั้งหมด</Button></div>
+                </div>
+              </CardContent>
+            </Card>
                         ) : (<div className="text-center p-8 text-gray-500">ไม่มีรายการจัดการสำหรับวันที่เลือก</div>)}
                     </TabsContent>
                 </Tabs>
                 </motion.div>
-            )}
+          )}
 
             <AnimatePresence>
-            {selectedNumbers.length > 0 && (
+      {selectedNumbers.length > 0 && (
                 <motion.div
                     key="selection-card"
                     className="fixed bottom-4 right-4 w-80 z-50"
@@ -560,23 +560,23 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                     exit={{ opacity: 0, y: 50, transition: { duration: 0.2 } }}
                 >
                     <Card className="shadow-lg">
-                        <CardHeader><CardTitle className="text-lg flex justify-between items-center"><span>เลือก {selectedNumbers.length} รายการ</span><Button variant="ghost" size="sm" onClick={() => setSelectedNumbers([])}>ยกเลิก</Button></CardTitle></CardHeader>
-                        <CardContent className="flex flex-col gap-2"><Button onClick={handleActionDialog} className="w-full"><Settings className="mr-2 h-4 w-4" />จัดการเลขที่เลือก</Button></CardContent>
-                    </Card>
+          <CardHeader><CardTitle className="text-lg flex justify-between items-center"><span>เลือก {selectedNumbers.length} รายการ</span><Button variant="ghost" size="sm" onClick={() => setSelectedNumbers([])}>ยกเลิก</Button></CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2"><Button onClick={handleActionDialog} className="w-full"><Settings className="mr-2 h-4 w-4" />จัดการเลขที่เลือก</Button></CardContent>
+        </Card>
                 </motion.div>
             )}
             </AnimatePresence>
 
-            <AlertDialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
-              <AlertDialogContent>
+      <AlertDialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
+        <AlertDialogContent>
                 <AlertDialogHeader><AlertDialogTitle>เลือกการกระทำสำหรับ {selectedNumbers.length} เลขที่เลือก</AlertDialogTitle><AlertDialogDescription>คุณต้องการ "หารครึ่ง" หรือ "ปิดรับ" สำหรับตัวเลขที่เลือกทั้งหมด?</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
-                  <Button variant="outline" onClick={() => handleSelectAction('half')}><Scissors className="mr-2 h-4 w-4" />หารครึ่ง</Button>
-                  <Button variant="destructive" onClick={() => handleSelectAction('close')}><Ban className="mr-2 h-4 w-4" />ปิดรับ</Button>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+          <AlertDialogFooter>
+            <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+            <Button variant="outline" onClick={() => handleSelectAction('half')}><Scissors className="mr-2 h-4 w-4" />หารครึ่ง</Button>
+            <Button variant="destructive" onClick={() => handleSelectAction('close')}><Ban className="mr-2 h-4 w-4" />ปิดรับ</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
         </CardContent>
         <CardFooter className="flex justify-end pt-6 border-t mt-4">
             <Button variant="outline" onClick={onClose}>ปิดหน้าต่าง</Button>
