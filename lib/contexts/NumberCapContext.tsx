@@ -122,57 +122,67 @@ export const NumberCapProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const removeManagedNumber = async (numberKey: string) => {
     try {
-      // แยกข้อมูลจาก numberKey
       const parts = numberKey.split('-');
-      if (parts.length >= 4) {
-        const number = parts[0];
-        const digit_count = parseInt(parts[1]);
-        const type_number = parts[2];
-        const lottery_sub_type_id = parseInt(parts[3]);
-
-        console.log('DEBUG: [NumberCapContext] removeManagedNumber:', {
-          numberKey,
-          number,
-          digit_count,
-          type_number,
-          lottery_sub_type_id
-        });
-
-        // ลบจากฐานข้อมูล
-        const { data, error } = await supabase
-          .from('managed_numbers')
-          .delete()
-          .eq('number', number)
-          .eq('digit_count', digit_count)
-          .eq('type_number', type_number)
-          .eq('lottery_sub_type_id', lottery_sub_type_id);
-
-        if (error) {
-          console.error('Error deleting managed number:', {
-            error: error,
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          });
-          throw new Error(`ไม่สามารถลบเลขอั้นได้: ${error.message || 'ข้อผิดพลาดที่ไม่ทราบสาเหตุ'}`);
-        }
-
-        console.log('DEBUG: [NumberCapContext] delete success:', data);
-
-        // ดึง draw_date ล่าสุดจาก state (ถ้าเจอ)
-        const found = managedNumbers.find(n => n.number === number && n.digit_count === digit_count && n.type_number === type_number && n.lottery_sub_type_id === lottery_sub_type_id);
-        const draw_date = found ? found.draw_date : undefined;
-        if (draw_date) {
-          await fetchManagedNumbers(lottery_sub_type_id, draw_date);
-        }
+      if (parts.length < 3) {
+        console.error('Invalid numberKey for removal:', numberKey);
+        throw new Error('ข้อมูลสำหรับลบไม่ถูกต้อง');
       }
-    } catch (error) {
-      console.error('Error removing managed number:', {
-        error: error,
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+      
+      const number = parts[0];
+      const digit_count = parseInt(parts[1], 10);
+      const type_number = parts[2];
+
+      // Find the specific managed number in the state to get all its properties, including draw_date and sub_type_id
+      const numberToRemove = managedNumbers.find(n => 
+        n.number === number && 
+        n.digit_count === digit_count && 
+        n.type_number === type_number
+      );
+
+      if (!numberToRemove) {
+        console.warn('Could not find number to remove in context state:', numberKey);
+        // Force a state update to remove it from the view anyway
+        setManagedNumbers(prev => prev.filter(n => `${n.number}-${n.digit_count}-${n.type_number}` !== numberKey));
+        return;
+      }
+      
+      const { lottery_sub_type_id, draw_date } = numberToRemove;
+
+      console.log('DEBUG: [NumberCapContext] removeManagedNumber:', {
+        number,
+        digit_count,
+        type_number,
+        lottery_sub_type_id,
+        draw_date,
       });
+
+      const { error } = await supabase
+        .from('managed_numbers')
+        .delete()
+        .eq('number', number)
+        .eq('digit_count', digit_count)
+        .eq('type_number', type_number)
+        .eq('lottery_sub_type_id', lottery_sub_type_id)
+        .eq('draw_date', draw_date);
+
+      if (error) {
+        console.error('Error deleting managed number:', error);
+        throw new Error(`ไม่สามารถลบเลขอั้นได้: ${error.message}`);
+      }
+
+      console.log('DEBUG: [NumberCapContext] delete success');
+
+      // Update state locally for faster UI response
+      setManagedNumbers(prev => prev.filter(n => 
+        !(n.number === number && 
+          n.digit_count === digit_count && 
+          n.type_number === type_number && 
+          n.lottery_sub_type_id === lottery_sub_type_id &&
+          n.draw_date === draw_date)
+      ));
+      
+    } catch (error) {
+      console.error('Error removing managed number:', error);
       throw error;
     }
   };

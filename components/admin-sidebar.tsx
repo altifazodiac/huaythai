@@ -71,16 +71,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       icon: CalendarDays,
     },
      
-    {
-      title: "จัดการ Task Scheduler",
-      href: "/task-manager",
-      icon: Settings,
-    },
-    {
-      title: "รายการที่ลบ",
-      href: "/lottery-ticketAd",
-      icon: Trash,
-    },
+   
     {
       title: "จัดการประเภทหวย",
       href: "/lotterysubtype",
@@ -100,6 +91,16 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       title: "รายงานหวยแบบรายละเอียด",
       href: "/lottery-report",
       icon: BarChart3,
+    },
+    {
+      title: "จัดการ Task Scheduler",
+      href: "/task-manager",
+      icon: Settings,
+    },
+    {
+      title: "รายการที่ลบ",
+      href: "/lottery-ticketAd",
+      icon: Trash,
     },
     {
       title: "ประวัติการทำรายการ",

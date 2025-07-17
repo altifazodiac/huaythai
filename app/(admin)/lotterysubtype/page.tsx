@@ -59,6 +59,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/u
 import { toast } from "sonner";
 import { useRef } from "react";
 import UniversalNumberCapAnalyzer from "@/components/lottery/UniversalNumberCapAnalyzer";
+import NumberCapAnalyzerDialog from '@/components/lottery/NumberCapAnalyzerDialog';
 
 interface LotteryType {
   lottery_type_id: number;
@@ -169,9 +170,10 @@ export default function LotterySubTypePage() {
   const tableRef = useRef<HTMLTableElement>(null);
   // Debounced search
   const [searchTerm, setSearchTerm] = useState("");
-  // Universal Number Cap System
-  const [numberCapAnalyzerOpen, setNumberCapAnalyzerOpen] = useState(false);
-  const [numberCapSubTypeId, setNumberCapSubTypeId] = useState<number | null>(null);
+  // Universal Number Cap System - Removed states, handled by new component
+  // const [numberCapAnalyzerOpen, setNumberCapAnalyzerOpen] = useState(false);
+  // const [numberCapSubTypeId, setNumberCapSubTypeId] = useState<number | null>(null);
+  
   // เพิ่มตรงนี้
   const [showColumns, setShowColumns] = useState<Record<string, boolean>>({
     index: true,
@@ -673,16 +675,16 @@ export default function LotterySubTypePage() {
     await fetchPayouts(payoutSubTypeId);
   };
 
-  // Universal Number Cap Analyzer
-  const openNumberCapAnalyzer = async (lottery_sub_type_id: number) => {
-    setNumberCapSubTypeId(lottery_sub_type_id);
-    setNumberCapAnalyzerOpen(true);
-  };
+  // Universal Number Cap Analyzer - Removed functions, handled by new component
+  // const openNumberCapAnalyzer = async (lottery_sub_type_id: number) => {
+  //   setNumberCapSubTypeId(lottery_sub_type_id);
+  //   setNumberCapAnalyzerOpen(true);
+  // };
 
-  const closeNumberCapAnalyzer = () => {
-    setNumberCapAnalyzerOpen(false);
-    setNumberCapSubTypeId(null);
-  };
+  // const closeNumberCapAnalyzer = () => {
+  //   setNumberCapAnalyzerOpen(false);
+  //   setNumberCapSubTypeId(null);
+  // };
 
   // Helper function to check if it's Government Lottery
 
@@ -1028,9 +1030,11 @@ export default function LotterySubTypePage() {
                               <Button size="sm" variant="outline" onClick={() => openPayoutDrawer(item.lottery_sub_type_id)}>
                                 อัตรา
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => openNumberCapAnalyzer(item.lottery_sub_type_id)} className="bg-red-50 text-red-700 hover:bg-red-100">
-                                เลขอั้น
-                              </Button>
+                              <NumberCapAnalyzerDialog lottery_sub_type_id={item.lottery_sub_type_id}>
+                                <Button size="sm" variant="outline" className="bg-red-50 text-red-700 hover:bg-red-100">
+                                  เลขอั้น
+                                </Button>
+                              </NumberCapAnalyzerDialog>
                               <Button size="sm" className="bg-red-400 text-white" variant="outline" onClick={() => handleDelete(item.lottery_sub_type_id)}>
                               ลบ
                             </Button>
@@ -1395,7 +1399,8 @@ export default function LotterySubTypePage() {
         </DrawerContent>
       </Drawer>
      
-      {/* Universal Number Cap Analyzer Dialog */}
+      {/* Universal Number Cap Analyzer Dialog is now a separate component */}
+      {/* 
       <Dialog open={numberCapAnalyzerOpen} onOpenChange={setNumberCapAnalyzerOpen}>
         <DialogContent className="sm:max-w-[90vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1412,6 +1417,7 @@ export default function LotterySubTypePage() {
           )}
         </DialogContent>
       </Dialog>
+      */}
     </>
   );
 }
