@@ -178,7 +178,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   try {
     let query = supabase
       .from('lottery_tickets')
-      .select('*, lottery_ticket_items(*, lottery_sub_number(*)), profiles(name)')
+      .select('*, lottery_ticket_items(*, lottery_sub_number(*)), profiles(name, percent)')
       .eq('status', 'confirmed');
 
     if (startDate) query = query.gte('draw_date', startDate);
@@ -198,7 +198,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       const profit_loss = total_purchase_amount - total_reward_amount;
       
       // คำนวณ commission และอื่นๆ
-      const commission_percentage = ticket.profiles?.commission_percentage || 0;
+      const commission_percentage = ticket.profiles?.percent || 0;
       const commission_amount = total_purchase_amount * (commission_percentage / 100);
       const remaining_balance = profit_loss - commission_amount;
 

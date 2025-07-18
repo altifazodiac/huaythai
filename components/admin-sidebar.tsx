@@ -22,6 +22,7 @@ import {
   Moon,
   ChevronDown,
   Globe,
+  Calculator,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -76,6 +77,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       title: "จัดการประเภทหวย",
       href: "/lotterysubtype",
       icon: Ticket,
+    },
+    {
+      title: "วิเคราะห์หมายเลขหวย",
+      href: "/number_analysis",
+      icon: Calculator,
     },
     {
       title: "ประวัติการทำธุรกรรมเครดิต",
