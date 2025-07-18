@@ -81,7 +81,7 @@ export const countryFlagImg = (country: string | null | undefined): string => {
     KR: "Korea.jpg",
     IN: "India.jpg",
     TH: "Thailand.jpg",
-    STOCK: "Thai.jpg",
+    STOCK: "Unknown.jpg",
     US: "USA.jpg",
     HK: "Hongkong.jpg",
     TW: "Taiwan.jpg",
@@ -101,6 +101,7 @@ export const countryFlagImg = (country: string | null | undefined): string => {
     SET: "Thailand.jpg",
     SSE: "China.jpg",
     KOSPI: "KOSPI.jpg",
+     
   };
 
   // Normalize the input: check if it's a Thai name or stock index and convert to code

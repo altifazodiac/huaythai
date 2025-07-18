@@ -115,6 +115,7 @@ export default function LotteryTicketResultsPage() {
               lottery_sub_number:lottery_sub_number(id,lottery_sub_type_id,digit_number,type_number,price_paid)
             )
           `)
+          .eq("user_id", user.id)
           .order("created_at", { ascending: false });
           
         if (ticketsError) {
@@ -126,7 +127,9 @@ export default function LotteryTicketResultsPage() {
           .from("lottery_results")
           .select(`*,
             lottery_sub_types:lottery_sub_type_id(lottery_sub_type_id,sub_type_name)
-          `);
+          `)
+          .in('draw_date', ticketsData?.map(t => t.draw_date) || [])
+          .order('draw_date', { ascending: false });
           
         if (resultsError) {
           console.error('Error fetching results:', resultsError);
@@ -265,7 +268,7 @@ export default function LotteryTicketResultsPage() {
       }
     }
     return { winningTickets: wins, totalPrize };
-  }, [tickets, resultMap]);
+  }, [tickets, results]);
 
   useEffect(() => {
     supabase.from('lottery_winning_bills').select('*').then(({ data }: { data: any[] | null }) => setWinningBills(data || []));
@@ -495,6 +498,8 @@ export default function LotteryTicketResultsPage() {
                   <FaTicketAlt className="mx-auto text-4xl text-gray-300 dark:text-gray-600 mb-2" />
                   <h3 className="text-base font-semibold text-gray-600 dark:text-gray-200 mb-1">ไม่พบบิลที่ถูกรางวัล</h3>
                   <p className="text-gray-500 dark:text-gray-400 text-xs">ลองเปลี่ยนเงื่อนไขการค้นหาหรือตรวจสอบในงวดอื่น</p>
+
+
                 </CardContent>
               </Card>
             ) : (
@@ -548,7 +553,7 @@ export default function LotteryTicketResultsPage() {
                                   <div className="flex items-center gap-1 text-sm">
                                     <FaCalendarAlt className="text-blue-200 text-xs" />
                                     <span className="text-blue-100">
-                                      ซื้อ: {format(new Date(win.items[0]?.result?.created_at || win.draw_date), 'd MMM yy', { locale: th })}
+                                      ซื้อ: {format(new Date(tickets.find(t => t.id === win.ticket_id)?.created_at || win.draw_date), 'd MMM yy', { locale: th })}
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-1">
