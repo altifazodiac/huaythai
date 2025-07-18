@@ -36,7 +36,8 @@ import {
   CheckCircle,
   XCircle,
   PlusCircle,
-  MinusCircle
+  MinusCircle,
+  Computer
 } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
 
@@ -89,6 +90,7 @@ interface LotteryTransactionData {
   commission_amount: number;
   remaining_balance: number;
   profit_loss: number;
+  net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
   bill_count: number;
   ticket_count: number;
   status: string;
@@ -104,6 +106,7 @@ interface UserSummary {
   total_commission: number;
   total_remaining: number;
   total_profit_loss: number;
+  total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
   bill_count: number;
   transaction_count: number;
 }
@@ -116,6 +119,7 @@ interface DateGroupedReport {
   total_commission: number;
   total_remaining: number;
   total_profit_loss: number;
+  total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
   total_bills: number;
   total_transactions: number;
   users: UserSummary[];
@@ -201,6 +205,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       const commission_percentage = ticket.profiles?.percent || 0;
       const commission_amount = total_purchase_amount * (commission_percentage / 100);
       const remaining_balance = profit_loss - commission_amount;
+      const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 
       return {
         id: ticket.id,
@@ -214,6 +219,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
         commission_amount,
         remaining_balance,
         profit_loss,
+        net_amount,
         bill_count: 1,
         ticket_count: (ticket.lottery_ticket_items || []).length,
         status: ticket.status,
@@ -312,6 +318,7 @@ const LotteryReportSummaryPage: React.FC = () => {
             total_commission: 0,
             total_remaining: 0,
             total_profit_loss: 0,
+            total_net_amount: 0,
             total_bills: 0,
             total_transactions: 0,
             users: [],
@@ -326,6 +333,7 @@ const LotteryReportSummaryPage: React.FC = () => {
         dateGroup.total_commission += transaction.commission_amount;
         dateGroup.total_remaining += transaction.remaining_balance;
         dateGroup.total_profit_loss += transaction.profit_loss;
+        dateGroup.total_net_amount += transaction.net_amount;
         dateGroup.total_bills += transaction.bill_count;
         dateGroup.total_transactions += 1;
 
@@ -341,6 +349,7 @@ const LotteryReportSummaryPage: React.FC = () => {
             total_commission: 0,
             total_remaining: 0,
             total_profit_loss: 0,
+            total_net_amount: 0,
             bill_count: 0,
             transaction_count: 0,
           };
@@ -352,6 +361,7 @@ const LotteryReportSummaryPage: React.FC = () => {
         userSummary.total_commission += transaction.commission_amount;
         userSummary.total_remaining += transaction.remaining_balance;
         userSummary.total_profit_loss += transaction.profit_loss;
+        userSummary.total_net_amount += transaction.net_amount;
         userSummary.bill_count += transaction.bill_count;
         userSummary.transaction_count += 1;
 
@@ -812,6 +822,12 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         {dateReport.total_profit_loss >= 0 ? 'กำไร' : 'ขาดทุน'}
                                       </div>
                                     </div>
+                                    <div className="text-right rounded-md border border-green-200 bg-green-100 p-4">
+                                      <div className={`font-semibold text-lg ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                        {formatCurrency(dateReport.total_net_amount)}
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">ยอดสุทธิ</div>
+                                    </div>
                                   </div>
                                 </div>
                               </CardHeader>
@@ -828,6 +844,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         <TableHead className="text-right w-32">ถูกรางวัล</TableHead>
                                         <TableHead className="text-right w-32">ยอดคงเหลือ</TableHead>
                                         <TableHead className="text-right w-32">กำไร/ขาดทุน</TableHead>
+                                        <TableHead className="text-right w-32">ยอดสุทธิ</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -860,7 +877,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                             </span>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <span className="text-green-600 font-medium">
+                                            <span className="text-red-600 font-medium">
                                               {formatCurrency(user.total_reward)}
                                             </span>
                                           </TableCell>
@@ -879,9 +896,43 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(user.total_profit_loss)}
                                             </span>
                                           </TableCell>
+                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100 p-2">
+                                            <span className={`font-medium ${user.total_net_amount >= 0 ? 'text-emerald-900' : 'text-orange-600'}`}>
+                                              {formatCurrency(user.total_net_amount)}
+                                            </span>
+                                          </TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
+                                    {/* Summary Row for Users */}
+                                    {dateReport.users.length > 0 && (
+                                      <TableBody>
+                                        <TableRow className="bg-gray-100 dark:bg-gray-800 font-bold">
+                                          <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
+                                          <TableCell></TableCell>
+                                          <TableCell className="text-right">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_purchase, 0))}
+                                          </TableCell>
+                                          <TableCell className="text-right text-blue-600">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_commission, 0))}
+                                          </TableCell>
+                                          <TableCell className="text-right text-red-600">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_reward, 0))}
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_remaining, 0))}
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <span className={dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                              {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_net_amount, 0))}
+                                          </TableCell>
+                                        </TableRow>
+                                      </TableBody>
+                                    )}
                                   </Table>
                                 </div>
                               </CardContent>
@@ -915,6 +966,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                     <TableHead className="text-right w-32">ถูกรางวัล</TableHead>
                                     <TableHead className="text-right w-32">ยอดคงเหลือ</TableHead>
                                     <TableHead className="text-right w-32">กำไร/ขาดทุน</TableHead>
+                                    <TableHead className="text-right w-32">ยอดสุทธิ</TableHead>
                                     <TableHead className="text-right w-20">อัตราส่วนกำไร</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -966,6 +1018,11 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         </span>
                                       </TableCell>
                                       <TableCell className="text-right">
+                                        <span className={`font-medium ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                          {formatCurrency(dateReport.total_net_amount)}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-right">
                                         <Badge variant={dateReport.profit_margin_percentage >= 0 ? 'default' : 'destructive'}>
                                           {dateReport.profit_margin_percentage.toFixed(1)}%
                                         </Badge>
@@ -973,6 +1030,38 @@ const LotteryReportSummaryPage: React.FC = () => {
                                     </TableRow>
                                   ))}
                                 </TableBody>
+                                {/* Summary Row */}
+                                {filteredDateData.length > 0 && (
+                                  <TableBody>
+                                    <TableRow className="bg-gray-100 dark:bg-gray-800 font-bold">
+                                      <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
+                                      <TableCell className="text-right">
+                                        {filteredDateData.reduce((sum, item) => sum + item.total_users, 0)}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_purchase, 0))}
+                                      </TableCell>
+                                      <TableCell className="text-right text-blue-600">
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_commission, 0))}
+                                      </TableCell>
+                                      <TableCell className="text-right text-green-600">
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_reward, 0))}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_remaining, 0))}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <span className={filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                          {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0))}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-right text-emerald-600">
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_net_amount, 0))}
+                                      </TableCell>
+                                      <TableCell></TableCell>
+                                    </TableRow>
+                                  </TableBody>
+                                )}
                               </Table>
                             </div>
                           </CardContent>
@@ -986,34 +1075,112 @@ const LotteryReportSummaryPage: React.FC = () => {
                 <Card className="mt-8">
                   <CardHeader>
                     <CardTitle className="text-xl flex items-center">
-                      <Calculator className="h-5 w-5 mr-2" />
-                      Overall Summary Report
+                      <Computer className="h-5 w-5 mr-2" />
+                      ค่าบริหารระบบ
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-primary">{overallSummary.total_dates}</div>
-                        <div className="text-sm text-muted-foreground">วันที่ทั้งหมด</div>
+                                      <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* กำไร/ขาดทุนรวม */}
+                        <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200 dark:border-emerald-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                                  <TrendingDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">กำไร/ขาดทุนรวม</p>
+                                  <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">Total Profit/Loss</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                                  {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0))}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* ค่าบริหารระบบ (5%) */}
+                        <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                                  <Computer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">ค่าบริหารระบบ</p>
+                                  <p className="text-xs text-blue-600/70 dark:text-blue-400/70">System Management (5%)</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                  {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05)}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* ยอดคงเหลือ */}
+                        <Card className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                                  <Wallet className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">ยอดคงเหลือ</p>
+                                  <p className="text-xs text-purple-600/70 dark:text-purple-400/70">Remaining Balance</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                                  {formatCurrency(Math.abs((filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05) - filteredDateData.reduce((sum, item) => sum + item.total_net_amount, 0)))}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold">{formatCurrency(overallSummary.total_purchase)}</div>
-                        <div className="text-sm text-muted-foreground">ยอดขายรวม</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">{formatCurrency(overallSummary.total_commission)}</div>
-                        <div className="text-sm text-muted-foreground">ค่าคอมรวม ({overallSummary.commission_rate_average.toFixed(1)}%)</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold ${overallSummary.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(overallSummary.total_profit_loss)}
+
+                      {/* Summary Bar */}
+                      <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">สรุปการคำนวณ</h3>
+                          <Badge variant="outline" className="text-xs">
+                            กำไร/ขาดทุน × 5% = ค่าบริหารระบบ
+                          </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {overallSummary.total_profit_loss >= 0 ? 'กำไรสุทธิ' : 'ขาดทุนสุทธิ'} ({overallSummary.profit_margin_percentage.toFixed(1)}%)
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+                            <span className="text-gray-600 dark:text-gray-400">กำไร/ขาดทุนรวม:</span>
+                            <span className="font-semibold text-emerald-600">
+                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0))}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+                            <span className="text-gray-600 dark:text-gray-400">ค่าบริหารระบบ (5%):</span>
+                            <span className="font-semibold text-blue-600">
+                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+                            <span className="text-gray-600 dark:text-gray-400">ยอดคงเหลือ:</span>
+                                                          <span className="font-semibold text-purple-600">
+                                {formatCurrency(
+                                  Math.abs((filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05) -
+                                   filteredDateData.reduce((sum, item) => sum + item.total_net_amount, 0))
+                                )}
+                              </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
+                    </CardContent>
                 </Card>
               </motion.div>
             </div>

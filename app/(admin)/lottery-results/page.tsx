@@ -37,19 +37,13 @@ interface LotteryTypeDetail {
   description: string | null;
 }
 
-interface ScheduleSubType {
+interface LotterySubType {
   lottery_sub_type_id: number;
   sub_type_name: string;
-  lottery_type_id: number; // Crucial for grouping
-}
-
-interface Schedule {
-  schedule_id: number;
-  draw_time: string;
-  frequency_unit: 'day' | 'week';
-  day_of_week?: string[]; // Assuming it's an array of strings like ["Monday", "Tuesday"]
-  lottery_sub_types: ScheduleSubType[]; // Changed to an array of ScheduleSubType
-  // Add other schedule properties if needed
+  lottery_type_id: number;
+  description?: string | null;
+  country_origin?: string;
+  is_active?: boolean;
 }
 
 interface SubNumber {
@@ -61,52 +55,33 @@ interface SubNumber {
   // Add other sub_number properties if needed
 }
 
-interface GroupedScheduleInfo {
+interface GroupedSubTypeInfo {
   details: LotteryTypeDetail;
-  schedules: Schedule[];
+  subTypes: LotterySubType[];
 }
 
-// --- LotteryScheduleCard Component ---
-interface LotteryScheduleCardProps {
-  sch: Schedule;
+// --- LotterySubTypeCard Component ---
+interface LotterySubTypeCardProps {
+  subType: LotterySubType;
   subNumbers: SubNumber[];
   resultInput: any; // Consider defining a more specific type
-  handleInputChange: (scheduleId: number, key: string, value: string) => void;
-  handleSave: (schedule: Schedule) => Promise<boolean>;
-   isSaving: boolean;
+  handleInputChange: (subTypeId: number, key: string, value: string) => void;
+  handleSave: (subType: LotterySubType) => Promise<boolean>;
+  isSaving: boolean;
   isSuccessfullySaved: boolean;
-   onEdit: (scheduleId: number) => void;
+  onEdit: (subTypeId: number) => void;
   onPasteResultForThisCard?: (values: { top3: string, bottom2: string }) => void;
 }
 
-// ฟังก์ชันแปลงชื่อวันอังกฤษเป็นไทย (ใช้ร่วมกับ LotteryScheduleCard)
-const dayOfWeekTH: Record<string, string> = {
-  'Monday': 'จันทร์',
-  'Tuesday': 'อังคาร',
-  'Wednesday': 'พุธ',
-  'Thursday': 'พฤหัสบดี',
-  'Friday': 'ศุกร์',
-  'Saturday': 'เสาร์',
-  'Sunday': 'อาทิตย์',
-};
-
-function getDayOfWeekTH(days: string[] | string | undefined): string {
-  if (!days) return '';
-  if (Array.isArray(days)) {
-    return days.map(d => dayOfWeekTH[d] || d).join(', ');
-  }
-  return dayOfWeekTH[days] || days;
-}
-
-const LotteryScheduleCard: React.FC<LotteryScheduleCardProps> = ({
-  sch,
+const LotterySubTypeCard: React.FC<LotterySubTypeCardProps> = ({
+  subType,
   subNumbers,
   resultInput,
   handleInputChange,
   handleSave,
   isSaving,
- onEdit,
-    isSuccessfullySaved,
+  onEdit,
+  isSuccessfullySaved,
   onPasteResultForThisCard,
 }) => {
   const cardVariants = {
@@ -134,10 +109,6 @@ const LotteryScheduleCard: React.FC<LotteryScheduleCardProps> = ({
       }
       return b.digit_number - a.digit_number || a.type_number.localeCompare(b.type_number);
     });
-
-  const subTypeName = sch.lottery_sub_types && sch.lottery_sub_types.length > 0 
-                      ? sch.lottery_sub_types[0].sub_type_name 
-                      : "ไม่ระบุประเภทย่อย";
 
   const groupedByDigits: Record<string, typeof processedSubNumbers> = {};
   processedSubNumbers.forEach(sn => {
@@ -174,13 +145,11 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
           <div className="flex-grow">
             <CardTitle className="text-xs font-semibold text-slate-800 truncate flex items-center">
               {isSuccessfullySaved && <CheckCircle2 className="w-3 h-3 text-red-600 mr-1.5 flex-shrink-0" />}
-              {subTypeName}
+              {subType.sub_type_name}
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              รอบ: {sch.draw_time}
-              {sch.day_of_week && getDayOfWeekTH(sch.day_of_week) && (
-                <span> วัน{getDayOfWeekTH(sch.day_of_week)}</span>
-              )}
+              {subType.country_origin || 'ไม่ระบุประเทศ'}
+              {subType.description && ` • ${subType.description}`}
             </CardDescription>
           </div>
           {(!isSuccessfullySaved || isSaving) && !isSaving && (
@@ -221,7 +190,7 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
                             const sanitized = typeof rawValue === 'string' ? rawValue.replace(/\D/g, '') : '';
                             return sanitized.slice(-sn.digit_number);
                           })()}
-                          onChange={e => handleInputChange(sch.schedule_id, sn.key, e.target.value)}
+                          onChange={e => handleInputChange(subType.lottery_sub_type_id, sn.key, e.target.value)}
                         disabled={
                             isSuccessfullySaved ||
                             isSaving ||
@@ -245,7 +214,7 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
         <CardFooter className="p-2 border-t border-slate-100 bg-slate-50">
           <motion.div whileTap={{ scale: 0.97 }} className="w-full">
             <Button
-              onClick={() => isSuccessfullySaved ? onEdit(sch.schedule_id) : handleSave(sch)}
+              onClick={() => isSuccessfullySaved ? onEdit(subType.lottery_sub_type_id) : handleSave(subType)}
               disabled={isSaving}
               className={`w-full text-xs py-1 h-7 rounded-md transition-colors duration-150 ${isSuccessfullySaved ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-sky-600 hover:bg-sky-700 text-white'}`}
             >
@@ -263,12 +232,12 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
 export default function LotteryResultsPage() {
   const { supabase } = useAuth(); // 🔧 **แก้ไข**: ใช้ supabase จาก AuthContext
   const [lotteryTypeDetails, setLotteryTypeDetails] = useState<Record<number, LotteryTypeDetail>>({});
-  const [groupedSchedules, setGroupedSchedules] = useState<Record<string, GroupedScheduleInfo>>({});
-  const [resultInputs, setResultInputs] = useState<{ [scheduleId: number]: any }>({});
+  const [groupedSubTypes, setGroupedSubTypes] = useState<Record<string, GroupedSubTypeInfo>>({});
+  const [resultInputs, setResultInputs] = useState<{ [subTypeId: number]: any }>({});
   const [subNumbersMap, setSubNumbersMap] = useState<Record<number, SubNumber[]>>({});
-  const [successfullySavedSchedules, setSuccessfullySavedSchedules] = useState<Set<number>>(new Set());
+  const [successfullySavedSubTypes, setSuccessfullySavedSubTypes] = useState<Set<number>>(new Set());
   const [pageIsLoading, setPageIsLoading] = useState(true);
-  const [saveInProgressForScheduleId, setSaveInProgressForScheduleId] = useState<number | null>(null);
+  const [saveInProgressForSubTypeId, setSaveInProgressForSubTypeId] = useState<number | null>(null);
  const [isSavingAll, setIsSavingAll] = useState(false);
   const [isBulkPasteOpen, setIsBulkPasteOpen] = useState(false);
   const [bulkPasteText, setBulkPasteText] = useState("");
@@ -287,40 +256,47 @@ export default function LotteryResultsPage() {
       return detailsMap;
     };
 
-      const fetchSchedulesAndGroup = async (fetchedLotteryTypes: Record<number, LotteryTypeDetail>): Promise<Record<string, GroupedScheduleInfo> | null> => {
-        const selectedDayOfWeek = format(new Date(selectedDate), 'EEEE');
+    const fetchAllSubTypesAndGroup = async (fetchedLotteryTypes: Record<number, LotteryTypeDetail>): Promise<Record<string, GroupedSubTypeInfo> | null> => {
+      // ดึงข้อมูล lottery_sub_types ทั้งหมด (ไม่กรอง is_active เพื่อให้ได้ 77 รายการ)
+      const { data: fetchedSubTypesData, error: subTypesError } = await supabase
+        .from('lottery_sub_types')
+        .select('lottery_sub_type_id, sub_type_name, lottery_type_id, description, country_origin, is_active')
+        .order('sub_type_name');
 
-        const { data: fetchedSchedulesData, error: schedulesError } = await supabase.from('drawing_schedules').select('schedule_id, draw_time, frequency_unit, day_of_week, lottery_sub_types(lottery_sub_type_id, sub_type_name, lottery_type_id)').eq('is_active', true);
-        if (schedulesError) { console.error("Error fetching schedules:", schedulesError.message); setGroupedSchedules({}); return null; }
-        if (!fetchedSchedulesData || fetchedSchedulesData.length === 0) { setGroupedSchedules({}); return null; }
+      if (subTypesError) { 
+        console.error("Error fetching sub types:", subTypesError.message); 
+        setGroupedSubTypes({}); 
+        return null; 
+      }
+      
+      if (!fetchedSubTypesData || fetchedSubTypesData.length === 0) { 
+        setGroupedSubTypes({}); 
+        return null; 
+      }
 
-      const fetchedSchedules = fetchedSchedulesData as any[];
-      // 🔧 **ปรับปรุง**: ลบ timeCondition เพื่อแสดงทุกรอบของวันที่เลือก
-      const filteredSchedules: Schedule[] = fetchedSchedules.filter((sch: any) => {
-        if (!sch.draw_time || !sch.lottery_sub_types || sch.lottery_sub_types.length === 0) return false;
-            if (sch.frequency_unit === 'day') return true;
-            if (sch.frequency_unit === 'week' && Array.isArray(sch.day_of_week) && sch.day_of_week.includes(selectedDayOfWeek)) return true;
-        return false;
-        }).map(sch => ({ ...sch, lottery_sub_types: Array.isArray(sch.lottery_sub_types) ? sch.lottery_sub_types : [sch.lottery_sub_types].filter(Boolean) as ScheduleSubType[] }));
+      const fetchedSubTypes = fetchedSubTypesData as LotterySubType[];
 
-      if (filteredSchedules.length > 0 && Object.keys(fetchedLotteryTypes).length > 0) {
-        const groups: Record<string, GroupedScheduleInfo> = {};
-        filteredSchedules.forEach(sch => {
-          const subType = sch.lottery_sub_types[0];
-          if (subType) {
-            const typeId = subType.lottery_type_id;
-            if (typeId && fetchedLotteryTypes[typeId]) {
-                        if (!groups[typeId.toString()]) { groups[typeId.toString()] = { details: fetchedLotteryTypes[typeId], schedules: [] }; }
-              groups[typeId.toString()].schedules.push(sch);
+      if (fetchedSubTypes.length > 0 && Object.keys(fetchedLotteryTypes).length > 0) {
+        const groups: Record<string, GroupedSubTypeInfo> = {};
+        fetchedSubTypes.forEach(subType => {
+          const typeId = subType.lottery_type_id;
+          if (typeId && fetchedLotteryTypes[typeId]) {
+            if (!groups[typeId.toString()]) { 
+              groups[typeId.toString()] = { details: fetchedLotteryTypes[typeId], subTypes: [] }; 
             }
+            groups[typeId.toString()].subTypes.push(subType);
           }
         });
-        setGroupedSchedules(groups);
-            const subTypeIds = filteredSchedules.map(sch => sch.lottery_sub_types[0]?.lottery_sub_type_id).filter((id): id is number => id !== null && id !== undefined);
-            if (subTypeIds.length > 0) { await fetchSubNumbers(subTypeIds); } else { setSubNumbersMap({}); }
-            return groups;
-        } else {
-        setGroupedSchedules({});
+        setGroupedSubTypes(groups);
+        const subTypeIds = fetchedSubTypes.map(st => st.lottery_sub_type_id);
+        if (subTypeIds.length > 0) { 
+          await fetchSubNumbers(subTypeIds); 
+        } else { 
+          setSubNumbersMap({}); 
+        }
+        return groups;
+      } else {
+        setGroupedSubTypes({});
         setSubNumbersMap({});
         return null;
       }
@@ -337,16 +313,21 @@ export default function LotteryResultsPage() {
       setSubNumbersMap(map);
     };
 
-const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<string, GroupedScheduleInfo>) => {
-      const allScheduleIds = Object.values(currentGroupedSchedules).flatMap(group => group.schedules.map(sch => sch.schedule_id));
-      if (allScheduleIds.length === 0) return;
+const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<string, GroupedSubTypeInfo>) => {
+      const allSubTypeIds = Object.values(currentGroupedSubTypes).flatMap(group => group.subTypes.map(st => st.lottery_sub_type_id));
+      if (allSubTypeIds.length === 0) return;
 
-      const { data: existingResults, error } = await supabase.from("lottery_results").select("schedule_id, prize_code, winning_number").eq("draw_date", selectedDate).in("schedule_id", allScheduleIds);
+      const { data: existingResults, error } = await supabase
+        .from("lottery_results")
+        .select("lottery_sub_type_id, prize_code, winning_number")
+        .eq("draw_date", selectedDate)
+        .in("lottery_sub_type_id", allSubTypeIds);
+      
       if (error) { toast.error("ไม่สามารถโหลดผลรางวัลที่บันทึกไว้ได้"); return; }
 
       if (existingResults && existingResults.length > 0) {
         const newSavedSet = new Set<number>();
-        const newResultInputs: { [scheduleId: number]: any } = {};
+        const newResultInputs: { [subTypeId: number]: any } = {};
           const mapDbPrizeCodeToComponentKey = (prizeCode: string): string | null => {
               switch (prizeCode) {
                   case '3 ตัวบน': return '3_บน';
@@ -359,30 +340,30 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
               }
           };
         existingResults.forEach(dbResult => {
-              if (!newResultInputs[dbResult.schedule_id]) { newResultInputs[dbResult.schedule_id] = {}; }
+              if (!newResultInputs[dbResult.lottery_sub_type_id]) { newResultInputs[dbResult.lottery_sub_type_id] = {}; }
               const componentKey = mapDbPrizeCodeToComponentKey(dbResult.prize_code);
               if (componentKey) {
-                  newResultInputs[dbResult.schedule_id][componentKey] = dbResult.winning_number;
+                  newResultInputs[dbResult.lottery_sub_type_id][componentKey] = dbResult.winning_number;
               }
-          newSavedSet.add(dbResult.schedule_id);
+          newSavedSet.add(dbResult.lottery_sub_type_id);
         });
-        setSuccessfullySavedSchedules(newSavedSet);
+        setSuccessfullySavedSubTypes(newSavedSet);
         setResultInputs(newResultInputs);
       } else {
-          setSuccessfullySavedSchedules(new Set());
+          setSuccessfullySavedSubTypes(new Set());
           setResultInputs({});
       }
     };
     
     const loadInitialData = async () => {
         setPageIsLoading(true);
-        setGroupedSchedules({});
+        setGroupedSubTypes({});
         setResultInputs({});
-        setSuccessfullySavedSchedules(new Set());
+        setSuccessfullySavedSubTypes(new Set());
         const types = await fetchLotteryTypes();
-        const currentGroupedSchedulesData = await fetchSchedulesAndGroup(types);
-        if (currentGroupedSchedulesData && Object.keys(currentGroupedSchedulesData).length > 0) {
-          await fetchExistingResultsAndSetStates(currentGroupedSchedulesData);
+        const currentGroupedSubTypesData = await fetchAllSubTypesAndGroup(types);
+        if (currentGroupedSubTypesData && Object.keys(currentGroupedSubTypesData).length > 0) {
+          await fetchExistingResultsAndSetStates(currentGroupedSubTypesData);
         }
         setPageIsLoading(false);
     };
@@ -393,12 +374,12 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
 
 
   // 🔧 **ปรับปรุง**: Debounce การคำนวณผลอัตโนมัติ
-  const handleInputChange = (scheduleId: number, key: string, value: string) => {
+  const handleInputChange = (subTypeId: number, key: string, value: string) => {
     // อัปเดต UI ทันทีเพื่อความลื่นไหล
     setResultInputs(prev => ({
       ...prev,
-      [scheduleId]: {
-        ...prev[scheduleId],
+      [subTypeId]: {
+        ...prev[subTypeId],
         [key]: isMultiValuePrize(key) ? value.replace(/[^0-9,]/g, '') : value.replace(/\D/g, "")
       }
     }));
@@ -410,41 +391,37 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
 
     debounceTimeoutRef.current = setTimeout(() => {
       setResultInputs(prev => {
-        const scheduleSpecificInputs = { ...prev[scheduleId] };
-      const sanitizedMainValue = scheduleSpecificInputs[key];
+        const subTypeSpecificInputs = { ...prev[subTypeId] };
+      const sanitizedMainValue = subTypeSpecificInputs[key];
         
         if (!sanitizedMainValue) return prev;
 
       if (key === "3_บน") {
         if (sanitizedMainValue.length === 3) {
-          scheduleSpecificInputs["3_โต๊ด"] = getPermutations(sanitizedMainValue).join(",");
-          scheduleSpecificInputs["2_บน"] = sanitizedMainValue.slice(-2);
-          scheduleSpecificInputs["1_วิ่งบน"] = [...new Set(sanitizedMainValue.split(""))].join(",");
+          subTypeSpecificInputs["3_โต๊ด"] = getPermutations(sanitizedMainValue).join(",");
+          subTypeSpecificInputs["2_บน"] = sanitizedMainValue.slice(-2);
+          subTypeSpecificInputs["1_วิ่งบน"] = [...new Set(sanitizedMainValue.split(""))].join(",");
         } else {
-          scheduleSpecificInputs["3_โต๊ด"] = "";
-          scheduleSpecificInputs["2_บน"] = "";
-          scheduleSpecificInputs["1_วิ่งบน"] = "";
+          subTypeSpecificInputs["3_โต๊ด"] = "";
+          subTypeSpecificInputs["2_บน"] = "";
+          subTypeSpecificInputs["1_วิ่งบน"] = "";
         }
       } else if (key === "2_ล่าง") {
         if (sanitizedMainValue.length === 2) {
-          scheduleSpecificInputs["1_วิ่งล่าง"] = [...new Set(sanitizedMainValue.split(""))].join(",");
+          subTypeSpecificInputs["1_วิ่งล่าง"] = [...new Set(sanitizedMainValue.split(""))].join(",");
         } else {
-          scheduleSpecificInputs["1_วิ่งล่าง"] = "";
+          subTypeSpecificInputs["1_วิ่งล่าง"] = "";
         }
       }
-      return { ...prev, [scheduleId]: scheduleSpecificInputs };
+      return { ...prev, [subTypeId]: subTypeSpecificInputs };
     });
     }, 300); // delay 300ms
   };
 
   const isMultiValuePrize = (key: string) => key === '3_โต๊ด' || key === '1_วิ่งบน' || key === '1_วิ่งล่าง';
 
-   const handleSave = async (sch: Schedule): Promise<boolean> => {
-    if (!sch.lottery_sub_types || sch.lottery_sub_types.length === 0) {
-        toast.error("ข้อมูลประเภทย่อยของหวยไม่สมบูรณ์"); return false;
-    }
-    const subTypeData = sch.lottery_sub_types[0];
-    const resultData = resultInputs[sch.schedule_id] || {};
+   const handleSave = async (subType: LotterySubType): Promise<boolean> => {
+    const resultData = resultInputs[subType.lottery_sub_type_id] || {};
     const prizeKeyMapping = { '3_บน': '3 ตัวบน', '2_ล่าง': '2 ตัวล่าง', '3_โต๊ด': '3 ตัวโต๊ด', '2_บน': '2 ตัวบน', '1_วิ่งบน': 'วิ่งบน', '1_วิ่งล่าง': 'วิ่งล่าง' };
     
     const upsertPayload = Object.entries(resultData)
@@ -453,11 +430,11 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
           const prize_code = prizeKeyMapping[key as keyof typeof prizeKeyMapping];
           if (!prize_code) return null;
           return {
-              lottery_type_id: subTypeData.lottery_type_id,
-              lottery_sub_type_id: subTypeData.lottery_sub_type_id,
-              schedule_id: sch.schedule_id,
+              lottery_type_id: subType.lottery_type_id,
+              lottery_sub_type_id: subType.lottery_sub_type_id,
+              schedule_id: null, // ไม่ใช้ schedule_id แล้ว
               draw_date: selectedDate,
-              draw_time: sch.draw_time,
+              draw_time: null, // ไม่ใช้ draw_time แล้ว
               prize_code: prize_code,
               winning_number: String(winning_number),
           };
@@ -465,15 +442,15 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
 
     if (upsertPayload.length === 0) { toast.error("กรุณากรอกผลรางวัล"); return false; }
 
-    setSaveInProgressForScheduleId(sch.schedule_id);
+    setSaveInProgressForSubTypeId(subType.lottery_sub_type_id);
 
-    const { error } = await supabase.from("lottery_results").upsert(upsertPayload, { onConflict: 'schedule_id, draw_date, draw_time, prize_code' });
+    const { error } = await supabase.from("lottery_results").upsert(upsertPayload, { onConflict: 'lottery_sub_type_id, draw_date, prize_code' });
 
-    setSaveInProgressForScheduleId(null);
+    setSaveInProgressForSubTypeId(null);
     if (error) { toast.error(`บันทึกผิดพลาด: ${error.message}`); return false; }
 
-    toast.success(`บันทึกผลสำหรับ ${subTypeData.sub_type_name} สำเร็จ!`);
-    setSuccessfullySavedSchedules(prev => new Set(prev).add(sch.schedule_id));
+    toast.success(`บันทึกผลสำหรับ ${subType.sub_type_name} สำเร็จ!`);
+    setSuccessfullySavedSubTypes(prev => new Set(prev).add(subType.lottery_sub_type_id));
       return true;
   };
   
@@ -482,21 +459,21 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
     setIsSavingAll(true);
     toast.info("กำลังเริ่มบันทึกผลรางวัลทั้งหมด...");
 
-    const schedulesToSave = Object.values(groupedSchedules)
-      .flatMap(group => group.schedules)
-      .filter(sch => 
-        resultInputs[sch.schedule_id] && 
-        Object.values(resultInputs[sch.schedule_id]).some(val => val) && // มีการกรอกข้อมูล
-        !successfullySavedSchedules.has(sch.schedule_id) // ยังไม่ได้บันทึก
+    const subTypesToSave = Object.values(groupedSubTypes)
+      .flatMap(group => group.subTypes)
+      .filter(subType => 
+        resultInputs[subType.lottery_sub_type_id] && 
+        Object.values(resultInputs[subType.lottery_sub_type_id]).some(val => val) && // มีการกรอกข้อมูล
+        !successfullySavedSubTypes.has(subType.lottery_sub_type_id) // ยังไม่ได้บันทึก
       );
 
-    if (schedulesToSave.length === 0) {
+    if (subTypesToSave.length === 0) {
       toast.info("ไม่พบรายการที่กรอกผลไว้และยังไม่ได้บันทึก");
       setIsSavingAll(false);
       return;
     }
 
-    const savePromises = schedulesToSave.map(sch => handleSave(sch));
+    const savePromises = subTypesToSave.map(subType => handleSave(subType));
     const results = await Promise.all(savePromises);
 
     const successfulSaves = results.filter(res => res).length;
@@ -515,12 +492,9 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
   // 🔧 **ใหม่**: ฟังก์ชันจัดการการวางผลแบบชุด
   const handleApplyBulkPaste = () => {
     const lines = bulkPasteText.trim().split('\n');
-    const allSchedulesByName: Record<string, Schedule> = {};
-    Object.values(groupedSchedules).flatMap(g => g.schedules).forEach(sch => {
-      const subTypeName = sch.lottery_sub_types?.[0]?.sub_type_name;
-      if (subTypeName) {
-        allSchedulesByName[subTypeName.toLowerCase().trim()] = sch;
-      }
+    const allSubTypesByName: Record<string, LotterySubType> = {};
+    Object.values(groupedSubTypes).flatMap(g => g.subTypes).forEach(subType => {
+      allSubTypesByName[subType.sub_type_name.toLowerCase().trim()] = subType;
     });
 
     let appliedCount = 0;
@@ -535,11 +509,11 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
       const top3 = parts[1];
       const bottom2 = parts[2];
 
-      const targetSchedule = allSchedulesByName[subTypeName];
+      const targetSubType = allSubTypesByName[subTypeName];
       
-      if (targetSchedule) {
-        handleInputChange(targetSchedule.schedule_id, '3_บน', top3);
-        handleInputChange(targetSchedule.schedule_id, '2_ล่าง', bottom2);
+      if (targetSubType) {
+        handleInputChange(targetSubType.lottery_sub_type_id, '3_บน', top3);
+        handleInputChange(targetSubType.lottery_sub_type_id, '2_ล่าง', bottom2);
         appliedCount++;
       } else {
         notFoundCount++;
@@ -556,10 +530,10 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
   };
 
   
-  const handleEditSchedule = (scheduleId: number) => {
-    setSuccessfullySavedSchedules(prev => {
+  const handleEditSubType = (subTypeId: number) => {
+    setSuccessfullySavedSubTypes(prev => {
       const newSet = new Set(prev);
-      newSet.delete(scheduleId);
+      newSet.delete(subTypeId);
       return newSet;
     });
   };
@@ -662,14 +636,14 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
         </div>
       </div>
       
-      {Object.keys(groupedSchedules).length === 0 ? (
+      {Object.keys(groupedSubTypes).length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-slate-500 text-lg">ยังไม่มีรอบหวยสำหรับวันที่เลือก</p>
-          <p className="text-sm text-slate-400 mt-2">กรุณาเลือกวันอื่น หรือตรวจสอบอีกครั้งในภายหลัง</p>
+          <p className="text-slate-500 text-lg">ไม่พบข้อมูลประเภทย่อยของหวย</p>
+          <p className="text-sm text-slate-400 mt-2">กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล</p>
             </div>
       ) : (
       <div className="space-y-10">
-        {Object.entries(groupedSchedules).map(([typeId, group], categoryIndex) => (
+        {Object.entries(groupedSubTypes).map(([typeId, group], categoryIndex) => (
           <motion.section
             key={typeId}
             initial={{ opacity: 0, y: 30 }}
@@ -679,22 +653,21 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSchedules: Record<
             <h2 className="text-xl font-semibold text-slate-700 mb-1.5">{group.details.type_name}</h2>
               {group.details.description && <p className="text-sm text-slate-500 mb-5">{group.details.description}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {group.schedules
+              {group.subTypes
                 .slice() // copy to avoid mutating state
-                .sort((a, b) => a.draw_time.localeCompare(b.draw_time))
-                .map(sch => {
-                  const subTypeId = sch.lottery_sub_types[0]?.lottery_sub_type_id;
+                .sort((a, b) => a.sub_type_name.localeCompare(b.sub_type_name))
+                .map(subType => {
                 return (
-                  <LotteryScheduleCard
-                    key={sch.schedule_id}
-                    sch={sch}
-                      subNumbers={subTypeId ? subNumbersMap[subTypeId] || [] : []}
-                      resultInput={resultInputs[sch.schedule_id]}
+                  <LotterySubTypeCard
+                    key={subType.lottery_sub_type_id}
+                    subType={subType}
+                      subNumbers={subNumbersMap[subType.lottery_sub_type_id] || []}
+                      resultInput={resultInputs[subType.lottery_sub_type_id]}
                     handleInputChange={handleInputChange}
                     handleSave={handleSave}
-                     isSaving={saveInProgressForScheduleId === sch.schedule_id}
-                    isSuccessfullySaved={successfullySavedSchedules.has(sch.schedule_id)}
-                     onEdit={handleEditSchedule}
+                     isSaving={saveInProgressForSubTypeId === subType.lottery_sub_type_id}
+                    isSuccessfullySaved={successfullySavedSubTypes.has(subType.lottery_sub_type_id)}
+                     onEdit={handleEditSubType}
                   />
         );
       })}

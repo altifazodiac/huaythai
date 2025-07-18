@@ -93,6 +93,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       href: "/lottery-report-summary",
       icon: BarChart3,
     },
+    {
+      title: "ค่าบริหารระบบ",
+      href: "/management-fee",
+      icon: Calculator,
+    },
    /* {
       title: "รายงานหวยแบบรายละเอียด",
       href: "/lottery-report",

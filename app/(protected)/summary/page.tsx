@@ -54,6 +54,7 @@ interface DailySummary {
   total_payout: number;
   net_profit_loss: number;
   commission_amount: number;
+  net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 }
 
 interface LotteryTypeSummary {
@@ -66,6 +67,7 @@ interface LotteryTypeSummary {
   total_payout: number;
   net_profit_loss: number;
   commission_amount: number;
+  net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 }
 
 interface BillSummary {
@@ -81,6 +83,7 @@ interface BillSummary {
   numbers_count: number;
   status: string;
   commission_amount: number;
+  net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 }
 
 interface NumberDetail {
@@ -209,11 +212,16 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
       return acc;
     }, {});
 
-    return Object.values(groupedData).map((summary: any) => ({
-      ...summary,
-      net_profit_loss: summary.total_purchase_amount - summary.total_payout,
-      commission_amount: (summary.total_purchase_amount * summary.user_percent) / 100
-    })).sort((a: any, b: any) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime());
+    return Object.values(groupedData).map((summary: any) => {
+      const netProfitLoss = summary.total_purchase_amount - summary.total_payout;
+      const commissionAmount = (summary.total_purchase_amount * summary.user_percent) / 100;
+      return {
+        ...summary,
+        net_profit_loss: netProfitLoss,
+        commission_amount: commissionAmount,
+        net_amount: netProfitLoss - commissionAmount // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
+      };
+    }).sort((a: any, b: any) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime());
   } catch (err) {
     console.error('Error in fetchDailySummary:', err);
     throw err;
@@ -260,12 +268,17 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
       return acc;
     }, {});
     
-    return Object.values(groupedData).map((item: any) => ({
-      ...item,
-      total_bills: item.total_bills.size,
-      net_profit_loss: item.total_purchase_amount - item.total_payout,
-      commission_amount: (item.total_purchase_amount * 0) / 100, // สำหรับประเภทหวยยังไม่มีการคำนวณ percent
-    })).sort((a: any, b: any) => b.total_purchase_amount - a.total_purchase_amount);
+    return Object.values(groupedData).map((item: any) => {
+      const netProfitLoss = item.total_purchase_amount - item.total_payout;
+      const commissionAmount = (item.total_purchase_amount * 0) / 100; // สำหรับประเภทหวยยังไม่มีการคำนวณ percent
+      return {
+        ...item,
+        total_bills: item.total_bills.size,
+        net_profit_loss: netProfitLoss,
+        commission_amount: commissionAmount,
+        net_amount: netProfitLoss - commissionAmount // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
+      };
+    }).sort((a: any, b: any) => b.total_purchase_amount - a.total_purchase_amount);
   } catch (err) {
     console.error('Error in fetchLotteryTypeSummary:', err);
     throw err;
@@ -308,6 +321,8 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
           totalNumbers += (item.numbers || []).length;
         });
           
+          const netProfitLoss = Number(ticket.total_amount || 0) - totalPayout;
+          const commissionAmount = (Number(ticket.total_amount || 0) * (userProfile?.percent || 0)) / 100;
           return {
             bill_number: ticket.bill_number,
             draw_date: ticket.draw_date,
@@ -317,10 +332,11 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
             country_origin: countries.join(', '),
             total_amount: Number(ticket.total_amount || 0),
             total_payout: totalPayout,
-            net_profit_loss: Number(ticket.total_amount || 0) - totalPayout,
+            net_profit_loss: netProfitLoss,
             numbers_count: totalNumbers,
             status: ticket.status,
-            commission_amount: (Number(ticket.total_amount || 0) * (userProfile?.percent || 0)) / 100
+            commission_amount: commissionAmount,
+            net_amount: netProfitLoss - commissionAmount // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
           };
       }).filter(Boolean);
     
@@ -546,6 +562,7 @@ const LotterySummaryPage: React.FC = () => {
                   <TableHead className="text-right">กำไร/ขาดทุน</TableHead>
                   {role === 'admin' && <TableHead className="text-right">%</TableHead>}
                   {role === 'admin' && <TableHead className="text-right">คอมมิชชั่น</TableHead>}
+                  {role === 'admin' && <TableHead className="text-right">ยอดสุทธิ</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -577,7 +594,7 @@ const LotterySummaryPage: React.FC = () => {
                       <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
+                      <TableCell className="text-right text-red-600">{formatCurrency(Number(item.total_payout))}</TableCell>
                       <TableCell className={`text-right font-semibold ${
                         Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
@@ -593,22 +610,128 @@ const LotterySummaryPage: React.FC = () => {
                           {formatCurrency(Number(item.commission_amount))}
                         </TableCell>
                       )}
+                      {role === 'admin' && (
+                        <TableCell className={`text-right font-semibold ${
+                          Number(item.net_amount) >= 0 ? 'text-emerald-600' : 'text-orange-600'
+                        }`}>
+                          {formatCurrency(Number(item.net_amount) || 0)}
+                        </TableCell>
+                      )}
                     </motion.tr>
                   ))}
                 </AnimatePresence>
+                {role === 'admin' && dailySummary.length > 0 && (
+                  <tr className="font-bold bg-gray-100 dark:bg-gray-800 dark:text-white text-black">
+                    <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
+                    <TableCell></TableCell>
+                    <TableCell className="text-right">{dailySummary.reduce((sum, item) => sum + Number(item.total_bills), 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{dailySummary.reduce((sum, item) => sum + Number(item.total_numbers), 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0))}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0))}</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.net_profit_loss), 0))}
+                    </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell className="text-right text-purple-600 font-semibold">
+                      {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold text-emerald-600">
+                      {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.net_amount), 0))}
+                    </TableCell>
+                  </tr>
+                )}
               </TableBody>
             </Table>
           </div>
           {role === 'admin' && dailySummary.length > 0 && (
-            <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border">
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-muted-foreground">
-                  <span className="font-semibold">สรุปคอมมิชชั่นทั้งหมด:</span>
-                </div>
-                <div className="text-lg font-bold text-purple-600">
-                  {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
-                </div>
-              </div>
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* ยอดซื้อรวม */}
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-700 dark:text-blue-300">ยอดซื้อรวม</p>
+                        <p className="text-xs text-blue-600/70 dark:text-blue-400/70">Total Purchase</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                        {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0))}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ยอดจ่ายรวม */}
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">ยอดจ่ายรวม</p>
+                        <p className="text-xs text-green-600/70 dark:text-green-400/70">Total Payout</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                        {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0))}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* คอมมิชชั่นรวม */}
+              <Card className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                        <BarChart3 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-purple-700 dark:text-purple-300">คอมมิชชั่นรวม</p>
+                        <p className="text-xs text-purple-600/70 dark:text-purple-400/70">Total Commission</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                        {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ยอดสุทธิรวม */}
+              <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200 dark:border-emerald-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                        <TrendingDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">ยอดสุทธิรวม</p>
+                        <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70">Net Total</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                        {formatCurrency(dailySummary.reduce((sum, item) => sum + (Number(item.net_amount) || 0), 0))}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </CardContent>

@@ -1,995 +1,231 @@
-C:\Users\witta\source\repos\huaylotto\lib\supabase\supabaseClient.ts:8 🔧 Supabase Config: {url: 'Set', key: 'Set', env: 'development'}
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:204 🔍 Calculating prizes for tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:205 🔍 Available results: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:323 🔍 Total winning tickets found: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:324 🔍 Total prize amount: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:204 🔍 Calculating prizes for tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:205 🔍 Available results: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:323 🔍 Total winning tickets found: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:324 🔍 Total prize amount: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:111 🔍 Current user ID: 08c481f1-657a-446c-9428-152b1bade691
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:112 🔍 Current user email: admin@gmail.com
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:111 🔍 Current user ID: 08c481f1-657a-446c-9428-152b1bade691
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:112 🔍 Current user email: admin@gmail.com
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:135 🔍 Tickets loaded: 5
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:136 🔍 Sample ticket: {id: 'b9953e60-3391-4b7c-989e-f48a66179bbe', user_id: '08c481f1-657a-446c-9428-152b1bade691', purchase_date: '2025-07-18T05:38:31.896224+07:00', draw_date: '2025-07-18', total_amount: 120, …}
-C:\Users\witta\source\repos\huaylotto\components\UserHeader.tsx:31 roleData {role: 'admin'} error null user.id 08c481f1-657a-446c-9428-152b1bade691
-C:\Users\witta\source\repos\huaylotto\components\UserHeader.tsx:31 roleData {role: 'admin'} error null user.id 08c481f1-657a-446c-9428-152b1bade691
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
- 🔍 Tickets loaded: 5
- 🔍 Sample ticket: {id: 'b9953e60-3391-4b7c-989e-f48a66179bbe', user_id: '08c481f1-657a-446c-9428-152b1bade691', purchase_date: '2025-07-18T05:38:31.896224+07:00', draw_date: '2025-07-18', total_amount: 120, …}
- 🔍 Results loaded: 1000
- 🔍 Sample result: {id: 1, lottery_type_id: 1, lottery_sub_type_id: 1, schedule_id: 287, draw_date: '2025-07-15', …}
- 🔍 Relevant results for 2025-07-18 lottery_sub_type_id=2: (4) [{…}, {…}, {…}, {…}]
- 🔍 Calculating prizes for tickets: 5
- 🔍 Available results: 1000
- 🔍 Processing ticket 879341 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:256 🔍 Found matching result: 92
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:285 🔍 Matched numbers: 
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 25
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-18
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 2
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 2 ตัวล่าง
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 63
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-18
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 2
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:249 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:256 🔍 Found matching result: 92
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:285 🔍 Matched numbers: 
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 63
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-18
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 2
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 2 ตัวล่าง
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:211 🔍 Processing ticket 577329 for date 2025-07-18
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 73
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-18
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 2
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:249 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:256 🔍 Found matching result: 92
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:285 🔍 Matched numbers: 
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 25
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-18
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 2
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:249 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:256 🔍 Found matching result: 92
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:285 🔍 Matched numbers: 
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 36
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Processing ticket 575274 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Processing ticket 310807 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวโต๊ด
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวบน
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 340109 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 417
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 417
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 809
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 809
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Total winning tickets found: 0
- 🔍 Total prize amount: 0
- 🔍 Calculating prizes for tickets: 5
- 🔍 Available results: 1000
- 🔍 Processing ticket 879341 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 63
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 63
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 577329 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 36
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Processing ticket 575274 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Processing ticket 310807 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวโต๊ด
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวบน
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 340109 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 369
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 258
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 258
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 417
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 417
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 809
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 809
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:323 🔍 Total winning tickets found: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:324 🔍 Total prize amount: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-webpack-internal:///…r.development.js:14 [Violation] 'message' handler took 308ms
- 🔍 Results loaded: 1000
- 🔍 Sample result: {id: 1, lottery_type_id: 1, lottery_sub_type_id: 1, schedule_id: 287, draw_date: '2025-07-15', …}
- 🔍 Relevant results for 2025-07-18 lottery_sub_type_id=2: (4) [{…}, {…}, {…}, {…}]
- 🔍 Calculating prizes for tickets: 5
- 🔍 Available results: 1000
- 🔍 Processing ticket 879341 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 63
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 63
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 577329 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 36
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Processing ticket 575274 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Processing ticket 310807 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวโต๊ด
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวบน
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 340109 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 417
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 417
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 809
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 809
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Total winning tickets found: 0
- 🔍 Total prize amount: 0
- 🔍 Calculating prizes for tickets: 5
- 🔍 Available results: 1000
- 🔍 Processing ticket 879341 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 63
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวล่าง
- 🔍 Item numbers: 63
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 577329 for date 2025-07-18
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 73
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 25
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-18 | 2 | 2 ตัวบน
- 🔍 Item numbers: 36
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-18
-   - lottery_sub_type_id: 2
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 34844, lottery_type_id: 1, lottery_sub_type_id: 2, schedule_id: 288, draw_date: '2025-07-18', …}
- 🔍 Found matching result: 92
- 🔍 Matched numbers: 
- 🔍 Processing ticket 575274 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 085
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 214
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Processing ticket 310807 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวโต๊ด
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 53 | 3 ตัวบน
- 🔍 Item numbers: 269
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 3 ตัวบน
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 69
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวบน
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวบน
- 🔍 Found matching result: {id: 21581, lottery_type_id: 5, lottery_sub_type_id: 53, schedule_id: 244, draw_date: '2025-07-17', …}
- 🔍 Found matching result: 00
- 🔍 Matched numbers: 
- 🔍 Looking for: 2025-07-17 | 53 | 2 ตัวล่าง
- 🔍 Item numbers: 96
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 53
-   - prize_code: 2 ตัวล่าง
- 🔍 Processing ticket 340109 for date 2025-07-17
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 147
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 258
- 🔍 Searching for result with criteria:
-   - draw_date: 2025-07-17
-   - lottery_sub_type_id: 42
-   - prize_code: 3 ตัวโต๊ด
- 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
- 🔍 Item numbers: 369
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 258
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 258
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 417
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 417
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 809
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวโต๊ด
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:234 🔍 Looking for: 2025-07-17 | 42 | 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:235 🔍 Item numbers: 809
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:238 🔍 Searching for result with criteria:
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:239   - draw_date: 2025-07-17
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:240   - lottery_sub_type_id: 42
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:241   - prize_code: 3 ตัวบน
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:323 🔍 Total winning tickets found: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:324 🔍 Total prize amount: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:361 🔍 Filtered winning tickets: 0
-scheduler.development.js:14 [Violation] 'message' handler took 321ms
+ 🔧 Supabase Config: {url: 'Set', key: 'Set', env: 'development'}
+ Calculating winning tickets...
+ Tickets count: 0
+ Results count: 0
+ Final winning tickets count: 0
+ Total prize: 0
+ Calculating winning tickets...
+ Tickets count: 0
+ Results count: 0
+ Final winning tickets count: 0
+ Total prize: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ fetchData called
+ supabase available: true
+ user available: false
+ user id: undefined
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 0
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ fetchData called
+ supabase available: true
+ user available: true
+ user id: 08c481f1-657a-446c-9428-152b1bade691
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ fetchData called
+ supabase available: true
+ user available: true
+ user id: 08c481f1-657a-446c-9428-152b1bade691
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ roleData {role: 'admin'} error null user.id 08c481f1-657a-446c-9428-152b1bade691
+ Tickets query successful
+ Tickets data: []
+ roleData {role: 'admin'} error null user.id 08c481f1-657a-446c-9428-152b1bade691
+ Tickets query successful
+ Tickets data: []
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+ winningTickets count: 0
+ filteredWinningTickets count: 0
+ winningBills count: 2
+ selectedFilter: all
+ Final filteredTickets count: 0
+ Filtering tickets...
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:367 winningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:368 filteredWinningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:369 winningBills count: 2
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:370 selectedFilter: all
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:385 Final filteredTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:167 Results query successful
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:168 Results data: (50) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:174 Fetched tickets: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:175 Fetched results: 50
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:176 Sample ticket: undefined
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:177 Sample result: {id: 47263, lottery_type_id: 3, lottery_sub_type_id: 45, schedule_id: 276, draw_date: '2025-07-18', …}
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:167 Results query successful
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:168 Results data: (50) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:174 Fetched tickets: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:175 Fetched results: 50
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:176 Sample ticket: undefined
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:177 Sample result: {id: 47263, lottery_type_id: 3, lottery_sub_type_id: 45, schedule_id: 276, draw_date: '2025-07-18', …}
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:204 Calculating winning tickets...
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:205 Tickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:206 Results count: 50
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:323 Final winning tickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:324 Total prize: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:204 Calculating winning tickets...
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:205 Tickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:206 Results count: 50
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:323 Final winning tickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:324 Total prize: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:366 Filtering tickets...
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:367 winningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:368 filteredWinningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:369 winningBills count: 2
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:370 selectedFilter: all
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:385 Final filteredTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:366 Filtering tickets...
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:367 winningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:368 filteredWinningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:369 winningBills count: 2
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:370 selectedFilter: all
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:385 Final filteredTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:366 Filtering tickets...
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:367 winningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:368 filteredWinningTickets count: 0
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:369 winningBills count: 2
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:370 selectedFilter: all
+C:\Users\witta\source\repos\huaylotto\app\(protected)\results\page.tsx:385 Final filteredTickets count: 0

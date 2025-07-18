@@ -30,6 +30,7 @@ import { toZonedTime } from "date-fns-tz";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import { useUserRole } from "@/hooks/use-user-role";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface LotterySubType {
@@ -70,6 +71,7 @@ interface LotteryTicket {
   status: string;
   created_at: string;
   lottery_ticket_items: LotteryTicketItem[];
+  user_name?: string; // เพิ่มชื่อผู้ใช้
 }
 
 interface LotteryResult {
@@ -90,6 +92,7 @@ export default function LotteryTicketResultsPage() {
   useRequireAuth();
   const isMobile = useIsMobile();
   const { supabase, user } = useAuth();
+  const { role } = useUserRole();
   const [tickets, setTickets] = useState<LotteryTicket[]>([]);
   const [results, setResults] = useState<LotteryResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,7 +109,31 @@ export default function LotteryTicketResultsPage() {
       
       setLoading(true);
       try {
-        const { data: ticketsData, error: ticketsError } = await supabase
+        // 🔧 Debug: ตรวจสอบ status ของ tickets ทั้งหมดก่อน
+        const { data: allTickets, error: allTicketsError } = await supabase
+          .from("lottery_tickets")
+          .select("id, status, draw_date, user_id")
+          .eq("user_id", user.id);
+        
+        // 🔧 Debug: ตรวจสอบ tickets ทั้งหมดในระบบ (สำหรับ admin)
+        const { data: allSystemTickets, error: allSystemTicketsError } = await supabase
+          .from("lottery_tickets")
+          .select("id, status, draw_date, user_id, bill_number")
+          .limit(10);
+        
+        console.log('=== ALL TICKETS DEBUG ===');
+        console.log('Current user tickets count:', allTickets?.length);
+        console.log('Current user tickets statuses:', allTickets?.map(t => ({ id: t.id, status: t.status, draw_date: t.draw_date })));
+        console.log('=== ALL SYSTEM TICKETS DEBUG ===');
+        console.log('All system tickets count:', allSystemTickets?.length);
+        console.log('All system tickets:', allSystemTickets?.map(t => ({ id: t.id, status: t.status, draw_date: t.draw_date, user_id: t.user_id, bill_number: t.bill_number })));
+        console.log('Current user ID:', user.id);
+        console.log('Tickets with status confirmed:', allSystemTickets?.filter(t => t.status === 'confirmed'));
+        console.log('Tickets with status pending:', allSystemTickets?.filter(t => t.status === 'pending'));
+        console.log('Tickets with null status:', allSystemTickets?.filter(t => !t.status));
+        
+        // 🔧 สำหรับ admin ให้แสดงข้อมูลของทุก user (เหมือนหน้า summary)
+        let ticketQuery = supabase
           .from("lottery_tickets")
           .select(`*,
             lottery_ticket_items:lottery_ticket_items(
@@ -115,8 +142,30 @@ export default function LotteryTicketResultsPage() {
               lottery_sub_number:lottery_sub_number(id,lottery_sub_type_id,digit_number,type_number,price_paid)
             )
           `)
-          .eq("user_id", user.id)
           .order("created_at", { ascending: false });
+        
+        // ถ้าไม่ใช่ admin ให้แสดงเฉพาะข้อมูลของ user นั้น
+        if (role !== 'admin') {
+          ticketQuery = ticketQuery.eq("user_id", user.id);
+        }
+        
+        const { data: ticketsData, error: ticketsError } = await ticketQuery;
+        
+        // 🔧 ดึงข้อมูลชื่อผู้ใช้สำหรับ admin
+        if (role === 'admin' && ticketsData && ticketsData.length > 0) {
+          const userIds = [...new Set(ticketsData.map(t => t.user_id).filter(Boolean))];
+          const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, name')
+            .in('id', userIds);
+          
+          if (!profileError && profiles) {
+            const profilesMap = new Map(profiles.map(p => [p.id, p.name]));
+            ticketsData.forEach(ticket => {
+              ticket.user_name = profilesMap.get(ticket.user_id) || 'ไม่ระบุ';
+            });
+          }
+        }
           
         if (ticketsError) {
           console.error('Error fetching tickets:', ticketsError);
@@ -135,6 +184,15 @@ export default function LotteryTicketResultsPage() {
           console.error('Error fetching results:', resultsError);
           return;
         }
+        
+        // 🔧 Debug: ตรวจสอบข้อมูลที่โหลด
+        console.log('=== RESULTS DEBUG ===');
+        console.log('Tickets count:', ticketsData?.length);
+        console.log('Tickets dates:', ticketsData?.map(t => t.draw_date));
+        console.log('Results count:', resultsData?.length);
+        console.log('Results for 2025-07-18:', resultsData?.filter(r => r.draw_date === '2025-07-18'));
+        console.log('Results for lottery_sub_type_id = 2:', resultsData?.filter(r => r.lottery_sub_type_id === 2));
+        console.log('Results for 2 ตัวล่าง:', resultsData?.filter(r => r.prize_code === '2 ตัวล่าง'));
         
         setTickets(ticketsData || []);
         setResults(resultsData || []);
@@ -171,6 +229,7 @@ export default function LotteryTicketResultsPage() {
       draw_date: string;
       draw_time: string;
       ticket_id: string;
+      user_name?: string; // เพิ่มชื่อผู้ใช้
       items: (LotteryTicketItem & {
         winning_number: string;
         prize_code: string;
@@ -204,12 +263,18 @@ export default function LotteryTicketResultsPage() {
           prizeCodePattern = 'วิ่งล่าง';
         }
         
-        // Find matching result
-        const matchingResult = results.find(res => 
-          res.draw_date === ticket.draw_date &&
-          res.lottery_sub_type_id === item.lottery_sub_type_id &&
-          res.prize_code === prizeCodePattern
-        );
+        // Find matching result using resultMap (same as summary page)
+        const resultMapKey = `${ticket.draw_date}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
+        const matchingResult = resultMap[resultMapKey];
+        
+        // 🔧 Debug: ตรวจสอบการจับคู่ผลรางวัล
+        console.log('=== MATCHING DEBUG ===');
+        console.log('Ticket draw_date:', ticket.draw_date);
+        console.log('Item lottery_sub_type_id:', item.lottery_sub_type_id);
+        console.log('Prize code pattern:', prizeCodePattern);
+        console.log('Result map key:', resultMapKey);
+        console.log('Matching result:', matchingResult);
+        console.log('Available result keys:', Object.keys(resultMap));
         
         if (matchingResult && matchingResult.winning_number && item.numbers) {
           let matchedNumbers: string[] = [];
@@ -262,6 +327,7 @@ export default function LotteryTicketResultsPage() {
           draw_date: ticket.draw_date,
           draw_time: winItems[0]?.draw_time || '',
           ticket_id: ticket.id,
+          user_name: ticket.user_name, // เพิ่มชื่อผู้ใช้
           items: winItems,
           sum,
         });
@@ -535,6 +601,11 @@ export default function LotteryTicketResultsPage() {
                                       <p className="text-blue-100 text-sm">
                                         บิล: {win.bill_number} | {win.bill_name || '-'}
                                       </p>
+                                      {role === 'admin' && win.user_name && (
+                                        <p className="text-blue-200 text-xs">
+                                          ผู้ใช้: {win.user_name}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="text-right">

@@ -202,29 +202,50 @@ export default function NumberAnalysisPage() {
         .order('digit_number')
         .order('type_number');
       
-      // Fetch lottery ticket items with related data
-      const { data: ticketItemsData } = await supabase
+      // ดึงข้อมูลทั้งหมดแบบง่ายๆ แล้วกรองใน JavaScript
+      const { data: allTicketItems } = await supabase
         .from('lottery_ticket_items')
         .select(`
           *,
-          lottery_tickets!inner(status),
           lottery_sub_types:lottery_sub_types(*),
           lottery_sub_number:lottery_sub_number(*)
-        `)
-        .eq('lottery_tickets.status', 'confirmed');
+        `);
 
-      if (subTypesData) setSubTypes(subTypesData);
-      if (subNumbersData) setSubNumbers(subNumbersData);
+      const { data: allTickets } = await supabase
+        .from('lottery_tickets')
+        .select('id, status');
+
+      // สร้าง map ของ ticket status
+      const ticketStatusMap = new Map();
+      allTickets?.forEach(ticket => {
+        ticketStatusMap.set(ticket.id, ticket.status);
+      });
+
+      // กรองเฉพาะ confirmed tickets
+      const filteredTicketItems = allTicketItems?.filter(item => 
+        ticketStatusMap.get(item.ticket_id) === 'confirmed'
+      ) || [];
+
+
+
+              if (subTypesData) {
+          setSubTypes(subTypesData);
+        }
+      if (subNumbersData) {
+        setSubNumbers(subNumbersData);
+      }
 
       // Process analysis data
-      if (ticketItemsData) {
+      if (filteredTicketItems) {
         const analysis: Record<string, NumberAnalysis> = {};
 
-        ticketItemsData.forEach((item: any) => {
+        filteredTicketItems.forEach((item: any) => {
           const subType = item.lottery_sub_types;
           const subNumber = item.lottery_sub_number;
           
-          if (!subType || !subNumber) return;
+          if (!subType || !subNumber) {
+            return;
+          }
 
           item.numbers.forEach((number: string) => {
             const key = `${subType.lottery_sub_type_id}-${subNumber.digit_number}-${subNumber.type_number}-${number}`;
