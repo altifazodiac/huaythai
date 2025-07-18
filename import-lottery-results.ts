@@ -34,7 +34,52 @@ type LotteryResult = {
 };
 
 // =================================================================================
-// 2. TOAST NOTIFICATION FUNCTIONS
+// 2. LOTTERY NAME MAPPING FOR BACKUP WEBSITE
+// =================================================================================
+
+// Mapping สำหรับแปลงชื่อหวยจากเว็บสำรองให้ตรงกับชื่อในระบบ
+const BACKUP_LOTTERY_NAME_MAPPING: Record<string, string> = {
+    // หวยลาว
+    'หวยลาวพัฒนา': 'หวยลาวพัฒนา',
+    'หวยลาว VIP': 'หวยลาวVIP',
+    'หวยลาวเช้า': 'ลาวสันติภาพ',
+    'หวยลาวเที่ยง': 'ลาวประชาคม',
+    'หวยลาวร่วมใจ': 'ลาวสามัคคี',
+    'หวยลาววิลล่า': 'ลาวอาเซียน',
+    'หวยลาวนคร': 'ลาวเหนือ',
+    'หวยลาวทูไนท์': 'ลาวใต้',
+    'หวยลาวเศรษฐกิจ': 'ลาวกาชาด',
+    'หวยลาวดีเดย์': 'ลาวประตูชัย',
+    'หวยลาวรุ่งเรือง': 'ลาวมิตรภาพ',
+    'หวยลาวพลัส+ (อ,พฤ,ส,อา)': 'ลาวSTAR',
+    'หวยลาว พิเศษ': 'ลาวEXTRA',
+    'หวยลาววันใหม่': 'ลาวไชโย',
+    
+    // หวยฮานอย
+    'หวยฮานอย': 'ฮานอยปกติ',
+    'หวยฮานอย VIP': 'ฮานอยVIP',
+    'หวยฮานอย พิเศษ': 'ฮานอยพิเศษ',
+    'หวยฮานอยรอบดึก': 'ฮานอยEXTRA',
+    'หวยฮานอยเช้า': 'ฮานอยอาเซียน',
+    'หวยฮานอยเดย์': 'ฮานอยHD',
+    'หวยฮานอยไชโย': 'ฮานอยสามัคคี',
+    'หวยฮานอยท้องถิ่น': 'ฮานอยชุด',
+    'หวยฮานอยพลัส พิเศษ': 'ฮานอยSTAR',
+    'หวยฮานอยพลัส': 'ฮานอย ดิจิตอล',
+    'หวยฮานอยพลัส วีไอพี': 'ฮานอยTV',
+    
+    // หวยไทย
+    'หวยรัฐบาลไทย': 'หวยรัฐบาล',
+    'หวย ธกส.': 'หวย ธกส.',
+    'หวยออมสิน': 'หวยออมสิน',
+    
+    // หวยหุ้น
+    'หวยมาเลย์': 'หวยหุ้นมาเลย์',
+    'หวยแคนาดา': 'หุ้นดาวโจนส์',
+};
+
+// =================================================================================
+// 3. TOAST NOTIFICATION FUNCTIONS
 // =================================================================================
 
 /**
@@ -112,7 +157,7 @@ async function createLotteryImportErrorToast(errorMessage: string) {
 }
 
 // =================================================================================
-// 3. SCRAPING & PARSING FUNCTIONS
+// 4. SCRAPING & PARSING FUNCTIONS
 // =================================================================================
 
 async function autoScroll(page: Page): Promise<void> {
@@ -208,6 +253,107 @@ function parseGovLotteryCards($: cheerio.CheerioAPI, url: string): LotteryResult
     return cardResults;
 }
 
+// =================================================================================
+// 5. BACKUP WEBSITE SCRAPING FUNCTIONS
+// =================================================================================
+
+/**
+ * Scrape และ parse ผลหวยจากเว็บสำรอง gemlotto.com
+ */
+async function scrapeBackupWebsite(context: BrowserContext, targetLotteryNames: string[]): Promise<LotteryResult[]> {
+    let page = null;
+    const backupUrl = 'https://www.gemlotto.com/';
+    
+    try {
+        console.log(`[Backup Scraper] Navigating to ${backupUrl}`);
+        page = await context.newPage();
+        await page.goto(backupUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+        
+        // รอให้เนื้อหาถูกโหลด
+        await page.waitForSelector('div.th-result-login-game-color', { timeout: 30000 });
+        
+        const html = await page.content();
+        const $ = cheerio.load(html);
+        
+        const results: LotteryResult[] = [];
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Parse ผลหวยจากโครงสร้างใหม่
+        $('div.th-result-login-game-color').each((_, element) => {
+            const lotteryElement = $(element);
+            
+            // ดึงชื่อหวย
+            const lotteryNameElement = lotteryElement.find('div.col-6 img + *').first();
+            let lotteryName = lotteryNameElement.text().trim();
+            
+            // ดึงผล 3 ตัวบน
+            const top3Element = lotteryElement.find('div.col-3.bot-col3-result-number').first();
+            const top3Result = top3Element.text().trim();
+            
+            // ดึงผล 2 ตัวล่าง
+            const bottom2Element = lotteryElement.find('div.col-3.bot-col3-result-number').last();
+            const bottom2Result = bottom2Element.text().trim();
+            
+            // ตรวจสอบว่าผลหวยมีข้อมูลหรือไม่
+            if (top3Result === 'xxx' || bottom2Result === 'xx' || !top3Result || !bottom2Result) {
+                return; // ข้ามถ้าไม่มีผล
+            }
+            
+            // แปลงชื่อหวยให้ตรงกับระบบ
+            const mappedLotteryName = BACKUP_LOTTERY_NAME_MAPPING[lotteryName];
+            if (!mappedLotteryName) {
+                console.log(`[Backup Parser] No mapping found for lottery: "${lotteryName}"`);
+                return;
+            }
+            
+            // ตรวจสอบว่าเป็นหวยที่ต้องการหรือไม่
+            if (!targetLotteryNames.includes(mappedLotteryName)) {
+                console.log(`[Backup Parser] Skipping "${mappedLotteryName}" (mapped from "${lotteryName}") as it's not a target.`);
+                return;
+            }
+            
+            // ดึง metadata สำหรับหวยนี้
+            const meta = LOTTERY_METADATA[mappedLotteryName as keyof typeof LOTTERY_METADATA];
+            if (!meta) {
+                console.log(`[Backup Parser] No metadata found for mapped lottery: "${mappedLotteryName}"`);
+                return;
+            }
+            
+            // สร้างผลหวย
+            const availablePrizes: string[] = [
+                `3 ตัวบน: ${top3Result}`,
+                `2 ตัวล่าง: ${bottom2Result}`
+            ];
+            
+            // พยายามหาวันที่จากหน้าเว็บ หรือใช้วันปัจจุบัน
+            let drawDate = today;
+            
+            // พยายามหาข้อมูลเวลา
+            let drawTime: string | undefined = undefined;
+            
+            results.push({
+                draw_date: drawDate,
+                draw_time: drawTime,
+                country: meta.country,
+                lottery_name: mappedLotteryName,
+                results: availablePrizes,
+                source_url: backupUrl
+            });
+            
+            console.log(`[Backup Parser] Found result for "${mappedLotteryName}": 3ตัวบน=${top3Result}, 2ตัวล่าง=${bottom2Result}`);
+        });
+        
+        console.log(`[Backup Scraper] Found ${results.length} results from backup website.`);
+        return results;
+        
+    } catch (error) {
+        console.error(`[Backup Scraper] Error scraping backup website:`, error instanceof Error ? error.message : error);
+        return [];
+    } finally {
+        if (page) await page.close();
+    }
+}
+
 async function scrapeAndParseResults(url: string, context: BrowserContext, targetLotteryNames: string[]): Promise<LotteryResult[]> {
     let page = null;
     console.log(`[Scraper] Navigating to ${url}`);
@@ -271,7 +417,44 @@ async function scrapeAndParseResults(url: string, context: BrowserContext, targe
 }
 
 // =================================================================================
-// 4. DATA IMPORT & UTILITY LOGIC
+// 6. ENHANCED SCRAPING WITH BACKUP
+// =================================================================================
+
+/**
+ * Scrape ผลหวยจากเว็บหลักและเว็บสำรอง
+ */
+async function scrapeWithBackup(context: BrowserContext, targetLotteryNames: string[]): Promise<LotteryResult[]> {
+    const primaryUrl = 'https://xn--t3cjebmjd5a.com/';
+    const backupUrl = 'https://www.gemlotto.com/';
+    
+    console.log('\n[Enhanced Scraper] Starting scraping with backup support...');
+    
+    // ลองเว็บหลักก่อน
+    console.log('[Enhanced Scraper] Attempting primary website...');
+    let results = await scrapeAndParseResults(primaryUrl, context, targetLotteryNames);
+    
+    if (results.length > 0) {
+        console.log(`[Enhanced Scraper] ✅ Primary website successful! Found ${results.length} results.`);
+        return results;
+    }
+    
+    console.log('[Enhanced Scraper] ❌ Primary website failed or no results found.');
+    console.log('[Enhanced Scraper] Attempting backup website...');
+    
+    // ถ้าเว็บหลักไม่สำเร็จ ลองเว็บสำรอง
+    results = await scrapeBackupWebsite(context, targetLotteryNames);
+    
+    if (results.length > 0) {
+        console.log(`[Enhanced Scraper] ✅ Backup website successful! Found ${results.length} results.`);
+        return results;
+    }
+    
+    console.log('[Enhanced Scraper] ❌ Both primary and backup websites failed or no results found.');
+    return [];
+}
+
+// =================================================================================
+// 7. DATA IMPORT & UTILITY LOGIC
 // =================================================================================
 
 function getPermutations(str: string): string[] {
@@ -386,7 +569,7 @@ async function automateBatchImportLotteryResults(drawDate: string) {
 }
 
 // =================================================================================
-// 5. MAIN ORCHESTRATOR
+// 8. MAIN ORCHESTRATOR
 // =================================================================================
 
 async function main() {
@@ -394,7 +577,7 @@ async function main() {
     try {
         const timeZone = 'Asia/Bangkok';
         const now = new Date();
-        console.log('🚀 Starting the TARGETED scrape and import process...');
+        console.log('🚀 Starting the ENHANCED scrape and import process with backup support...');
         console.log(`⏰ Started at: ${now.toLocaleString('th-TH', { timeZone })}`);
         
         // --- Determine Target Lotteries based on Schedule ---
@@ -449,8 +632,8 @@ async function main() {
 
         const targetLotteryNames = aliases.map(a => a.alias_name);
 
-        // --- Scraping Phase with Retry Logic ---
-        console.log('\n[Step 2/4] Scraping Phase (with up to 20 retries)...');
+        // --- Enhanced Scraping Phase with Backup Support ---
+        console.log('\n[Step 2/4] Enhanced Scraping Phase (Primary + Backup websites)...');
         browser = await chromium.launch({ 
             headless: true, 
             args: ['--disable-gpu', '--no-sandbox'],
@@ -458,16 +641,14 @@ async function main() {
         });
         const context = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' });
         
-        const targetUrl = 'https://xn--t3cjebmjd5a.com/';
-        
         let scrapedData: LotteryResult[] = [];
-        const maxRetries = 20;
-        const retryInterval = 60000; // 60 seconds
+        const maxRetries = 10; // ลดจำนวน retry เพราะมีเว็บสำรองแล้ว
+        const retryInterval = 30000; // 30 วินาที
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            console.log(`\n[Attempt ${attempt}/${maxRetries}] Scraping for: ${targetLotteryNames.join(', ')}`);
+            console.log(`\n[Attempt ${attempt}/${maxRetries}] Enhanced scraping for: ${targetLotteryNames.join(', ')}`);
             
-            scrapedData = await scrapeAndParseResults(targetUrl, context, targetLotteryNames);
+            scrapedData = await scrapeWithBackup(context, targetLotteryNames);
 
             if (scrapedData.length > 0) {
                 console.log(`✅ Success! Found results on attempt ${attempt}.`);
@@ -505,7 +686,7 @@ async function main() {
         } else {
             console.log('\nNo new data was ultimately scraped for the targeted lotteries after all attempts.');
             const expectedLotteries = scheduledDraws.map(d => `ID ${d.lottery_sub_type_id} at ${d.draw_time}`);
-            console.warn(`Warning: The script was triggered for scheduled lotteries, but no results were found on the website after multiple attempts. This might be due to a publication delay. Expected: ${expectedLotteries.join(', ')}`);
+            console.warn(`Warning: The script was triggered for scheduled lotteries, but no results were found on both primary and backup websites after multiple attempts. This might be due to a publication delay. Expected: ${expectedLotteries.join(', ')}`);
             await createLotteryImportToast([]);
         }
 

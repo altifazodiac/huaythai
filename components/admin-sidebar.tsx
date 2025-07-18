@@ -87,11 +87,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       href: "/lottery-report-summary",
       icon: BarChart3,
     },
-    {
+   /* {
       title: "รายงานหวยแบบรายละเอียด",
       href: "/lottery-report",
       icon: BarChart3,
-    },
+    },*/
     {
       title: "จัดการ Task Scheduler",
       href: "/task-manager",

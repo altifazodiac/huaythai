@@ -47,11 +47,13 @@ interface DailySummary {
   draw_date: string;
   user_id: string;
   user_name: string;
+  user_percent: number;
   total_bills: number;
   total_numbers: number;
   total_purchase_amount: number;
   total_payout: number;
   net_profit_loss: number;
+  commission_amount: number;
 }
 
 interface LotteryTypeSummary {
@@ -63,12 +65,14 @@ interface LotteryTypeSummary {
   total_purchase_amount: number;
   total_payout: number;
   net_profit_loss: number;
+  commission_amount: number;
 }
 
 interface BillSummary {
   bill_number: string;
   draw_date: string;
   user_name: string;
+  user_percent: number;
   sub_type_name: string;
   country_origin: string;
   total_amount: number;
@@ -76,6 +80,7 @@ interface BillSummary {
   net_profit_loss: number;
   numbers_count: number;
   status: string;
+  commission_amount: number;
 }
 
 interface NumberDetail {
@@ -167,18 +172,23 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
     if (!tickets || tickets.length === 0) return [];
 
     const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
-    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
     if (profileError) throw profileError;
-    const profilesMap = new Map(profiles.map((p: {id: string, name: string}) => [p.id, p.name]));
+    const profilesMap = new Map<string, { name: string, percent: number }>();
+    profiles.forEach((p: {id: string, name: string, percent: number}) => {
+      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+    });
 
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
       if (!ticket.user_id) return acc;
       const key = `${ticket.draw_date}__${ticket.user_id}`;
       if (!acc[key]) {
+        const userProfile = profilesMap.get(ticket.user_id);
         acc[key] = {
           draw_date: ticket.draw_date,
           user_id: ticket.user_id,
-          user_name: profilesMap.get(ticket.user_id) || 'ไม่ระบุ',
+          user_name: userProfile?.name || 'ไม่ระบุ',
+          user_percent: userProfile?.percent || 0,
           total_bills: 0,
           total_numbers: 0,
           total_purchase_amount: 0,
@@ -201,7 +211,8 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
 
     return Object.values(groupedData).map((summary: any) => ({
       ...summary,
-      net_profit_loss: summary.total_purchase_amount - summary.total_payout
+      net_profit_loss: summary.total_purchase_amount - summary.total_payout,
+      commission_amount: (summary.total_purchase_amount * summary.user_percent) / 100
     })).sort((a: any, b: any) => new Date(b.draw_date).getTime() - new Date(a.draw_date).getTime());
   } catch (err) {
     console.error('Error in fetchDailySummary:', err);
@@ -253,6 +264,7 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
       ...item,
       total_bills: item.total_bills.size,
       net_profit_loss: item.total_purchase_amount - item.total_payout,
+      commission_amount: (item.total_purchase_amount * 0) / 100, // สำหรับประเภทหวยยังไม่มีการคำนวณ percent
     })).sort((a: any, b: any) => b.total_purchase_amount - a.total_purchase_amount);
   } catch (err) {
     console.error('Error in fetchLotteryTypeSummary:', err);
@@ -276,35 +288,41 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
     if (!tickets || tickets.length === 0) return [];
     
     const userIds = [...new Set(tickets.map((t: any) => t.user_id))];
-    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
     if (profileError) throw profileError;
-    const profilesMap = new Map(profiles.map((p: {id: string, name: string}) => [p.id, p.name]));
+    const profilesMap = new Map<string, { name: string, percent: number }>();
+    profiles.forEach((p: {id: string, name: string, percent: number}) => {
+      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+    });
     
-    const transformedData = tickets.map((ticket: any) => {
-      const subTypeNames = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.sub_type_name).filter(Boolean))];
-      const countries = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.country_origin).filter(Boolean))];
-      
-      let totalPayout = 0;
-      let totalNumbers = 0;
-      (ticket.lottery_ticket_items || []).forEach((item: any) => {
-        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
-        totalPayout += prize;
-        totalNumbers += (item.numbers || []).length;
-      });
+          const transformedData = tickets.map((ticket: any) => {
+        const subTypeNames = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.sub_type_name).filter(Boolean))];
+        const countries = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.country_origin).filter(Boolean))];
+        const userProfile = profilesMap.get(ticket.user_id);
         
-        return {
-          bill_number: ticket.bill_number,
-          draw_date: ticket.draw_date,
-        user_name: profilesMap.get(ticket.user_id) || 'ไม่ระบุ',
-        sub_type_name: subTypeNames.join(', '),
-        country_origin: countries.join(', '),
-          total_amount: Number(ticket.total_amount || 0),
-        total_payout: totalPayout,
-        net_profit_loss: Number(ticket.total_amount || 0) - totalPayout,
-        numbers_count: totalNumbers,
-          status: ticket.status
-        };
-    }).filter(Boolean);
+        let totalPayout = 0;
+        let totalNumbers = 0;
+        (ticket.lottery_ticket_items || []).forEach((item: any) => {
+          const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+          totalPayout += prize;
+          totalNumbers += (item.numbers || []).length;
+        });
+          
+          return {
+            bill_number: ticket.bill_number,
+            draw_date: ticket.draw_date,
+            user_name: userProfile?.name || 'ไม่ระบุ',
+            user_percent: userProfile?.percent || 0,
+            sub_type_name: subTypeNames.join(', '),
+            country_origin: countries.join(', '),
+            total_amount: Number(ticket.total_amount || 0),
+            total_payout: totalPayout,
+            net_profit_loss: Number(ticket.total_amount || 0) - totalPayout,
+            numbers_count: totalNumbers,
+            status: ticket.status,
+            commission_amount: (Number(ticket.total_amount || 0) * (userProfile?.percent || 0)) / 100
+          };
+      }).filter(Boolean);
     
     return transformedData as BillSummary[];
   } catch (err) {
@@ -359,11 +377,11 @@ const fetchNumberDetails = async (supabase: any, resultsMap: Record<string, Lott
 };
 
 // Function to fetch users for admin dropdown
-const fetchUsers = async (supabase: any): Promise<{ id: string; name: string; phone: string }[]> => {
+const fetchUsers = async (supabase: any): Promise<{ id: string; name: string; phone: string; percent: number }[]> => {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, phone')
+      .select('id, name, phone, percent')
       .order('name');
     
     if (error) throw error;
@@ -387,7 +405,7 @@ const LotterySummaryPage: React.FC = () => {
   const [lotteryTypeSummary, setLotteryTypeSummary] = useState<LotteryTypeSummary[]>([]);
   const [billSummary, setBillSummary] = useState<BillSummary[]>([]);
   const [numberDetails, setNumberDetails] = useState<NumberDetail[]>([]);
-  const [users, setUsers] = useState<{ id: string; name: string; phone: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string; phone: string; percent: number }[]>([]);
   const [resultsMap, setResultsMap] = useState<Record<string, LotteryResult>>({}); // 🔧 ใหม่
 
   // Filter states
@@ -526,6 +544,8 @@ const LotterySummaryPage: React.FC = () => {
                   <TableHead className="text-right">ยอดซื้อ</TableHead>
                   <TableHead className="text-right">ยอดจ่าย</TableHead>
                   <TableHead className="text-right">กำไร/ขาดทุน</TableHead>
+                  {role === 'admin' && <TableHead className="text-right">%</TableHead>}
+                  {role === 'admin' && <TableHead className="text-right">คอมมิชชั่น</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -563,12 +583,34 @@ const LotterySummaryPage: React.FC = () => {
                       }`}>
                         {formatCurrency(Number(item.net_profit_loss))}
                       </TableCell>
+                      {role === 'admin' && (
+                        <TableCell className="text-right text-blue-600 font-semibold">
+                          {item.user_percent}%
+                        </TableCell>
+                  )}
+                      {role === 'admin' && (
+                        <TableCell className="text-right text-purple-600 font-semibold">
+                          {formatCurrency(Number(item.commission_amount))}
+                        </TableCell>
+                      )}
                     </motion.tr>
                   ))}
                 </AnimatePresence>
               </TableBody>
             </Table>
           </div>
+          {role === 'admin' && dailySummary.length > 0 && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-semibold">สรุปคอมมิชชั่นทั้งหมด:</span>
+                </div>
+                <div className="text-lg font-bold text-purple-600">
+                  {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -600,6 +642,7 @@ const LotterySummaryPage: React.FC = () => {
                   <TableHead className="text-right">ยอดซื้อ</TableHead>
                   <TableHead className="text-right">ยอดจ่าย</TableHead>
                   <TableHead className="text-right">กำไร/ขาดทุน</TableHead>
+                  {role === 'admin' && <TableHead className="text-right">คอมมิชชั่น</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -629,12 +672,29 @@ const LotterySummaryPage: React.FC = () => {
                       }`}>
                         {formatCurrency(Number(item.net_profit_loss))}
                       </TableCell>
+                      {role === 'admin' && (
+                        <TableCell className="text-right text-purple-600 font-semibold">
+                          {formatCurrency(Number(item.commission_amount))}
+                        </TableCell>
+                      )}
                     </motion.tr>
                   ))}
                 </AnimatePresence>
               </TableBody>
             </Table>
           </div>
+          {role === 'admin' && lotteryTypeSummary.length > 0 && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-semibold">สรุปคอมมิชชั่นทั้งหมด:</span>
+                </div>
+                <div className="text-lg font-bold text-purple-600">
+                  {formatCurrency(lotteryTypeSummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -671,18 +731,21 @@ const LotterySummaryPage: React.FC = () => {
                 <TableRow>
                   <TableHead>เลขที่บิล</TableHead>
                   <TableHead>วันที่</TableHead>
+                  {role === 'admin' && <TableHead>ผู้ใช้</TableHead>}
                   <TableHead>ประเภทหวย</TableHead>
                   <TableHead>ประเทศ</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
                   <TableHead className="text-right">ยอดซื้อ</TableHead>
                   <TableHead className="text-right">ยอดจ่าย</TableHead>
                   <TableHead className="text-right">กำไร/ขาดทุน</TableHead>
+                  {role === 'admin' && <TableHead className="text-right">%</TableHead>}
+                  {role === 'admin' && <TableHead className="text-right">คอมมิชชั่น</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {billSummary.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={role === 'admin' ? 10 : 8} className="text-center py-8 text-muted-foreground">
                       ไม่พบข้อมูลบิล
                       {selectedDate && <div className="text-xs mt-1">สำหรับวันที่: {formatDate(selectedDate)}</div>}
                       {selectedLotteryType && <div className="text-xs mt-1">ประเภทหวย ID: {selectedLotteryType}</div>}
@@ -707,6 +770,13 @@ const LotterySummaryPage: React.FC = () => {
                       >
                         <TableCell className="font-medium">{item.bill_number}</TableCell>
                         <TableCell>{formatDate(item.draw_date)}</TableCell>
+                        {role === 'admin' && (
+                          <TableCell className="max-w-[150px]">
+                            <div className="truncate" title={item.user_name}>
+                              {item.user_name}
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell className="max-w-[200px]">
                           <div className="truncate" title={item.sub_type_name}>
                             {item.sub_type_name}
@@ -729,6 +799,16 @@ const LotterySummaryPage: React.FC = () => {
                         }`}>
                           {formatCurrency(Number(item.net_profit_loss))}
                         </TableCell>
+                        {role === 'admin' && (
+                          <TableCell className="text-right text-blue-600 font-semibold">
+                            {item.user_percent}%
+                          </TableCell>
+                        )}
+                        {role === 'admin' && (
+                          <TableCell className="text-right text-purple-600 font-semibold">
+                            {formatCurrency(Number(item.commission_amount))}
+                          </TableCell>
+                        )}
                       </motion.tr>
                     ))}
                   </AnimatePresence>
@@ -736,6 +816,18 @@ const LotterySummaryPage: React.FC = () => {
               </TableBody>
             </Table>
           </div>
+          {role === 'admin' && billSummary.length > 0 && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-semibold">สรุปคอมมิชชั่นทั้งหมด:</span>
+                </div>
+                <div className="text-lg font-bold text-purple-600">
+                  {formatCurrency(billSummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -880,7 +972,7 @@ const LotterySummaryPage: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
+                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-6' : 'md:grid-cols-4'} gap-4`}>
                       <div>
                         <label className="block text-sm font-medium mb-2">วันที่</label>
                         <Input
@@ -926,6 +1018,17 @@ const LotterySummaryPage: React.FC = () => {
                               ))}
                             </SelectContent>
                           </Select>
+                        </div>
+                      )}
+                      {role === 'admin' && (
+                        <div>
+                          <label className="block text-sm font-medium mb-2">% คอมมิชชั่น</label>
+                          <div className="text-sm text-muted-foreground p-2 bg-muted rounded border">
+                            {selectedUserId && selectedUserId !== 'all' 
+                              ? `${(users.find(u => u.id === selectedUserId) as any)?.percent || 0}%`
+                              : 'เลือกผู้ใช้เพื่อดู %'
+                            }
+                          </div>
                         </div>
                       )}
                       <div className="flex items-end">
