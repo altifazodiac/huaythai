@@ -157,12 +157,23 @@ const calculateWinningsForItem = (
 
 
 // 🔧 **ปรับปรุง**: แก้ไขฟังก์ชันดึงข้อมูลสรุปทั้งหมด
-const fetchDailySummary = async (supabase: any, resultsMap: Record<string, LotteryResult>): Promise<DailySummary[]> => {
+const fetchDailySummary = async (supabase: any, resultsMap: Record<string, LotteryResult>, dateRange: string = 'all'): Promise<DailySummary[]> => {
   try {
-    const { data: tickets, error: ticketError } = await supabase
+    // เพิ่มการกรองช่วงเวลา
+    let ticketQuery = supabase
       .from('lottery_tickets')
       .select('id, draw_date, total_amount, user_id, lottery_ticket_items(*, lottery_sub_number(*))')
       .eq('status', 'confirmed');
+    
+    // กรองตามช่วงเวลาที่เลือก
+    if (dateRange !== 'all') {
+      const now = new Date()
+      const daysBack = dateRange === 'week' ? 7 : dateRange === 'month' ? 30 : 90
+      const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+      ticketQuery = ticketQuery.gte('draw_date', startDate.toISOString())
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
     if (ticketError) throw ticketError;
     if (!tickets || tickets.length === 0) return [];
 
@@ -396,6 +407,7 @@ const LotterySummaryPage: React.FC = () => {
   const [selectedLotteryType, setSelectedLotteryType] = useState<number | null>(null);
   const [selectedBillNumber, setSelectedBillNumber] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
+  const [selectedDateRange, setSelectedDateRange] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
  
   useRequireAuth();
@@ -423,7 +435,7 @@ const LotterySummaryPage: React.FC = () => {
       setResultsMap(newResultsMap);
 
       const [dailyData, typeData, billData, numberData] = await Promise.all([
-        fetchDailySummary(supabase, newResultsMap),
+        fetchDailySummary(supabase, newResultsMap, selectedDateRange),
         fetchLotteryTypeSummary(supabase, newResultsMap, selectedDate || undefined),
         fetchBillSummary(supabase, newResultsMap, selectedDate || undefined, selectedLotteryType || undefined, selectedUserId === 'all' ? undefined : selectedUserId || undefined),
         fetchNumberDetails(supabase, newResultsMap, selectedBillNumber || undefined)
@@ -453,7 +465,7 @@ const LotterySummaryPage: React.FC = () => {
       loadData();
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [selectedDate, selectedLotteryType, selectedBillNumber, selectedUserId]);
+  }, [selectedDate, selectedLotteryType, selectedBillNumber, selectedUserId, selectedDateRange]);
 
   // Format currency in Thai Baht
   const formatCurrency = (amount: number) => {
@@ -476,81 +488,125 @@ const LotterySummaryPage: React.FC = () => {
   };
 
   const clearFilters = () => {
-    setSelectedDate('');
+    setSelectedDate(todayStr);
     setSelectedLotteryType(null);
     setSelectedBillNumber('');
     setSelectedUserId('all');
+    setSelectedDateRange('all');
     setSearchTerm('');
   };
 
-  const renderDailySummaryTab = () => (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            สรุปรายวัน
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {role === 'admin' && <TableHead>ผู้ใช้</TableHead>}
-                  <TableHead>วันที่</TableHead>
-                  <TableHead className="text-right">จำนวนบิล</TableHead>
-                  <TableHead className="text-right">จำนวนเลข</TableHead>
-                  <TableHead className="text-right">ยอดซื้อ</TableHead>
-                  <TableHead className="text-right">ยอดจ่าย</TableHead>
-                  <TableHead className="text-right">กำไร/ขาดทุน</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <AnimatePresence>
-                  {dailySummary.map((item, index) => (
-                    <motion.tr 
-                      key={item.draw_date + '__' + (item.user_id || '')}
-                      layout
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
-                      onClick={() => {
-                        setSelectedDate(item.draw_date);
-                        setActiveTab('types');
-                      }}
-                    >
-                      {role === 'admin' && (
-                        <TableCell className="max-w-[150px]">
-                          <div className="truncate" title={item.user_name}>
-                            {item.user_name || 'ไม่ระบุ'}
-                          </div>
+  const renderDailySummaryTab = () => {
+    // คำนวณผลรวม
+    const totalPurchase = dailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0);
+    const totalPayout = dailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0);
+    const totalProfitLoss = totalPurchase - totalPayout;
+    
+    return (
+      <div className="space-y-4">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">ยอดซื้อรวม</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalPurchase)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">ยอดจ่ายรวม</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalPayout)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">กำไร/ขาดทุนรวม</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${totalProfitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(totalProfitLoss)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              สรุปรายวัน
+              {selectedDateRange !== 'all' && (
+                <span className="text-sm font-normal text-muted-foreground">
+                  - {selectedDateRange === 'week' ? '7 วันล่าสุด' : 
+                     selectedDateRange === 'month' ? '30 วันล่าสุด' : '90 วันล่าสุด'}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {role === 'admin' && <TableHead>ผู้ใช้</TableHead>}
+                    <TableHead>วันที่</TableHead>
+                    <TableHead className="text-right">จำนวนบิล</TableHead>
+                    <TableHead className="text-right">จำนวนเลข</TableHead>
+                    <TableHead className="text-right">ยอดซื้อ</TableHead>
+                    <TableHead className="text-right">ยอดจ่าย</TableHead>
+                    <TableHead className="text-right">กำไร/ขาดทุน</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <AnimatePresence>
+                    {dailySummary.map((item, index) => (
+                      <motion.tr 
+                        key={item.draw_date + '__' + (item.user_id || '')}
+                        layout
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted cursor-pointer"
+                        onClick={() => {
+                          setSelectedDate(item.draw_date);
+                          setActiveTab('types');
+                        }}
+                      >
+                        {role === 'admin' && (
+                          <TableCell className="max-w-[150px]">
+                            <div className="truncate" title={item.user_name}>
+                              {item.user_name || 'ไม่ระบุ'}
+                            </div>
+                          </TableCell>
+                        )}
+                        <TableCell className="font-medium">
+                          {formatDate(item.draw_date)}
                         </TableCell>
-                      )}
-                      <TableCell className="font-medium">
-                        {formatDate(item.draw_date)}
-                      </TableCell>
-                      <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
-                      <TableCell className={`text-right font-semibold ${
-                        Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {formatCurrency(Number(item.net_profit_loss))}
-                      </TableCell>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+                        <TableCell className="text-right">{item.total_bills.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{item.total_numbers.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(Number(item.total_purchase_amount))}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(Number(item.total_payout))}</TableCell>
+                        <TableCell className={`text-right font-semibold ${
+                          Number(item.net_profit_loss) >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(Number(item.net_profit_loss))}
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   const renderLotteryTypesTab = () => (
     <div className="space-y-4">
@@ -858,7 +914,21 @@ const LotterySummaryPage: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4`}>
+                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4`}>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">ช่วงเวลา</label>
+                        <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="เลือกช่วงเวลา" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">ทั้งหมด</SelectItem>
+                            <SelectItem value="week">7 วันล่าสุด</SelectItem>
+                            <SelectItem value="month">30 วันล่าสุด</SelectItem>
+                            <SelectItem value="quarter">90 วันล่าสุด</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div>
                         <label className="block text-sm font-medium mb-2">วันที่</label>
                         <Input

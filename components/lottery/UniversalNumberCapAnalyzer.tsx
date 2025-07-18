@@ -378,7 +378,7 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                   const isSelected = selectedNumbers.includes(numberKey);
                   const isManaged = managedNumbers.some(m => `${m.number}-${m.digit_count}-${m.type_number}` === numberKey);
                   return (
-                    <tr key={index} className={`border-b hover:bg-opacity-50 ${isSelected ? 'bg-blue-100' : ''} ${isManaged ? 'opacity-40 bg-gray-100' : 'hover:bg-gray-50'}`}>
+                    <tr key={index} className={`border-b hover:bg-opacity-50 ${isSelected ? 'bg-blue-100 dark:bg-blue-900/20' : ''} ${isManaged ? 'opacity-40 bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}>
                       <td className="p-2"><Checkbox checked={isSelected} disabled={isManaged} onCheckedChange={() => toggleNumberSelection(numberKey)} /></td>
                       <td className="p-2 font-mono font-bold">{number.number}</td><td className="p-2">{number.digit_count} ตัว{number.type_number}</td>
                       <td className="p-2 text-right">{formatCurrency(number.total_sales)}</td><td className="p-2 text-right font-bold">{formatCurrency(number.potential_payout)}</td>
@@ -406,10 +406,10 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
     <Card className="m-2 md:m-4">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-4">
-                <div className="bg-red-100 p-2 rounded-lg"><BarChart3 className="h-6 w-6 text-red-600" /></div>
+                <div className="bg-red-100 dark:bg-red-900/20 p-2 rounded-lg"><BarChart3 className="h-6 w-6 text-red-600 dark:text-red-400" /></div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">ระบบจัดการเลขอั้น</h1>
-                    <p className="text-sm text-gray-600">{lotterySubType?.sub_type_name} • {lotterySubType?.country_origin}</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">ระบบจัดการเลขอั้น</h1>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{lotterySubType?.sub_type_name} • {lotterySubType?.country_origin}</p>
                 </div>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5"/></Button>
@@ -418,11 +418,11 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
             <div className="flex flex-wrap gap-4 items-center justify-between mb-4">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-gray-500" /><label className="text-sm font-medium">วันที่:</label>
+                        <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" /><label className="text-sm font-medium dark:text-gray-200">วันที่:</label>
               <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-40" disabled={testMode || loading} />
             </div>
             <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-orange-500" /><label className="text-sm font-medium">เกณฑ์ (%):</label>
+                        <AlertTriangle className="h-4 w-4 text-orange-500 dark:text-orange-400" /><label className="text-sm font-medium dark:text-gray-200">เกณฑ์ (%):</label>
               <Input type="number" value={riskThreshold} onChange={(e) => setRiskThreshold(Number(e.target.value))} className="w-20" min="1" max="100" disabled={loading} />
             </div>
                     <Button onClick={() => { if (!testMode) fetchSalesAnalysis(); }} disabled={loading || testMode}>
@@ -433,7 +433,7 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
               <Button onClick={() => setShowManualAdd(prev => !prev)} variant="outline" size="sm">
                         <Plus className="mr-2 h-4 w-4" />เพิ่มเลขด้วยตนเอง
               </Button>
-                    <Button onClick={() => { setTestMode(prev => !prev); if(testMode) { setSelectedNumbers([]); toast.info("ออกจากโหมดทดสอบ"); } }} variant="outline" className={testMode ? "bg-orange-50 text-orange-700" : ""}>
+                    <Button onClick={() => { setTestMode(prev => !prev); if(testMode) { setSelectedNumbers([]); toast.info("ออกจากโหมดทดสอบ"); } }} variant="outline" className={testMode ? "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300" : ""}>
                 {testMode ? "ออกจากโหมดทดสอบ" : "ทดสอบ"}
               </Button>
           </div>
@@ -449,29 +449,29 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                     exit="exit"
                     style={{ overflow: 'hidden' }}
                 >
-                    <Card className="mb-4 bg-blue-50 border-blue-200">
-                        <CardHeader className="py-3"><CardTitle className="text-lg text-blue-800 flex items-center"><Plus className="mr-2 h-5 w-5"/>เพิ่มเลขดัง/เลขอั้นด้วยตนเอง</CardTitle></CardHeader>
+                    <Card className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                        <CardHeader className="py-3"><CardTitle className="text-lg text-blue-800 dark:text-blue-300 flex items-center"><Plus className="mr-2 h-5 w-5"/>เพิ่มเลขดัง/เลขอั้นด้วยตนเอง</CardTitle></CardHeader>
                         <CardContent className="pt-2 pb-4">
                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                           <div className="space-y-2">
-                              <label className="font-semibold">หมายเลข</label>
-                              <Input placeholder={manualForm.is3Digits ? "เช่น 123" : "เช่น 45"} value={manualForm.number} onChange={handleManualNumberInputChange} maxLength={manualForm.is3Digits ? 3 : 2} className="text-lg h-12" />
+                              <label className="font-semibold dark:text-gray-200">หมายเลข</label>
+                              <Input placeholder={manualForm.is3Digits ? "เช่น 123" : "เช่น 45"} value={manualForm.number} onChange={handleManualNumberInputChange} maxLength={manualForm.is3Digits ? 3 : 2} className="text-lg h-12 bg-white dark:bg-gray-800" />
                               <div className="flex items-center space-x-4 pt-2">
-                                <label className="flex items-center gap-2 cursor-pointer"><Checkbox id="is2Digits" checked={manualForm.is2Digits} onCheckedChange={(checked) => handleManualFormChange('is2Digits', !!checked)} /> 2 ตัว</label>
-                                <label className="flex items-center gap-2 cursor-pointer"><Checkbox id="is3Digits" checked={manualForm.is3Digits} onCheckedChange={(checked) => handleManualFormChange('is3Digits', !!checked)} /> 3 ตัว</label>
+                                <label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="is2Digits" checked={manualForm.is2Digits} onCheckedChange={(checked) => handleManualFormChange('is2Digits', !!checked)} /> 2 ตัว</label>
+                                <label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="is3Digits" checked={manualForm.is3Digits} onCheckedChange={(checked) => handleManualFormChange('is3Digits', !!checked)} /> 3 ตัว</label>
                               </div>
                           </div>
                           <div className="space-y-2">
-                              <label className="font-semibold">ประเภท</label>
+                              <label className="font-semibold dark:text-gray-200">ประเภท</label>
                               <div className="flex flex-col space-y-2 pt-2">
-                                  <label className="flex items-center gap-2 cursor-pointer"><Checkbox id="isTop" checked={manualForm.isTop} onCheckedChange={(checked) => handleManualFormChange('isTop', !!checked)} /> บน</label>
-                                  {!manualForm.is3Digits && <label className="flex items-center gap-2 cursor-pointer"><Checkbox id="isBottom" checked={manualForm.isBottom} onCheckedChange={(checked) => handleManualFormChange('isBottom', !!checked)} /> ล่าง</label>}
-                                   {manualForm.is3Digits && (<label className="flex items-center gap-2 cursor-pointer"><Checkbox id="isTod" checked={manualForm.isTod} onCheckedChange={(checked) => handleManualFormChange('isTod', !!checked)} /> โต๊ด</label>)}
-                                   <label className="flex items-center gap-2 cursor-pointer pt-1"><Checkbox id="isSwap" checked={manualForm.isSwap} onCheckedChange={(checked) => handleManualFormChange('isSwap', !!checked)} /> กลับเลข</label>
+                                  <label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="isTop" checked={manualForm.isTop} onCheckedChange={(checked) => handleManualFormChange('isTop', !!checked)} /> บน</label>
+                                  {!manualForm.is3Digits && <label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="isBottom" checked={manualForm.isBottom} onCheckedChange={(checked) => handleManualFormChange('isBottom', !!checked)} /> ล่าง</label>}
+                                   {manualForm.is3Digits && (<label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="isTod" checked={manualForm.isTod} onCheckedChange={(checked) => handleManualFormChange('isTod', !!checked)} /> โต๊ด</label>)}
+                                   <label className="flex items-center gap-2 cursor-pointer pt-1 dark:text-gray-200"><Checkbox id="isSwap" checked={manualForm.isSwap} onCheckedChange={(checked) => handleManualFormChange('isSwap', !!checked)} /> กลับเลข</label>
                               </div>
                           </div>
                           <div className="space-y-2">
-                            <label className="font-semibold">การดำเนินการ</label>
+                            <label className="font-semibold dark:text-gray-200">การดำเนินการ</label>
                              <Select value={manualForm.action} onValueChange={(value: 'half' | 'close') => handleManualFormChange('action', value)}>
                                 <SelectTrigger><SelectValue placeholder="เลือกการดำเนินการ" /></SelectTrigger>
                                 <SelectContent>
@@ -479,7 +479,7 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                                   <SelectItem value="close"><Ban className="inline-block mr-2 h-4 w-4"/>ปิดรับ</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <label className="font-semibold pt-2 block">เหตุผล</label>
+                              <label className="font-semibold pt-2 block dark:text-gray-200">เหตุผล</label>
                               <Input placeholder="เช่น เลขดัง, เลขเฉพาะกิจ" value={manualForm.reason} onChange={(e) => handleManualFormChange('reason', e.target.value)} />
                           </div>
                        </div>
@@ -490,8 +490,8 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
             )}
             </AnimatePresence>
       
-      {testMode && <div className="bg-orange-50 border border-orange-200 text-orange-700 rounded-lg p-3 text-sm flex items-center gap-2"><AlertTriangle className="h-5 w-5" /><span>กำลังแสดงข้อมูลตัวอย่างสำหรับทดสอบระบบ</span></div>}
-      {loading && <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /> <span className="ml-2">กำลังวิเคราะห์ข้อมูล...</span></div>}
+      {testMode && <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300 rounded-lg p-3 text-sm flex items-center gap-2"><AlertTriangle className="h-5 w-5" /><span>กำลังแสดงข้อมูลตัวอย่างสำหรับทดสอบระบบ</span></div>}
+      {loading && <div className="flex justify-center items-center p-8"><Loader2 className="h-8 w-8 animate-spin text-gray-400 dark:text-gray-500" /> <span className="ml-2 dark:text-gray-300">กำลังวิเคราะห์ข้อมูล...</span></div>}
       
       {!loading && analysis && (
                 <motion.div
@@ -510,14 +510,14 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                             className="grid grid-cols-1 md:grid-cols-4 gap-4 my-4"
                             variants={containerVariants}
                         >
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm">ยอดขายรวม</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600">{formatCurrency(analysis.total_sales_all)}</div></CardContent></Card></motion.div>
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm">อาจต้องจ่าย</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600">{formatCurrency(analysis.total_potential_payout)}</div></CardContent></Card></motion.div>
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm">ความเสี่ยงรวม</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${analysis.overall_risk_percentage > riskThreshold ? 'text-red-600' : 'text-green-600'}`}>{formatPercentage(analysis.overall_risk_percentage)}</div></CardContent></Card></motion.div>
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm">เลขอั้น</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">{analysis.high_risk_numbers.length}</div><div className="text-xs text-gray-500">เลข</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">ยอดขายรวม</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(analysis.total_sales_all)}</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">อาจต้องจ่าย</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(analysis.total_potential_payout)}</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">ความเสี่ยงรวม</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${analysis.overall_risk_percentage > riskThreshold ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatPercentage(analysis.overall_risk_percentage)}</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">เลขอั้น</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.high_risk_numbers.length}</div><div className="text-xs text-gray-500 dark:text-gray-400">เลข</div></CardContent></Card></motion.div>
                         </motion.div>
-                        <motion.div variants={itemVariants}>{renderNumberTable('เลขอั้น - ควรจัดการด่วน', analysis.high_risk_numbers, <AlertTriangle className="h-5 w-5 text-red-600" />, 'border-red-200')}</motion.div>
-                        <motion.div variants={itemVariants}>{renderNumberTable('เลขเสี่ยงปานกลาง - ควรติดตาม', analysis.medium_risk_numbers, <TrendingUp className="h-5 w-5 text-orange-600" />, 'border-orange-200')}</motion.div>
-                        {!analysis.total_sales_all && <div className="text-center p-8 text-gray-500">ไม่พบข้อมูลการขายในวันที่เลือก</div>}
+                        <motion.div variants={itemVariants}>{renderNumberTable('เลขอั้น - ควรจัดการด่วน', analysis.high_risk_numbers, <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />, 'border-red-200 dark:border-red-800')}</motion.div>
+                        <motion.div variants={itemVariants}>{renderNumberTable('เลขเสี่ยงปานกลาง - ควรติดตาม', analysis.medium_risk_numbers, <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />, 'border-orange-200 dark:border-orange-800')}</motion.div>
+                        {!analysis.total_sales_all && <div className="text-center p-8 text-gray-500 dark:text-gray-400">ไม่พบข้อมูลการขายในวันที่เลือก</div>}
                     </TabsContent>
                     <TabsContent value="managed">
                          {filteredManagedNumbers.length > 0 ? (
@@ -528,10 +528,10 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                     <thead><tr className="border-b"><th className="text-left p-2">หมายเลข</th><th className="text-left p-2">ประเภท</th><th className="text-left p-2">การจัดการ</th><th className="text-left p-2">เหตุผล</th><th className="text-left p-2">ที่มา</th><th className="text-center p-2">จัดการ</th></tr></thead>
                     <tbody>
                       {filteredManagedNumbers.map((managed, index) => (
-                        <tr key={index} className="border-b hover:bg-green-50">
+                        <tr key={index} className="border-b hover:bg-green-50 dark:hover:bg-green-900/20">
                                               <td className="p-2 font-mono font-bold">{managed.number}</td><td className="p-2">{managed.digit_count} ตัว{managed.type_number}</td>
                           <td className="p-2"><Badge variant={managed.action === 'half' ? 'outline' : 'destructive'}>{managed.action === 'half' ? <><Scissors className="h-3 w-3 mr-1" />หารครึ่ง</> : <><Ban className="h-3 w-3 mr-1" />ปิดรับ</>}</Badge></td>
-                                              <td className="p-2 text-sm text-gray-600">{managed.reason}</td><td className="p-2"><Badge variant={managed.is_manual ? 'secondary' : 'outline'}>{managed.is_manual ? 'ด้วยตนเอง' : 'วิเคราะห์'}</Badge></td>
+                                              <td className="p-2 text-sm text-gray-600 dark:text-gray-400">{managed.reason}</td><td className="p-2"><Badge variant={managed.is_manual ? 'secondary' : 'outline'}>{managed.is_manual ? 'ด้วยตนเอง' : 'วิเคราะห์'}</Badge></td>
                           <td className="p-2 text-center"><Button size="sm" variant="ghost" onClick={() => removeManagedNumberFromContext(`${managed.number}-${managed.digit_count}-${managed.type_number}`)}>ลบ</Button></td>
                         </tr>
                       ))}
@@ -539,12 +539,12 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                   </table>
                 </div>
                 <div className="flex justify-between items-center mt-4">
-                  <div className="text-sm text-gray-600">รวม: หารครึ่ง {filteredManagedNumbers.filter(m => m.action === 'half').length} เลข, ปิดรับ {filteredManagedNumbers.filter(m => m.action === 'close').length} เลข</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">รวม: หารครึ่ง {filteredManagedNumbers.filter(m => m.action === 'half').length} เลข, ปิดรับ {filteredManagedNumbers.filter(m => m.action === 'close').length} เลข</div>
                   <div className="flex gap-2"><Button onClick={exportManagedNumbers} variant="outline" size="sm">ส่งออก CSV</Button><Button onClick={clearManagedNumbers} variant="outline" size="sm">ล้างทั้งหมด</Button></div>
                 </div>
               </CardContent>
             </Card>
-                        ) : (<div className="text-center p-8 text-gray-500">ไม่มีรายการจัดการสำหรับวันที่เลือก</div>)}
+                        ) : (<div className="text-center p-8 text-gray-500 dark:text-gray-400">ไม่มีรายการจัดการสำหรับวันที่เลือก</div>)}
                     </TabsContent>
                 </Tabs>
                 </motion.div>

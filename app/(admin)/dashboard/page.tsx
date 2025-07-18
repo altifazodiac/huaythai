@@ -362,7 +362,7 @@ export default function AdminDashboard() {
               <Card className="relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-blue-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ยอดขายรวม</CardTitle>
+                  <CardTitle className="text-sm font-medium">ยอดซื้อรวม</CardTitle>
                   <div className="p-2 bg-blue-100 rounded-full">
                     <TrendingUp className="h-4 w-4 text-blue-600" />
                   </div>
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
               <Card className="relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-green-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">จ่ายรางวัล</CardTitle>
+                  <CardTitle className="text-sm font-medium">ยอดจ่ายรางวัล</CardTitle>
                   <div className="p-2 bg-green-100 rounded-full">
                     <Award className="h-4 w-4 text-green-600" />
                   </div>
@@ -404,7 +404,7 @@ export default function AdminDashboard() {
               <Card className="relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-amber-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">จำนวนตั๋ว</CardTitle>
+                  <CardTitle className="text-sm font-medium">จำนวนบิล</CardTitle>
                   <div className="p-2 bg-amber-100 rounded-full">
                     <Ticket className="h-4 w-4 text-amber-600" />
                   </div>
@@ -532,14 +532,60 @@ export default function AdminDashboard() {
             </motion.div>
           </div>
 
+          {/* ยอดถูกรางวัลรายละเอียด */}
+          <motion.div variants={itemVariants}>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Award className="h-5 w-5 mr-2" />
+                  รายละเอียดยอดถูกรางวัล
+                </CardTitle>
+                <CardDescription>
+                  ข้อมูลการถูกรางวัลและอัตราการจ่ายรางวัล
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      {formatCurrency(dashboardData.performance.totalPayout)}
+                    </div>
+                    <div className="text-sm text-green-800">ยอดจ่ายรางวัลรวม</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatCurrency(dashboardData.performance.totalOriginalPayout)}
+                    </div>
+                    <div className="text-sm text-blue-800">ยอดจ่ายรางวัลเดิม</div>
+                  </div>
+                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {formatPercentage(dashboardData.performance.payoutRate)}
+                    </div>
+                    <div className="text-sm text-orange-800">อัตราการจ่ายรางวัล</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {dashboardData.performance.numberCapAffectedTickets}
+                    </div>
+                    <div className="text-sm text-purple-800">บิลที่ใช้เลขอั้น</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Risk Assessment */}
           <motion.div variants={itemVariants}>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <AlertTriangle className="h-5 w-5 mr-2" />
-                  การประเมินความเสี่ยง
+                  การประเมินความเสี่ยงและยอดถูกรางวัล
                 </CardTitle>
+                <CardDescription>
+                  ข้อมูลความเสี่ยงและสถิติการถูกรางวัล
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -578,6 +624,37 @@ export default function AdminDashboard() {
                     <RiskIndicator level="medium" value="ปกติ" />
                   </div>
                 </div>
+                
+                {/* ยอดถูกรางวัล */}
+                <div className="mt-6 pt-6 border-t">
+                  <h4 className="text-lg font-semibold mb-4 text-center">สถิติการถูกรางวัล</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-green-600">
+                        {formatCurrency(dashboardData.performance.totalPayout)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">ยอดจ่ายรางวัลรวม</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">
+                        {formatPercentage(dashboardData.performance.payoutRate)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">อัตราการจ่ายรางวัล</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-orange-600">
+                        {formatCurrency(dashboardData.performance.numberCapSavings)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">ประหยัดจากเลขอั้น</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-purple-600">
+                        {dashboardData.performance.numberCapAffectedTickets}
+                      </div>
+                      <div className="text-sm text-muted-foreground">บิลที่ใช้เลขอั้น</div>
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -590,7 +667,7 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center">
                       <BarChart3 className="h-5 w-5 mr-2" />
-                      รายได้และกำไรประจำวัน
+                      ยอดซื้อและยอดจ่ายรางวัลประจำวัน
                     </CardTitle>
                     <div className="flex items-center space-x-2">
                       <Badge variant="outline">
@@ -601,6 +678,9 @@ export default function AdminDashboard() {
                       </Badge>
                     </div>
                   </div>
+                  <CardDescription>
+                    แสดงยอดซื้อและยอดจ่ายรางวัลรายวัน พร้อมกำไร/ขาดทุน
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
@@ -610,10 +690,10 @@ export default function AdminDashboard() {
                       )}
                       values={dashboardData.revenue.dailyRevenue.map(item => item.revenue)}
                       chartType={chartType}
-                      title="รายได้และกำไรรายวัน"
+                      title="ยอดซื้อและยอดจ่ายรางวัลรายวัน"
                       showComparison={true}
-                      comparisonData={dashboardData.revenue.dailyRevenue.map(item => item.netProfit)}
-                      comparisonLabel="กำไรสุทธิ"
+                      comparisonData={dashboardData.revenue.dailyRevenue.map(item => item.payout)}
+                      comparisonLabel="ยอดจ่ายรางวัล"
                     />
                   </div>
                 </CardContent>
@@ -646,32 +726,32 @@ export default function AdminDashboard() {
             </motion.div>
           </div>
 
-          {/* Top Branches */}
+          {/* Top Users */}
           <motion.div variants={itemVariants}>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Building className="h-5 w-5 mr-2" />
-                  สาขาที่มียอดขายสูงสุด
+                  <Users className="h-5 w-5 mr-2" />
+                  ผู้ใช้ที่มียอดขายสูงสุด
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {dashboardData.users.topBranches.map((branch, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {dashboardData.users.topUsers.map((user, index) => (
+                    <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                           <span className="text-sm font-bold text-blue-600">{index + 1}</span>
                         </div>
                         <div>
-                          <div className="font-medium">{branch.branch}</div>
-                          <div className="text-sm text-gray-500">{branch.userCount} ผู้ใช้</div>
+                          <div className="font-medium">{user.name}</div>
+                          <div className="text-sm text-gray-500">{user.branch} • {user.ticketCount} บิล</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{formatCurrency(branch.totalSpent)}</div>
+                        <div className="font-bold">{formatCurrency(user.totalSpent)}</div>
                         <div className="text-sm text-gray-500">
-                          เฉลี่ย: {formatCurrency(branch.avgSpent)}
+                          เฉลี่ย: {formatCurrency(user.avgSpent)}
                         </div>
                       </div>
                     </div>
@@ -716,10 +796,10 @@ export default function AdminDashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <Ticket className="h-5 w-5 mr-2" />
-                    จำนวนตั๋วที่ขาย
+                    จำนวนบิลที่ขาย
                   </CardTitle>
                   <CardDescription>
-                    จำนวนตั๋วที่ขายได้ในแต่ละวัน
+                    จำนวนบิลที่ขายได้ในแต่ละวัน
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -730,7 +810,7 @@ export default function AdminDashboard() {
                       )}
                       values={dashboardData.tickets.dailyStats.map(item => item.sold)}
                       chartType={chartType}
-                      title="จำนวนตั๋วรายวัน"
+                      title="จำนวนบิลรายวัน"
                       showComparison={true}
                       comparisonData={dashboardData.tickets.dailyStats.map(item => item.avgTicketValue)}
                       comparisonLabel="มูลค่าเฉลี่ย"
@@ -743,11 +823,11 @@ export default function AdminDashboard() {
 
           {/* Ticket Status Distribution */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="bg-white dark:bg-gray-800 mt-20">
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Activity className="h-5 w-5 mr-2" />
-                  การกระจายตัวของสถานะตั๋ว
+                  การกระจายตัวของสถานะบิล
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -888,7 +968,7 @@ export default function AdminDashboard() {
                     onClick={() => setSelectedDetail('tickets')}
                   >
                     <Ticket className="h-8 w-8 mb-2 text-purple-600" />
-                    <span className="font-medium">รายงานตั๋ว</span>
+                    <span className="font-medium">รายงานบิล</span>
                     <span className="text-xs text-muted-foreground">การขายและประเภท</span>
                   </Button>
                   
@@ -936,7 +1016,7 @@ export default function AdminDashboard() {
           title={`รายงาน${
             selectedDetail === 'revenue' ? 'ยอดขาย' : 
             selectedDetail === 'users' ? 'ผู้ใช้งาน' : 
-            selectedDetail === 'tickets' ? 'ตั๋ว' :
+            selectedDetail === 'tickets' ? 'บิล' :
             selectedDetail === 'performance' ? 'ประสิทธิภาพ' :
             selectedDetail === 'winnings' ? 'รางวัล' : 
             selectedDetail === 'analytics' ? 'การวิเคราะห์' : 'รายงาน'
@@ -949,19 +1029,22 @@ export default function AdminDashboard() {
               <div>
                 <h4 className="font-semibold mb-4 flex items-center">
                   <TrendingUp className="h-5 w-5 mr-2" />
-                  รายได้และกำไรรายวัน
+                  ยอดซื้อและยอดจ่ายรางวัลรายวัน
                 </h4>
                 <div className="space-y-3">
                   {dashboardData.revenue.dailyRevenue.map((day, index) => (
                     <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <div>
                         <div className="font-medium">{format(new Date(day.date), 'EEEE dd MMMM yyyy', { locale: th })}</div>
-                        <div className="text-sm text-gray-500">{day.tickets} ตั๋ว • จ่าย: {formatCurrency(day.payout)}</div>
+                        <div className="text-sm text-gray-500">{day.tickets} บิล • ยอดซื้อ: {formatCurrency(day.revenue)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{formatCurrency(day.revenue)}</div>
+                        <div className="font-bold text-green-600">{formatCurrency(day.payout)}</div>
                         <div className={`text-sm ${day.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           กำไร: {formatCurrency(day.netProfit)} ({formatPercentage(day.profitMargin)})
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          อัตราจ่าย: {formatPercentage(day.payoutRate)}
                         </div>
                       </div>
                     </div>
@@ -1030,6 +1113,36 @@ export default function AdminDashboard() {
                       <div className="text-sm text-purple-800">จุดคุ้มทุน (วัน)</div>
                     </div>
                   </div>
+                  
+                  <div className="p-4 bg-indigo-50 rounded-lg">
+                    <h5 className="font-semibold text-indigo-800 mb-2">ข้อมูลยอดถูกรางวัล</h5>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-lg font-bold text-indigo-600">
+                          {formatCurrency(dashboardData.performance.totalPayout)}
+                        </div>
+                        <div className="text-sm text-indigo-800">ยอดจ่ายรางวัลรวม</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-indigo-600">
+                          {formatPercentage(dashboardData.performance.payoutRate)}
+                        </div>
+                        <div className="text-sm text-indigo-800">อัตราการจ่ายรางวัล</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-indigo-600">
+                          {formatCurrency(dashboardData.performance.totalOriginalPayout)}
+                        </div>
+                        <div className="text-sm text-indigo-800">ยอดจ่ายรางวัลเดิม</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-indigo-600">
+                          {formatCurrency(dashboardData.performance.numberCapSavings)}
+                        </div>
+                        <div className="text-sm text-indigo-800">ประหยัดจากเลขอั้น</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1061,6 +1174,20 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-sm text-teal-800">
                       เปอร์เซ็นต์: {formatPercentage(dashboardData.performance.numberCapSavingsPercentage)}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="text-lg font-bold text-green-600">
+                      ข้อมูลยอดถูกรางวัล
+                    </div>
+                    <div className="text-sm text-green-800 mt-2">
+                      ยอดจ่ายรางวัลรวม: {formatCurrency(dashboardData.performance.totalPayout)}
+                    </div>
+                    <div className="text-sm text-green-800">
+                      อัตราการจ่าย: {formatPercentage(dashboardData.performance.payoutRate)}
+                    </div>
+                    <div className="text-sm text-green-800">
+                      ยอดจ่ายรางวัลเดิม: {formatCurrency(dashboardData.performance.totalOriginalPayout)}
                     </div>
                   </div>
                 </div>

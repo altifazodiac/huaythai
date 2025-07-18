@@ -13,10 +13,12 @@ export interface DashboardData {
       activeUsers: number
       retention: number
     }>
-    topBranches: Array<{
+    topUsers: Array<{
+      id: string
+      name: string
       branch: string
-      userCount: number
       totalSpent: number
+      ticketCount: number
       avgSpent: number
     }>
   }
@@ -246,6 +248,306 @@ export interface DashboardData {
   }
 }
 
+// ฟังก์ชันทดสอบ: ตรวจสอบข้อมูลในตาราง lottery_results
+async function testLotteryResultsData() {
+  try {
+    console.log('🔍 Testing lottery_results data...');
+    
+    // ตรวจสอบจำนวนข้อมูลทั้งหมด
+    const { count: totalCount, error: countError } = await supabase
+      .from('lottery_results')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('❌ Error counting lottery_results:', countError);
+      return;
+    }
+    
+    console.log('📊 Total lottery_results count:', totalCount);
+    
+    // ตรวจสอบข้อมูลล่าสุด
+    const { data: recentResults, error: recentError } = await supabase
+      .from('lottery_results')
+      .select('*')
+      .order('draw_date', { ascending: false })
+      .limit(5);
+    
+    if (recentError) {
+      console.error('❌ Error fetching recent lottery_results:', recentError);
+      return;
+    }
+    
+    console.log('📅 Recent lottery_results:', recentResults?.length || 0);
+    if (recentResults && recentResults.length > 0) {
+      console.log('📋 Sample result:', recentResults[0]);
+    }
+    
+    // ตรวจสอบข้อมูลในช่วง 7 วันล่าสุด
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const { data: weekResults, error: weekError } = await supabase
+      .from('lottery_results')
+      .select('*')
+      .gte('draw_date', sevenDaysAgo.toISOString().split('T')[0])
+      .order('draw_date', { ascending: false });
+    
+    if (weekError) {
+      console.error('❌ Error fetching week lottery_results:', weekError);
+      return;
+    }
+    
+    console.log('📈 Week lottery_results:', weekResults?.length || 0);
+    
+    // ตรวจสอบข้อมูลสำหรับวันที่ 2025-07-18
+    const { data: specificDateResults, error: specificDateError } = await supabase
+      .from('lottery_results')
+      .select('*')
+      .eq('draw_date', '2025-07-18')
+      .order('lottery_sub_type_id', { ascending: true });
+    
+    if (specificDateError) {
+      console.error('❌ Error fetching specific date results:', specificDateError);
+      return;
+    }
+    
+    console.log('📅 Results for 2025-07-18:', specificDateResults?.length || 0);
+    if (specificDateResults && specificDateResults.length > 0) {
+      console.log('📋 Sample results for 2025-07-18:', specificDateResults.slice(0, 5));
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in testLotteryResultsData:', error);
+  }
+}
+
+// ฟังก์ชันทดสอบ: ตรวจสอบข้อมูลในตาราง lottery_tickets
+async function testLotteryTicketsData() {
+  try {
+    console.log('🎫 Testing lottery_tickets data...');
+    
+    // ตรวจสอบจำนวนข้อมูลทั้งหมด
+    const { count: totalCount, error: countError } = await supabase
+      .from('lottery_tickets')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('❌ Error counting lottery_tickets:', countError);
+      return;
+    }
+    
+    console.log('📊 Total lottery_tickets count:', totalCount);
+    
+    // ตรวจสอบข้อมูลตาม status
+    const { data: statusData, error: statusError } = await supabase
+      .from('lottery_tickets')
+      .select('status')
+      .limit(1000);
+    
+    if (statusError) {
+      console.error('❌ Error fetching lottery_tickets status:', statusError);
+      return;
+    }
+    
+    const statusCounts = (statusData || []).reduce((acc: any, ticket: any) => {
+      acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+      return acc;
+    }, {});
+    
+    console.log('📋 Status distribution:', statusCounts);
+    
+    // ตรวจสอบข้อมูล confirmed ในช่วง 7 วันล่าสุด
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const { data: confirmedTickets, error: confirmedError } = await supabase
+      .from('lottery_tickets')
+      .select('id, draw_date, total_amount, status')
+      .eq('status', 'confirmed')
+      .gte('draw_date', sevenDaysAgo.toISOString().split('T')[0])
+      .order('draw_date', { ascending: false });
+    
+    if (confirmedError) {
+      console.error('❌ Error fetching confirmed lottery_tickets:', confirmedError);
+      return;
+    }
+    
+    console.log('✅ Confirmed tickets in last 7 days:', confirmedTickets?.length || 0);
+    if (confirmedTickets && confirmedTickets.length > 0) {
+      console.log('📋 Sample confirmed ticket:', confirmedTickets[0]);
+    }
+    
+    // ตรวจสอบข้อมูลสำหรับวันที่ 2025-07-18
+    const { data: specificDateTickets, error: specificDateTicketError } = await supabase
+      .from('lottery_tickets')
+      .select(`
+        id,
+        draw_date,
+        total_amount,
+        status,
+        lottery_ticket_items(
+          id,
+          lottery_sub_type_id,
+          numbers,
+          amount,
+          lottery_sub_number(
+            digit_number,
+            type_number,
+            price_paid
+          )
+        )
+      `)
+      .eq('draw_date', '2025-07-18')
+      .eq('status', 'confirmed');
+    
+    if (specificDateTicketError) {
+      console.error('❌ Error fetching specific date tickets:', specificDateTicketError);
+      return;
+    }
+    
+    console.log('📅 Confirmed tickets for 2025-07-18:', specificDateTickets?.length || 0);
+    if (specificDateTickets && specificDateTickets.length > 0) {
+      console.log('📋 Sample ticket for 2025-07-18:', specificDateTickets[0]);
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in testLotteryTicketsData:', error);
+  }
+}
+
+// ฟังก์ชันทดสอบ: ตรวจสอบข้อมูลในตาราง lottery_ticket_items
+async function testLotteryTicketItemsData() {
+  try {
+    console.log('🎯 Testing lottery_ticket_items data...');
+    
+    // ตรวจสอบจำนวนข้อมูลทั้งหมด
+    const { count: totalCount, error: countError } = await supabase
+      .from('lottery_ticket_items')
+      .select('*', { count: 'exact', head: true });
+    
+    if (countError) {
+      console.error('❌ Error counting lottery_ticket_items:', countError);
+      return;
+    }
+    
+    console.log('📊 Total lottery_ticket_items count:', totalCount);
+    
+    // ตรวจสอบ lottery_sub_type_id ในทุก items
+    const { data: allItems, error: allItemsError } = await supabase
+      .from('lottery_ticket_items')
+      .select('id, lottery_sub_type_id')
+      .limit(100);
+    
+    if (allItemsError) {
+      console.error('❌ Error fetching all lottery_ticket_items:', allItemsError);
+      return;
+    }
+    
+    const itemsWithSubTypeId = (allItems || []).filter(item => item.lottery_sub_type_id);
+    const itemsWithoutSubTypeId = (allItems || []).filter(item => !item.lottery_sub_type_id);
+    
+    console.log('📊 Items with lottery_sub_type_id:', itemsWithSubTypeId.length);
+    console.log('📊 Items without lottery_sub_type_id:', itemsWithoutSubTypeId.length);
+    
+    if (itemsWithoutSubTypeId.length > 0) {
+      console.log('⚠️ Items without lottery_sub_type_id:', itemsWithoutSubTypeId.slice(0, 3));
+    }
+    
+    // ตรวจสอบข้อมูลในตาราง lottery_sub_types
+    const { data: subTypes, error: subTypesError } = await supabase
+      .from('lottery_sub_types')
+      .select('lottery_sub_type_id, sub_type_name')
+      .limit(10);
+    
+    if (subTypesError) {
+      console.error('❌ Error fetching lottery_sub_types:', subTypesError);
+      return;
+    }
+    
+    console.log('📊 lottery_sub_types count:', subTypes?.length || 0);
+    if (subTypes && subTypes.length > 0) {
+      console.log('📋 Sample lottery_sub_types:', subTypes.slice(0, 3));
+    }
+    
+    // ตรวจสอบข้อมูลในตาราง lottery_sub_number
+    const { data: subNumbers, error: subNumbersError } = await supabase
+      .from('lottery_sub_number')
+      .select('id, lottery_sub_type_id, digit_number, type_number, price_paid')
+      .limit(10);
+    
+    if (subNumbersError) {
+      console.error('❌ Error fetching lottery_sub_number:', subNumbersError);
+      return;
+    }
+    
+    console.log('📊 lottery_sub_number count:', subNumbers?.length || 0);
+    if (subNumbers && subNumbers.length > 0) {
+      console.log('📋 Sample lottery_sub_number:', subNumbers.slice(0, 3));
+    }
+    
+    // ตรวจสอบความสัมพันธ์ระหว่างตาราง
+    const { data: relatedItems, error: relatedError } = await supabase
+      .from('lottery_ticket_items')
+      .select(`
+        id,
+        lottery_sub_type_id,
+        lottery_sub_number(
+          id,
+          lottery_sub_type_id,
+          digit_number,
+          type_number,
+          price_paid
+        )
+      `)
+      .limit(5);
+    
+    if (relatedError) {
+      console.error('❌ Error fetching related items:', relatedError);
+      return;
+    }
+    
+    console.log('🔗 Related items:', relatedItems?.length || 0);
+    if (relatedItems && relatedItems.length > 0) {
+      console.log('🔗 Sample related item:', relatedItems[0]);
+    }
+    
+    // ตรวจสอบข้อมูลตัวอย่าง
+    const { data: sampleItems, error: sampleError } = await supabase
+      .from('lottery_ticket_items')
+      .select(`
+        id,
+        amount,
+        numbers,
+        effective_prize_rate,
+        lottery_sub_type_id,
+        lottery_sub_number(
+          digit_number,
+          type_number,
+          price_paid
+        )
+      `)
+      .limit(5);
+    
+    if (sampleError) {
+      console.error('❌ Error fetching sample lottery_ticket_items:', sampleError);
+      return;
+    }
+    
+    console.log('📋 Sample lottery_ticket_items:', sampleItems?.length || 0);
+    if (sampleItems && sampleItems.length > 0) {
+      console.log('📋 Sample item:', sampleItems[0]);
+      
+      // ตรวจสอบ lottery_sub_type_id ในแต่ละ item
+      sampleItems.forEach((item, index) => {
+        console.log(`📋 Item ${index + 1} lottery_sub_type_id:`, item.lottery_sub_type_id);
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error in testLotteryTicketItemsData:', error);
+  }
+}
+
 export async function fetchDashboardData(dateRange: string = 'week'): Promise<DashboardData> {
   try {
     const now = new Date()
@@ -253,8 +555,21 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
     const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
     const previousStartDate = new Date(startDate.getTime() - daysBack * 24 * 60 * 60 * 1000)
     
+    // ทดสอบข้อมูล lottery_results ก่อน
+    await testLotteryResultsData();
+    
+    // ทดสอบข้อมูล lottery_tickets ก่อน
+    await testLotteryTicketsData();
+    
+    // ทดสอบข้อมูล lottery_ticket_items ก่อน
+    await testLotteryTicketItemsData();
+    
     // โหลดผลรางวัลของช่วงเวลาที่ต้องการ เหมือน summary
     const resultsMap = await createResultsMap(supabase, startDate.toISOString())
+    
+    // Debug: ตรวจสอบ resultsMap
+    console.log('Dashboard - ResultsMap loaded:', Object.keys(resultsMap).length, 'results')
+    console.log('Dashboard - Sample results:', Object.entries(resultsMap).slice(0, 3))
 
     // Fetch all required data in parallel for better performance
     const [
@@ -267,7 +582,7 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
       recentActivitiesData
     ] = await Promise.all([
       fetchUsersData(startDate, previousStartDate),
-      fetchTicketsData(startDate, previousStartDate, resultsMap),
+      fetchTicketsData(startDate, previousStartDate, resultsMap), // ส่ง resultsMap ไปด้วย
       fetchCreditData(startDate, previousStartDate),
       fetchLotteryTypesData(startDate, previousStartDate),
       fetchWinningsData(startDate, previousStartDate),
@@ -275,14 +590,32 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
       fetchRecentActivitiesData(startDate)
     ])
 
+    // Debug: ตรวจสอบข้อมูลที่ได้จาก fetchTicketsData
+    console.log('Dashboard - TicketsData:', {
+      totalRevenue: ticketsData.totalRevenue,
+      totalPayout: ticketsData.totalPayout,
+      totalOriginalPayout: ticketsData.totalOriginalPayout,
+      dailyStatsCount: ticketsData.dailyStats.length
+    })
+
     // Calculate comprehensive performance metrics
     const performance = calculatePerformanceMetrics(
       ticketsData.dailyStats,
       ticketsData.totalRevenue,
       ticketsData.totalPayout,
       ticketsData.totalOriginalPayout,
-      daysBack
+      daysBack,
+      ticketsData.numberCapAffectedTickets || 0
     )
+
+    // Debug: ตรวจสอบ performance metrics
+    console.log('Dashboard - Performance:', {
+      totalSales: performance.totalSales,
+      totalPayout: performance.totalPayout,
+      payoutRate: performance.payoutRate,
+      netProfit: performance.netProfit,
+      numberCapAffectedTickets: performance.numberCapAffectedTickets
+    })
 
     // Calculate analytics and forecasts
     const analytics = calculateAnalytics(
@@ -456,33 +789,51 @@ async function fetchUsersData(startDate: Date, previousStartDate: Date) {
     })
   }
 
-  // Fetch top branches
-  const { data: branchData } = await supabase
+  // Fetch top users by sales
+  const { data: userData } = await supabase
     .from('profiles')
     .select(`
+      id,
+      name,
+      email,
       branch,
-      credit_transactions(amount, transaction_type)
+      lottery_tickets!inner(
+        id,
+        total_amount,
+        created_at,
+        status
+      )
     `)
-    .not('branch', 'is', null)
+    .eq('lottery_tickets.status', 'confirmed')
+    .gte('lottery_tickets.created_at', startDate.toISOString())
 
-  const topBranches = (branchData || []).reduce((acc: any, profile: any) => {
-    const branch = profile.branch || 'ไม่ระบุ'
-    if (!acc[branch]) {
-      acc[branch] = { branch, userCount: 0, totalSpent: 0 }
+  const topUsers = (userData || []).reduce((acc: any, profile: any) => {
+    const userId = profile.id
+    if (!acc[userId]) {
+      acc[userId] = { 
+        id: userId,
+        name: profile.name || profile.email || 'ไม่ระบุ',
+        branch: profile.branch || 'ไม่ระบุ',
+        totalSpent: 0,
+        ticketCount: 0
+      }
     }
-    acc[branch].userCount += 1
     
-    const totalSpent = (profile.credit_transactions || [])
-      .filter((tx: any) => tx.transaction_type === 'purchase')
-      .reduce((sum: number, tx: any) => sum + globalThis.Number(tx.amount), 0)
+    const totalSpent = (profile.lottery_tickets || [])
+      .filter((ticket: any) => ticket.status === 'confirmed')
+      .reduce((sum: number, ticket: any) => sum + globalThis.Number(ticket.total_amount), 0)
     
-    acc[branch].totalSpent += totalSpent
+    const ticketCount = (profile.lottery_tickets || [])
+      .filter((ticket: any) => ticket.status === 'confirmed').length
+    
+    acc[userId].totalSpent += totalSpent
+    acc[userId].ticketCount += ticketCount
     return acc
   }, {})
 
-  const topBranchesArray = Object.values(topBranches).map((branch: any) => ({
-    ...branch,
-    avgSpent: branch.userCount > 0 ? branch.totalSpent / branch.userCount : 0
+  const topUsersArray = Object.values(topUsers).map((user: any) => ({
+    ...user,
+    avgSpent: user.ticketCount > 0 ? user.totalSpent / user.ticketCount : 0
   })).sort((a: any, b: any) => b.totalSpent - a.totalSpent).slice(0, 5)
 
   const userGrowthRate = previousPeriodUsers && previousPeriodUsers > 0 
@@ -495,13 +846,20 @@ async function fetchUsersData(startDate: Date, previousStartDate: Date) {
     active: activeUsers?.length || 0,
     growthRate: userGrowthRate,
     dailyStats: dailyStats.reverse(),
-    topBranches: topBranchesArray
+    topUsers: topUsersArray
   }
 }
 
 // Helper function to fetch tickets data
 async function fetchTicketsData(startDate: Date, previousStartDate: Date, resultsMap: Record<string, any>) {
   const now = new Date()
+  
+  // Debug: ตรวจสอบ parameters
+  console.log('fetchTicketsData - Parameters:', {
+    startDate: startDate.toISOString(),
+    previousStartDate: previousStartDate.toISOString(),
+    resultsMapKeys: Object.keys(resultsMap).length
+  })
   
   // Fetch tickets with comprehensive data
   const { data: tickets } = await supabase
@@ -521,6 +879,7 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
         number_cap_action,
         number_cap_status,
         numbers,
+        lottery_sub_type_id,
         lottery_sub_number!inner(
           id,
           digit_number,
@@ -538,10 +897,16 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
     .gte('draw_date', previousStartDate.toISOString())
     .order('created_at', { ascending: false })
 
+  // Debug: ตรวจสอบ tickets ที่ได้
+  console.log('fetchTicketsData - Raw tickets:', tickets?.length || 0)
+
   // Filter tickets เฉพาะ status 'confirmed' และใช้ draw_date เหมือน summary
   const currentPeriodTickets = tickets?.filter(t => 
     new Date(t.draw_date) >= startDate && t.status === 'confirmed'
   ) || []
+  
+  // Debug: ตรวจสอบ tickets ที่กรองแล้ว
+  console.log('fetchTicketsData - Filtered tickets:', currentPeriodTickets.length)
   
   const previousPeriodTickets = tickets?.filter(t => 
     new Date(t.draw_date) >= previousStartDate && 
@@ -576,7 +941,21 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
     let dayNumberCapCount = 0
     
     dayTickets.forEach(ticket => {
+      let ticketHasNumberCap = false; // เพิ่มตัวแปรเพื่อตรวจสอบว่าบิลนี้ใช้เลขอั้นหรือไม่
+      
       ticket.lottery_ticket_items?.forEach((item: any) => {
+        // Debug: ตรวจสอบ lottery_sub_type_id
+        console.log('🔍 Item debug:', {
+          itemId: item.id,
+          lottery_sub_type_id: item.lottery_sub_type_id,
+          numbers: item.numbers,
+          amount: item.amount,
+          draw_date: ticket.draw_date,
+          number_cap_action: item.number_cap_action,
+          effective_prize_rate: item.effective_prize_rate,
+          original_amount: item.original_amount
+        });
+        
         // ใช้ฟังก์ชันเดียวกับ summary: calculateWinningsForItem อิงผลรางวัลจริง
         const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap)
         dayActualPayout += prize
@@ -590,11 +969,45 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
         )
         dayOriginalPayout += originalPrize
 
+        // Debug: ตรวจสอบการคำนวณรางวัล
+        if (prize > 0 || originalPrize > 0) {
+          console.log('💰 Prize calculation:', {
+            itemId: item.id,
+            actualPrize: prize,
+            originalPrize: originalPrize,
+            difference: originalPrize - prize,
+            hasNumberCap: !!item.number_cap_action
+          });
+        }
+
+        // ตรวจสอบว่าบิลนี้ใช้เลขอั้นหรือไม่
         if (item.number_cap_action) {
-          dayNumberCapCount++
+          ticketHasNumberCap = true;
         }
       })
+      
+      // นับบิลที่ใช้เลขอั้นที่ระดับ ticket
+      if (ticketHasNumberCap) {
+        dayNumberCapCount++;
+        console.log('🎯 Ticket with number cap found:', {
+          ticketId: ticket.id,
+          billNumber: ticket.bill_number,
+          totalAmount: ticket.total_amount,
+          drawDate: ticket.draw_date
+        });
+      }
     })
+    
+    // Debug: ตรวจสอบการคำนวณรายวัน
+    if (dayTicketCount > 0) {
+      console.log(`fetchTicketsData - Day ${dateStr}:`, {
+        tickets: dayTicketCount,
+        revenue: dayRevenue,
+        actualPayout: dayActualPayout,
+        originalPayout: dayOriginalPayout,
+        numberCapTickets: dayNumberCapCount // เพิ่มการแสดงจำนวนบิลที่ใช้เลขอั้น
+      })
+    }
     
     revenueByDate[dateStr] = dayRevenue
     totalRevenue += dayRevenue
@@ -620,6 +1033,14 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
       payoutRate
     })
   }
+
+  // Debug: ตรวจสอบผลรวม
+  console.log('fetchTicketsData - Totals:', {
+    totalRevenue,
+    totalPayout,
+    totalOriginalPayout,
+    numberCapAffectedTickets
+  })
 
   // Calculate ticket statistics
   const totalSold = currentPeriodTickets.filter(t => t.status === 'confirmed').length
@@ -670,7 +1091,8 @@ function calculatePerformanceMetrics(
   totalSales: number,
   totalPayout: number,
   totalOriginalPayout: number,
-  daysBack: number
+  daysBack: number,
+  numberCapAffectedTickets: number
 ) {
   const netProfit = totalSales - totalPayout
   const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0
@@ -708,7 +1130,7 @@ function calculatePerformanceMetrics(
     payoutRate,
     numberCapSavings,
     numberCapSavingsPercentage,
-    numberCapAffectedTickets: 0, // Would be calculated in tickets data
+    numberCapAffectedTickets,
     bestPerformingDay: bestPerformingDay?.date || '',
     worstPerformingDay: worstPerformingDay?.date || '',
     averageDailySales,
@@ -934,7 +1356,7 @@ function calculateAnalytics(userStats: any[], ticketStats: any[], performance: a
 
 function getEmptyDashboardData(): DashboardData {
   return {
-    users: { total: 0, newThisMonth: 0, active: 0, growthRate: 0, dailyStats: [], topBranches: [] },
+    users: { total: 0, newThisMonth: 0, active: 0, growthRate: 0, dailyStats: [], topUsers: [] },
     revenue: { total: 0, growth: 0, byDrawDate: {}, dailyRevenue: [], monthlyComparison: [], revenueByLotteryType: [] },
     tickets: { sold: 0, sales: 0, pending: 0, cancelled: 0, growthRate: 0, dailyStats: [], typeDistribution: [], statusDistribution: [] },
     lotteryTypes: { total: 0, popular: [], performance: [], dailyPerformance: [] },

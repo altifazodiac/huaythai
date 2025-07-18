@@ -47,7 +47,7 @@ export default function TicketChart({
   chartType = 'bar',
   showGradient = true,
   animationDuration = 1000,
-  title = 'ยอดขายตั๋วแต่ละวัน',
+  title = 'ยอดขายบิลแต่ละวัน',
   color = '#F59E0B',
   showComparison = false,
   comparisonData = [],
@@ -65,7 +65,7 @@ export default function TicketChart({
     labels,
     datasets: [
       {
-        label: 'จำนวนตั๋ว',
+        label: 'จำนวนบิล',
         data: values,
         backgroundColor: (context: any) => {
           const ctx = context.chart.ctx
@@ -166,7 +166,7 @@ export default function TicketChart({
               ((value / Math.max(...values)) * 100).toFixed(1) : '0'
             
             return [
-              `${context.dataset.label}: ${value.toLocaleString()} ตั๋ว`,
+              `${context.dataset.label}: ${value.toLocaleString()} บิล`,
               `เปอร์เซ็นต์: ${percentage}% ของยอดสูงสุด`
             ]
           },
