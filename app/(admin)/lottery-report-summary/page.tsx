@@ -107,6 +107,8 @@ interface UserSummary {
   total_remaining: number;
   total_profit_loss: number;
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
+  total_system_fee: number; // ค่าบริหารระบบ 5%
+  total_final_balance: number; // ยอดคงเหลือสุดท้าย = ยอดสุทธิ - ค่าบริหารระบบ
   bill_count: number;
   transaction_count: number;
 }
@@ -120,6 +122,8 @@ interface DateGroupedReport {
   total_remaining: number;
   total_profit_loss: number;
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
+  total_system_fee: number; // ค่าบริหารระบบ 5%
+  total_final_balance: number; // ยอดคงเหลือสุดท้าย = ยอดสุทธิ - ค่าบริหารระบบ
   total_bills: number;
   total_transactions: number;
   users: UserSummary[];
@@ -232,6 +236,24 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   }
 };
 
+// Function to get the latest draw date
+const getLatestDrawDate = async (supabase: any): Promise<string> => {
+  try {
+    const { data, error } = await supabase
+      .from('lottery_tickets')
+      .select('draw_date')
+      .eq('status', 'confirmed')
+      .order('draw_date', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+    return data?.[0]?.draw_date || new Date().toISOString().split('T')[0];
+  } catch (err) {
+    console.error('Error fetching latest draw date:', err);
+    return new Date().toISOString().split('T')[0];
+  }
+};
+
 const LotteryReportSummaryPage: React.FC = () => {
   const { user } = useAuth();
   const [reportData, setReportData] = useState<LotteryTransactionData[]>([]);
@@ -244,7 +266,184 @@ const LotteryReportSummaryPage: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<string>('confirmed');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const isMobile = useIsMobile();
+
+  // Function to group data by period
+  const groupDataByPeriod = (data: LotteryTransactionData[], period: 'daily' | 'weekly' | 'monthly'): DateGroupedReport[] => {
+    const groups: { [key: string]: DateGroupedReport } = {};
+
+    data.forEach(transaction => {
+      let groupKey: string;
+      const date = new Date(transaction.draw_date);
+
+      switch (period) {
+        case 'daily':
+          groupKey = transaction.draw_date;
+          break;
+        case 'weekly':
+          // Get the start of the week (Sunday)
+          const weekStart = new Date(date);
+          weekStart.setDate(date.getDate() - date.getDay());
+          groupKey = weekStart.toISOString().split('T')[0];
+          break;
+        case 'monthly':
+          groupKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          break;
+        default:
+          groupKey = transaction.draw_date;
+      }
+
+              if (!groups[groupKey]) {
+          groups[groupKey] = {
+            date: groupKey,
+            total_users: 0,
+            total_purchase: 0,
+            total_reward: 0,
+            total_commission: 0,
+            total_remaining: 0,
+            total_profit_loss: 0,
+            total_net_amount: 0,
+            total_system_fee: 0,
+            total_final_balance: 0,
+            total_bills: 0,
+            total_transactions: 0,
+            users: [],
+            commission_rate_average: 0,
+            profit_margin_percentage: 0,
+          };
+        }
+
+      const group = groups[groupKey];
+      group.total_purchase += transaction.total_purchase_amount;
+      group.total_reward += transaction.total_reward_amount;
+      group.total_commission += transaction.commission_amount;
+      group.total_remaining += transaction.remaining_balance;
+              group.total_profit_loss += transaction.profit_loss;
+        group.total_net_amount += transaction.net_amount;
+        group.total_system_fee = group.total_profit_loss * 0.05;
+        group.total_final_balance = group.total_net_amount - group.total_system_fee;
+        group.total_bills += transaction.bill_count;
+        group.total_transactions += 1;
+
+      // Group users within period
+      let userSummary = group.users.find(u => u.user_id === transaction.user_id);
+              if (!userSummary) {
+          userSummary = {
+            user_id: transaction.user_id,
+            user_name: transaction.user_name,
+            commission_percentage: transaction.commission_percentage,
+            total_purchase: 0,
+            total_reward: 0,
+            total_commission: 0,
+            total_remaining: 0,
+            total_profit_loss: 0,
+            total_net_amount: 0,
+            total_system_fee: 0,
+            total_final_balance: 0,
+            bill_count: 0,
+            transaction_count: 0,
+          };
+          group.users.push(userSummary);
+        }
+
+      userSummary.total_purchase += transaction.total_purchase_amount;
+      userSummary.total_reward += transaction.total_reward_amount;
+      userSummary.total_commission += transaction.commission_amount;
+      userSummary.total_remaining += transaction.remaining_balance;
+              userSummary.total_profit_loss += transaction.profit_loss;
+        userSummary.total_net_amount += transaction.net_amount;
+        userSummary.total_system_fee = userSummary.total_profit_loss * 0.05;
+        userSummary.total_final_balance = userSummary.total_net_amount - userSummary.total_system_fee;
+        userSummary.bill_count += transaction.bill_count;
+        userSummary.transaction_count += 1;
+    });
+
+    // Calculate percentages and set user count
+    Object.values(groups).forEach(group => {
+      group.total_users = group.users.length;
+      group.commission_rate_average = group.total_purchase > 0 ? (group.total_commission / group.total_purchase) * 100 : 0;
+      group.profit_margin_percentage = group.total_purchase > 0 ? (group.total_profit_loss / group.total_purchase) * 100 : 0;
+      
+      // Sort users by purchase amount desc
+      group.users.sort((a, b) => b.total_purchase - a.total_purchase);
+    });
+
+    return Object.values(groups);
+  };
+
+  // Enhanced data fetching function
+  const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, LotteryResult>, startDate?: string, endDate?: string): Promise<LotteryTransactionData[]> => {
+    try {
+      let query = supabase
+        .from('lottery_tickets')
+        .select('*, lottery_ticket_items(*, lottery_sub_number(*)), profiles(name, percent)')
+        .eq('status', 'confirmed');
+
+      if (startDate && startDate.trim() !== '') query = query.gte('draw_date', startDate);
+      if (endDate && endDate.trim() !== '') query = query.lte('draw_date', endDate);
+
+      const { data: tickets, error } = await query;
+      if (error) throw error;
+
+      return (tickets || []).map((ticket: any) => {
+        let total_reward_amount = 0;
+        (ticket.lottery_ticket_items || []).forEach((item: any) => {
+          const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+          total_reward_amount += prize;
+        });
+        
+        const total_purchase_amount = Number(ticket.total_amount || 0);
+        const profit_loss = total_purchase_amount - total_reward_amount;
+        
+        // คำนวณ commission และอื่นๆ
+        const commission_percentage = ticket.profiles?.percent || 0;
+        const commission_amount = total_purchase_amount * (commission_percentage / 100);
+        const remaining_balance = profit_loss - commission_amount;
+        const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
+
+        return {
+          id: ticket.id,
+          draw_date: ticket.draw_date,
+          purchase_date: ticket.created_at,
+          user_name: ticket.profiles?.name || 'ไม่ระบุ',
+          user_id: ticket.user_id,
+          total_purchase_amount,
+          total_reward_amount,
+          commission_percentage,
+          commission_amount,
+          remaining_balance,
+          profit_loss,
+          net_amount,
+          bill_count: 1,
+          ticket_count: (ticket.lottery_ticket_items || []).length,
+          status: ticket.status,
+          deleted_at: ticket.deleted_at
+        };
+      });
+    } catch (err) {
+      console.error('Error fetching lottery report data:', err);
+      return [];
+    }
+  };
+
+  // Function to get the latest draw date
+  const getLatestDrawDate = async (supabase: any): Promise<string> => {
+    try {
+      const { data, error } = await supabase
+        .from('lottery_tickets')
+        .select('draw_date')
+        .eq('status', 'confirmed')
+        .order('draw_date', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+      return data?.[0]?.draw_date || new Date().toISOString().split('T')[0];
+    } catch (err) {
+      console.error('Error fetching latest draw date:', err);
+      return new Date().toISOString().split('T')[0];
+    }
+  };
 
   // Calculate overall summary
   const overallSummary = useMemo((): OverallSummary => {
@@ -297,89 +496,21 @@ const LotteryReportSummaryPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const startDate = selectedDate || undefined;
-      const endDate = selectedDate || undefined;
+      
+      // ถ้าไม่มีการเลือกวันที่ ให้ดึงข้อมูลทั้งหมด
+      let startDate: string | undefined = selectedDate || undefined;
+      let endDate: string | undefined = selectedDate || undefined;
 
-      const resultsMap = await createResultsMap(supabase, startDate || new Date(0).toISOString());
+      const resultsMap = await createResultsMap(supabase, startDate);
       const data = await fetchLotteryReportData(supabase, resultsMap, startDate, endDate);
       
       setReportData(data);
 
-      // Group data by date first, then by user
-      const dateGroups = data.reduce((acc: { [key: string]: DateGroupedReport }, transaction) => {
-        const date = transaction.draw_date;
-        
-        if (!acc[date]) {
-          acc[date] = {
-            date,
-            total_users: 0,
-            total_purchase: 0,
-            total_reward: 0,
-            total_commission: 0,
-            total_remaining: 0,
-            total_profit_loss: 0,
-            total_net_amount: 0,
-            total_bills: 0,
-            total_transactions: 0,
-            users: [],
-            commission_rate_average: 0,
-            profit_margin_percentage: 0,
-          };
-        }
+      // Group data by period
+      const groupedData = groupDataByPeriod(data, period);
 
-        const dateGroup = acc[date];
-        dateGroup.total_purchase += transaction.total_purchase_amount;
-        dateGroup.total_reward += transaction.total_reward_amount;
-        dateGroup.total_commission += transaction.commission_amount;
-        dateGroup.total_remaining += transaction.remaining_balance;
-        dateGroup.total_profit_loss += transaction.profit_loss;
-        dateGroup.total_net_amount += transaction.net_amount;
-        dateGroup.total_bills += transaction.bill_count;
-        dateGroup.total_transactions += 1;
-
-        // Group users within date
-        let userSummary = dateGroup.users.find(u => u.user_id === transaction.user_id);
-        if (!userSummary) {
-          userSummary = {
-            user_id: transaction.user_id,
-            user_name: transaction.user_name,
-            commission_percentage: transaction.commission_percentage,
-            total_purchase: 0,
-            total_reward: 0,
-            total_commission: 0,
-            total_remaining: 0,
-            total_profit_loss: 0,
-            total_net_amount: 0,
-            bill_count: 0,
-            transaction_count: 0,
-          };
-          dateGroup.users.push(userSummary);
-        }
-
-        userSummary.total_purchase += transaction.total_purchase_amount;
-        userSummary.total_reward += transaction.total_reward_amount;
-        userSummary.total_commission += transaction.commission_amount;
-        userSummary.total_remaining += transaction.remaining_balance;
-        userSummary.total_profit_loss += transaction.profit_loss;
-        userSummary.total_net_amount += transaction.net_amount;
-        userSummary.bill_count += transaction.bill_count;
-        userSummary.transaction_count += 1;
-
-        return acc;
-      }, {});
-
-      // Calculate percentages and set user count
-      Object.values(dateGroups).forEach(dateGroup => {
-        dateGroup.total_users = dateGroup.users.length;
-        dateGroup.commission_rate_average = dateGroup.total_purchase > 0 ? (dateGroup.total_commission / dateGroup.total_purchase) * 100 : 0;
-        dateGroup.profit_margin_percentage = dateGroup.total_purchase > 0 ? (dateGroup.total_profit_loss / dateGroup.total_purchase) * 100 : 0;
-        
-        // Sort users by purchase amount desc
-        dateGroup.users.sort((a, b) => b.total_purchase - a.total_purchase);
-      });
-
-      // Sort date groups
-      const sortedDateGroups = Object.values(dateGroups).sort((a, b) => {
+      // Sort grouped data
+      const sortedGroupedData = groupedData.sort((a, b) => {
         switch (sortBy) {
           case 'date':
             return sortOrder === 'desc' 
@@ -402,7 +533,7 @@ const LotteryReportSummaryPage: React.FC = () => {
         }
       });
 
-      setDateGroupedData(sortedDateGroups);
+      setDateGroupedData(sortedGroupedData);
     } catch (err) {
       console.error('Error loading data:', err);
       setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
@@ -415,7 +546,7 @@ const LotteryReportSummaryPage: React.FC = () => {
     if (user) {
       loadData();
     }
-  }, [user, selectedDate, sortBy, sortOrder]);
+  }, [user, selectedDate, sortBy, sortOrder, period]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('th-TH', {
@@ -442,6 +573,26 @@ const LotteryReportSummaryPage: React.FC = () => {
     });
   };
 
+  const formatPeriodDate = (dateString: string, period: 'daily' | 'weekly' | 'monthly') => {
+    const date = new Date(dateString);
+    
+    switch (period) {
+      case 'daily':
+        return formatDate(dateString);
+      case 'weekly':
+        const weekEnd = new Date(date);
+        weekEnd.setDate(date.getDate() + 6);
+        return `${formatShortDate(dateString)} - ${formatShortDate(weekEnd.toISOString().split('T')[0])}`;
+      case 'monthly':
+        return date.toLocaleDateString('th-TH', {
+          year: 'numeric',
+          month: 'long'
+        });
+      default:
+        return formatDate(dateString);
+    }
+  };
+
   const filteredDateData = useMemo(() => {
     let filtered = dateGroupedData;
     
@@ -456,10 +607,11 @@ const LotteryReportSummaryPage: React.FC = () => {
     return filtered;
   }, [dateGroupedData, searchTerm]);
 
-  const clearFilters = () => {
+  const clearFilters = async () => {
     setSelectedDate('');
     setSearchTerm('');
     setStatusFilter('confirmed');
+    setPeriod('daily');
   };
 
   if (!user) {
@@ -550,7 +702,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">ค้นหาผู้ใช้</label>
                         <div className="relative">
@@ -564,12 +716,40 @@ const LotteryReportSummaryPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="space-y-2">
+                        <label className="text-sm font-medium">ช่วงเวลา</label>
+                        <Select value={period} onValueChange={(value: any) => setPeriod(value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="daily">รายวัน</SelectItem>
+                            <SelectItem value="weekly">รายสัปดาห์</SelectItem>
+                            <SelectItem value="monthly">รายเดือน</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
                         <label className="text-sm font-medium">วันที่เริ่มต้น</label>
-                        <Input
-                          type="date"
-                          value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
-                        />
+                        <div className="flex space-x-2">
+                          <Input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedDate('')}
+                            title="ดูข้อมูลทั้งหมด"
+                          >
+                            ทั้งหมด
+                          </Button>
+                        </div>
+                        {selectedDate && (
+                          <p className="text-xs text-muted-foreground">
+                            กำลังดูข้อมูลวันที่: {formatDate(selectedDate)}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">เรียงตาม</label>
@@ -621,122 +801,63 @@ const LotteryReportSummaryPage: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                {/* Enhanced Summary Cards 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <motion.div variants={cardVariants}>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Sales Revenue</CardTitle>
-                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(overallSummary.total_purchase)}</div>
-                        <p className="text-xs text-muted-foreground">
-                          {overallSummary.total_dates} วัน • {overallSummary.total_users} ผู้ใช้
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  <motion.div variants={cardVariants}>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Rewards Paid</CardTitle>
-                        <Trophy className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-green-600">{formatCurrency(overallSummary.total_reward)}</div>
-                        <p className="text-xs text-muted-foreground">
-                          รางวัลที่จ่ายออก
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  <motion.div variants={cardVariants}>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Commission</CardTitle>
-                        <Percent className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">{formatCurrency(overallSummary.total_commission)}</div>
-                        <p className="text-xs text-muted-foreground">
-                          {overallSummary.commission_rate_average.toFixed(1)}% เฉลี่ย
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  <motion.div variants={cardVariants}>
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Net Profit/Loss</CardTitle>
-                        {overallSummary.total_profit_loss >= 0 ? (
-                          <TrendingUp className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-red-600" />
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className={`text-2xl font-bold ${overallSummary.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {formatCurrency(overallSummary.total_profit_loss)}
+                {/* Period Tabs */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center">
+                      <BarChart3 className="h-5 w-5 mr-2" />
+                      สรุปรายงานตามช่วงเวลา
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs value={period} onValueChange={(value: any) => setPeriod(value)} className="w-full">
+                      <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="daily" className="flex items-center space-x-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>รายวัน</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="weekly" className="flex items-center space-x-2">
+                          <CalendarDays className="h-4 w-4" />
+                          <span>รายสัปดาห์</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="monthly" className="flex items-center space-x-2">
+                          <Activity className="h-4 w-4" />
+                          <span>รายเดือน</span>
+                        </TabsTrigger>
+                      </TabsList>
+                      
+                      <TabsContent value="daily" className="mt-4">
+                        <div className="text-center p-4">
+                          <Calendar className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                          <h3 className="text-lg font-semibold">สรุปรายงานรายวัน</h3>
+                          <p className="text-sm text-muted-foreground">
+                            แสดงข้อมูลสรุปการขายหวยแยกตามวัน
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {overallSummary.profit_margin_percentage.toFixed(1)}% margin
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </div>*/}
-
-                {/* Key Performance Indicators 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center">
-                        <Target className="h-4 w-4 mr-2" />
-                        Best Performance Day
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg font-bold text-green-600">
-                        {overallSummary.best_profit_date ? formatShortDate(overallSummary.best_profit_date) : 'N/A'}
-                      </div>
-                      <p className="text-xs text-muted-foreground">วันที่ทำกำไรสูงสุด</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center">
-                        <AlertCircle className="h-4 w-4 mr-2" />
-                        Worst Performance Day
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg font-bold text-red-600">
-                        {overallSummary.worst_profit_date ? formatShortDate(overallSummary.worst_profit_date) : 'N/A'}
-                      </div>
-                      <p className="text-xs text-muted-foreground">วันที่ขาดทุนสูงสุด</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center">
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        Highest Sales Day
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg font-bold text-blue-600">
-                        {overallSummary.highest_sales_date ? formatShortDate(overallSummary.highest_sales_date) : 'N/A'}
-                      </div>
-                      <p className="text-xs text-muted-foreground">วันที่ขายได้สูงสุด</p>
-                    </CardContent>
-                  </Card>
-                </div>*/}
+                      </TabsContent>
+                      
+                      <TabsContent value="weekly" className="mt-4">
+                        <div className="text-center p-4">
+                          <CalendarDays className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                          <h3 className="text-lg font-semibold">สรุปรายงานรายสัปดาห์</h3>
+                          <p className="text-sm text-muted-foreground">
+                            แสดงข้อมูลสรุปการขายหวยแยกตามสัปดาห์
+                          </p>
+                        </div>
+                      </TabsContent>
+                      
+                      <TabsContent value="monthly" className="mt-4">
+                        <div className="text-center p-4">
+                          <Activity className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+                          <h3 className="text-lg font-semibold">สรุปรายงานรายเดือน</h3>
+                          <p className="text-sm text-muted-foreground">
+                            แสดงยอดรวมการขายหวยแยกตามเดือน (ไม่แสดงรายละเอียดผู้ใช้)
+                          </p>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+                </Card>
 
                 {/* Date-Grouped Data Display */}
                 {loading ? (
@@ -788,51 +909,59 @@ const LotteryReportSummaryPage: React.FC = () => {
                             transition={{ delay: index * 0.1 }}
                           >
                             <Card className="overflow-hidden">
-                              <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 border-b">
-                                <div className="flex items-center justify-between">
+                              <CardHeader className={`border-b ${period === 'monthly' ? 'bg-gradient-to-r from-purple-50 to-indigo-50 py-4' : 'bg-gradient-to-r from-blue-50 to-purple-50'}`}>
+                                <div className={`flex items-center ${period === 'monthly' ? 'justify-center' : 'justify-between'}`}>
                                   <div className="flex items-center space-x-4">
                                     <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full">
-                                      <Calendar className="h-6 w-6 text-primary" />
+                                      {period === 'daily' && <Calendar className="h-6 w-6 text-primary" />}
+                                      {period === 'weekly' && <CalendarDays className="h-6 w-6 text-primary" />}
+                                      {period === 'monthly' && <BarChart3 className="h-6 w-6 text-primary" />}
                                     </div>
                                     <div>
-                                      <CardTitle className="text-xl">{formatDate(dateReport.date)}</CardTitle>
+                                      <CardTitle className="text-xl">{formatPeriodDate(dateReport.date, period)}</CardTitle>
                                       <CardDescription>
-                                        {dateReport.total_users} ผู้ใช้ • {dateReport.total_transactions} รายการ • {dateReport.total_bills} บิล
+                                        {period === 'monthly' ? (
+                                          `${dateReport.total_users} ผู้ใช้ • ${dateReport.total_transactions} รายการ`
+                                        ) : (
+                                          `${dateReport.total_users} ผู้ใช้ • ${dateReport.total_transactions} รายการ • ${dateReport.total_bills} บิล`
+                                        )}
                                       </CardDescription>
                                     </div>
                                   </div>
-                                  <div className="flex items-center space-x-6">
-                                    <div className="text-right">
-                                      <div className="font-semibold text-lg">{formatCurrency(dateReport.total_purchase)}</div>
-                                      <div className="text-sm text-muted-foreground">ยอดขาย</div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="font-semibold text-lg text-green-600">{formatCurrency(dateReport.total_reward)}</div>
-                                      <div className="text-sm text-muted-foreground">รางวัล</div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="font-semibold text-lg text-blue-600">{formatCurrency(dateReport.total_commission)}</div>
-                                      <div className="text-sm text-muted-foreground">ค่าคอม</div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={`font-semibold text-lg ${dateReport.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {formatCurrency(dateReport.total_profit_loss)}
+                                  {period !== 'monthly' && (
+                                    <div className="flex items-center space-x-6">
+                                      <div className="text-right">
+                                        <div className="font-semibold text-lg">{formatCurrency(dateReport.total_purchase)}</div>
+                                        <div className="text-sm text-muted-foreground">ยอดขาย</div>
                                       </div>
-                                      <div className="text-sm text-muted-foreground">
-                                        {dateReport.total_profit_loss >= 0 ? 'กำไร' : 'ขาดทุน'}
+                                      <div className="text-right">
+                                        <div className="font-semibold text-lg text-green-600">{formatCurrency(dateReport.total_reward)}</div>
+                                        <div className="text-sm text-muted-foreground">รางวัล</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="font-semibold text-lg text-blue-600">{formatCurrency(dateReport.total_commission)}</div>
+                                        <div className="text-sm text-muted-foreground">ค่าคอม</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className={`font-semibold text-lg ${dateReport.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {formatCurrency(dateReport.total_profit_loss)}
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">
+                                          {dateReport.total_profit_loss >= 0 ? 'กำไร' : 'ขาดทุน'}
+                                        </div>
+                                      </div>
+                                      <div className="text-right rounded-md border border-green-200 bg-green-100 p-4">
+                                        <div className={`font-semibold text-lg ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                          {formatCurrency(dateReport.total_net_amount)}
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">หลังหักค่าคอม</div>
                                       </div>
                                     </div>
-                                    <div className="text-right rounded-md border border-green-200 bg-green-100 p-4">
-                                      <div className={`font-semibold text-lg ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                        {formatCurrency(dateReport.total_net_amount)}
-                                      </div>
-                                      <div className="text-sm text-muted-foreground">ยอดสุทธิ</div>
-                                    </div>
-                                  </div>
+                                  )}
                                 </div>
                               </CardHeader>
                               
-                              <CardContent className="p-0">
+                              <CardContent className={`p-0 ${period === 'monthly' ? 'py-2' : ''}`}>
                                 <div className="overflow-x-auto">
                                   <Table>
                                     <TableHeader>
@@ -842,48 +971,101 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         <TableHead className="text-right w-32">ยอดขาย</TableHead>
                                         <TableHead className="text-right w-32">ค่าคอม</TableHead>
                                         <TableHead className="text-right w-32">ถูกรางวัล</TableHead>
-                                        <TableHead className="text-right w-32">ยอดคงเหลือ</TableHead>
                                         <TableHead className="text-right w-32">กำไร/ขาดทุน</TableHead>
-                                        <TableHead className="text-right w-32">ยอดสุทธิ</TableHead>
+                                        <TableHead className="text-right w-32">ค่าบริหารระบบ(5%)</TableHead>
+                                        <TableHead className="text-right w-32">ยอดคงเหลือ</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {dateReport.users.map((user, userIndex) => (
-                                        <TableRow key={user.user_id} className="hover:bg-muted/30">
+                                      {period === 'monthly' ? (
+                                        // สำหรับรายเดือน แสดงเฉพาะยอดรวม
+                                        <TableRow className="bg-gradient-to-r from-purple-50 to-indigo-50 font-bold">
                                           <TableCell className="font-medium">
                                             <div className="flex items-center space-x-2">
-                                              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                                                <User className="h-4 w-4 text-primary" />
+                                              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                                <BarChart3 className="h-4 w-4 text-purple-600" />
                                               </div>
                                               <div>
-                                                <div className="font-medium">{user.user_name}</div>
+                                                <div className="font-medium">ยอดรวมทั้งหมด</div>
                                                 <div className="text-xs text-muted-foreground">
-                                                  {user.bill_count} บิล • {user.transaction_count} รายการ
+                                                  {dateReport.total_users} ผู้ใช้ • {dateReport.total_transactions} รายการ
                                                 </div>
                                               </div>
                                             </div>
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <Badge variant="outline" className="text-xs">
-                                              {user.commission_percentage}%
+                                              {dateReport.commission_rate_average.toFixed(1)}%
                                             </Badge>
                                           </TableCell>
                                           <TableCell className="text-right font-medium">
-                                            {formatCurrency(user.total_purchase)}
+                                            {formatCurrency(dateReport.total_purchase)}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <span className="text-blue-600 font-medium">
-                                              {formatCurrency(user.total_commission)}
+                                              {formatCurrency(dateReport.total_commission)}
                                             </span>
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <span className="text-red-600 font-medium">
-                                              {formatCurrency(user.total_reward)}
+                                              {formatCurrency(dateReport.total_reward)}
                                             </span>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <span className="font-medium">
-                                              {formatCurrency(user.total_remaining)}
+                                            <span className={`font-medium ${dateReport.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                              {dateReport.total_profit_loss >= 0 ? (
+                                                <PlusCircle className="h-4 w-4 inline mr-1" />
+                                              ) : (
+                                                <MinusCircle className="h-4 w-4 inline mr-1" />
+                                              )}
+                                              {formatCurrency(dateReport.total_profit_loss)}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <span className="text-blue-600 font-medium">
+                                              {formatCurrency(dateReport.total_system_fee)}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100 p-2">
+                                            <span className={`font-medium ${dateReport.total_final_balance >= 0 ? 'text-emerald-900' : 'text-orange-600'}`}>
+                                              {formatCurrency(dateReport.total_final_balance)}
+                                            </span>
+                                          </TableCell>
+                                        </TableRow>
+                                      ) : (
+                                        // สำหรับรายวันและรายสัปดาห์ แสดงรายละเอียด user
+                                        <>
+                                          {dateReport.users.map((user, userIndex) => (
+                                            <TableRow key={user.user_id} className="hover:bg-muted/30">
+                                              <TableCell className="font-medium">
+                                                <div className="flex items-center space-x-2">
+                                                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                                                    <User className="h-4 w-4 text-primary" />
+                                                  </div>
+                                                  <div>
+                                                    <div className="font-medium">{user.user_name}</div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                      {user.bill_count} บิล • {user.transaction_count} รายการ
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                <Badge variant="outline" className="text-xs">
+                                                  {user.commission_percentage}%
+                                                </Badge>
+                                              </TableCell>
+                                              <TableCell className="text-right font-medium">
+                                                {formatCurrency(user.total_purchase)}
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                <span className="text-blue-600 font-medium">
+                                                  {formatCurrency(user.total_commission)}
+                                                </span>
+                                              </TableCell>
+                                                                                        <TableCell className="text-right">
+                                            <span className="text-red-600 font-medium">
+                                              {formatCurrency(user.total_reward)}
                                             </span>
                                           </TableCell>
                                           <TableCell className="text-right">
@@ -896,43 +1078,48 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(user.total_profit_loss)}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100 p-2">
-                                            <span className={`font-medium ${user.total_net_amount >= 0 ? 'text-emerald-900' : 'text-orange-600'}`}>
-                                              {formatCurrency(user.total_net_amount)}
+                                          <TableCell className="text-right">
+                                            <span className="text-blue-600 font-medium">
+                                              {formatCurrency(user.total_system_fee)}
                                             </span>
                                           </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                    {/* Summary Row for Users */}
-                                    {dateReport.users.length > 0 && (
-                                      <TableBody>
-                                        <TableRow className="bg-gray-100 dark:bg-gray-800 font-bold">
-                                          <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
-                                          <TableCell></TableCell>
-                                          <TableCell className="text-right">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_purchase, 0))}
+                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100 p-2">
+                                            <span className={`font-medium ${user.total_final_balance >= 0 ? 'text-emerald-900' : 'text-orange-600'}`}>
+                                              {formatCurrency(user.total_final_balance)}
+                                            </span>
                                           </TableCell>
-                                          <TableCell className="text-right text-blue-600">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_commission, 0))}
-                                          </TableCell>
-                                          <TableCell className="text-right text-red-600">
+                                            </TableRow>
+                                          ))}
+                                          {/* Summary Row for Users */}
+                                          {dateReport.users.length > 0 && (
+                                            <TableRow className="bg-gray-100 dark:bg-gray-800 font-bold">
+                                              <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
+                                              <TableCell></TableCell>
+                                              <TableCell className="text-right">
+                                                {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_purchase, 0))}
+                                              </TableCell>
+                                              <TableCell className="text-right text-blue-600">
+                                                {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_commission, 0))}
+                                              </TableCell>
+                                                                                        <TableCell className="text-right text-red-600">
                                             {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_reward, 0))}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_remaining, 0))}
                                           </TableCell>
                                           <TableCell className="text-right">
                                             <span className={dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
                                               {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_net_amount, 0))}
+                                          <TableCell className="text-right text-blue-600">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_system_fee, 0))}
                                           </TableCell>
-                                        </TableRow>
-                                      </TableBody>
-                                    )}
+                                          <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_final_balance, 0))}
+                                          </TableCell>
+                                            </TableRow>
+                                          )}
+                                        </>
+                                      )}
+                                    </TableBody>
                                   </Table>
                                 </div>
                               </CardContent>
@@ -951,7 +1138,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                           <CardHeader>
                             <CardTitle className="flex items-center">
                               <FileText className="h-5 w-5 mr-2" />
-                              ตารางสรุปรายงานตามวันที่
+                              ตารางสรุปรายงานตาม{period === 'daily' ? 'วันที่' : period === 'weekly' ? 'สัปดาห์' : 'เดือน'}
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="p-0">
@@ -959,27 +1146,33 @@ const LotteryReportSummaryPage: React.FC = () => {
                               <Table>
                                 <TableHeader>
                                   <TableRow>
-                                    <TableHead className="w-48">วันที่</TableHead>
+                                    <TableHead className="w-48">{period === 'daily' ? 'วันที่' : period === 'weekly' ? 'สัปดาห์' : 'เดือน'}</TableHead>
                                     <TableHead className="text-right w-20">ผู้ใช้</TableHead>
                                     <TableHead className="text-right w-32">ยอดขาย</TableHead>
                                     <TableHead className="text-right w-32">ค่าคอม</TableHead>
                                     <TableHead className="text-right w-32">ถูกรางวัล</TableHead>
-                                    <TableHead className="text-right w-32">ยอดคงเหลือ</TableHead>
                                     <TableHead className="text-right w-32">กำไร/ขาดทุน</TableHead>
-                                    <TableHead className="text-right w-32">ยอดสุทธิ</TableHead>
+                                    <TableHead className="text-right w-32">ค่าบริหารระบบ</TableHead>
+                                    <TableHead className="text-right w-32">ยอดคงเหลือสุดท้าย</TableHead>
                                     <TableHead className="text-right w-20">อัตราส่วนกำไร</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {filteredDateData.map((dateReport, index) => (
-                                    <TableRow key={dateReport.date} className="hover:bg-muted/30">
+                                    <TableRow key={dateReport.date} className={`hover:bg-muted/30 ${period === 'monthly' ? 'bg-gradient-to-r from-blue-50 to-purple-50 font-bold' : ''}`}>
                                       <TableCell className="font-medium">
                                         <div className="flex items-center space-x-2">
-                                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                                          {period === 'daily' && <Calendar className="h-4 w-4 text-muted-foreground" />}
+                                          {period === 'weekly' && <CalendarDays className="h-4 w-4 text-muted-foreground" />}
+                                          {period === 'monthly' && <Activity className="h-4 w-4 text-muted-foreground" />}
                                           <div>
-                                            <div className="font-medium">{formatDate(dateReport.date)}</div>
+                                            <div className="font-medium">{formatPeriodDate(dateReport.date, period)}</div>
                                             <div className="text-xs text-muted-foreground">
-                                              {dateReport.total_transactions} รายการ • {dateReport.total_bills} บิล
+                                              {period === 'monthly' ? (
+                                                `${dateReport.total_users} ผู้ใช้ • ${dateReport.total_transactions} รายการ`
+                                              ) : (
+                                                `${dateReport.total_transactions} รายการ • ${dateReport.total_bills} บิล`
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -1003,11 +1196,6 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         </span>
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        <span className="font-medium">
-                                          {formatCurrency(dateReport.total_remaining)}
-                                        </span>
-                                      </TableCell>
-                                      <TableCell className="text-right">
                                         <span className={`font-medium ${dateReport.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                           {dateReport.total_profit_loss >= 0 ? (
                                             <CheckCircle className="h-4 w-4 inline mr-1" />
@@ -1018,8 +1206,13 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         </span>
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        <span className={`font-medium ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                          {formatCurrency(dateReport.total_net_amount)}
+                                        <span className="text-blue-600 font-medium">
+                                          {formatCurrency(dateReport.total_system_fee)}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <span className={`font-medium ${dateReport.total_final_balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                          {formatCurrency(dateReport.total_final_balance)}
                                         </span>
                                       </TableCell>
                                       <TableCell className="text-right">
@@ -1048,15 +1241,15 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_reward, 0))}
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_remaining, 0))}
-                                      </TableCell>
-                                      <TableCell className="text-right">
                                         <span className={filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
                                           {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0))}
                                         </span>
                                       </TableCell>
+                                      <TableCell className="text-right text-blue-600">
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_system_fee, 0))}
+                                      </TableCell>
                                       <TableCell className="text-right text-emerald-600">
-                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_net_amount, 0))}
+                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
                                       </TableCell>
                                       <TableCell></TableCell>
                                     </TableRow>
@@ -1125,7 +1318,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                           </CardContent>
                         </Card>
 
-                        {/* ยอดคงเหลือ */}
+                        {/* ยอดคงเหลือสุดท้าย */}
                         <Card className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between">
@@ -1134,13 +1327,13 @@ const LotteryReportSummaryPage: React.FC = () => {
                                   <Wallet className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">ยอดคงเหลือ</p>
-                                  <p className="text-xs text-purple-600/70 dark:text-purple-400/70">Remaining Balance</p>
+                                  <p className="text-sm font-medium text-purple-700 dark:text-purple-300">ยอดคงเหลือสุดท้าย</p>
+                                  <p className="text-xs text-purple-600/70 dark:text-purple-400/70">Final Balance</p>
                                 </div>
                               </div>
                               <div className="text-right">
                                 <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
-                                  {formatCurrency(Math.abs((filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05) - filteredDateData.reduce((sum, item) => sum + item.total_net_amount, 0)))}
+                                  {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
                                 </p>
                               </div>
                             </div>
@@ -1153,7 +1346,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">สรุปการคำนวณ</h3>
                           <Badge variant="outline" className="text-xs">
-                            กำไร/ขาดทุน × 5% = ค่าบริหารระบบ
+                            ยอดสุทธิ - ค่าบริหารระบบ = ยอดคงเหลือสุดท้าย
                           </Badge>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -1170,13 +1363,10 @@ const LotteryReportSummaryPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
-                            <span className="text-gray-600 dark:text-gray-400">ยอดคงเหลือ:</span>
-                                                          <span className="font-semibold text-purple-600">
-                                {formatCurrency(
-                                  Math.abs((filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05) -
-                                   filteredDateData.reduce((sum, item) => sum + item.total_net_amount, 0))
-                                )}
-                              </span>
+                            <span className="text-gray-600 dark:text-gray-400">ยอดคงเหลือสุดท้าย:</span>
+                            <span className="font-semibold text-purple-600">
+                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
+                            </span>
                           </div>
                         </div>
                       </div>

@@ -9,11 +9,16 @@ interface LotteryResult {
 }
 
 // Function to create a map of lottery results for quick lookup
-export const createResultsMap = async (supabase: SupabaseClient, startDate: string): Promise<Record<string, LotteryResult>> => {
-  const { data, error } = await supabase
+export const createResultsMap = async (supabase: SupabaseClient, startDate?: string): Promise<Record<string, LotteryResult>> => {
+  let query = supabase
     .from('lottery_results')
-    .select('draw_date, lottery_sub_type_id, prize_code, winning_number')
-    .gte('draw_date', startDate);
+    .select('draw_date, lottery_sub_type_id, prize_code, winning_number');
+  
+  if (startDate && startDate.trim() !== '') {
+    query = query.gte('draw_date', startDate);
+  }
+  
+  const { data, error } = await query;
 
   if (error) {
     console.error('Error fetching lottery results:', error);

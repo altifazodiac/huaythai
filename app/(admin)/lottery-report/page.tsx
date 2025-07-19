@@ -272,7 +272,7 @@ const LotteryReportPage: React.FC = () => {
       const startDate = selectedDate || undefined;
       const endDate = selectedDate || undefined;
 
-      const resultsMap = await createResultsMap(supabase, startDate || new Date(0).toISOString());
+              const resultsMap = await createResultsMap(supabase, startDate);
       const data = await fetchLotteryReportData(supabase, resultsMap, startDate, endDate);
       
       // Group data by user first, then by date
