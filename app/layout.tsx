@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { GeistSans } from 'geist/font/sans';
+import { Inter } from 'next/font/google';
 import { Kanit } from 'next/font/google';
-import { GeistMono } from 'geist/font/mono';
+import { JetBrains_Mono } from 'next/font/google';
 import "./globals.css";
 import { Toaster } from 'sonner'
 
@@ -22,6 +22,18 @@ const kanit = Kanit({
   weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
 });
 
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-jetbrains-mono',
+});
+
 export const metadata: Metadata = {
   title: "สิงโตทองคำ 77",
   description: "สิงโตทองคำ 77",
@@ -38,8 +50,8 @@ export default function RootLayout({
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
           kanit.variable,
-          GeistSans.variable,
-          GeistMono.variable
+          inter.variable,
+          jetbrainsMono.variable
         )}
       >
         <ReactQueryProvider>

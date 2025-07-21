@@ -39,7 +39,8 @@ import {
   Search,
   Filter as FilterIcon,
   SortAsc,
-  SortDesc
+  SortDesc,
+  DollarSign
 } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { format } from 'date-fns';
@@ -84,6 +85,7 @@ interface FilterState {
   sortBy: 'count' | 'percentage' | 'number';
   sortOrder: 'asc' | 'desc';
   riskFilter: 'all' | 'low' | 'medium' | 'high';
+  selectedDate: string;
 }
 
 // Animation variants
@@ -179,8 +181,10 @@ export default function NumberAnalysisPage() {
     searchNumber: '',
     sortBy: 'count',
     sortOrder: 'desc',
-    riskFilter: 'all'
+    riskFilter: 'all',
+    selectedDate: ''
   });
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState('analysis');
 
@@ -213,18 +217,35 @@ export default function NumberAnalysisPage() {
 
       const { data: allTickets } = await supabase
         .from('lottery_tickets')
-        .select('id, status');
+        .select('id, status, draw_date')
+        .eq('status', 'confirmed')
+        .order('draw_date', { ascending: false });
 
-      // สร้าง map ของ ticket status
-      const ticketStatusMap = new Map();
+      // ดึงวันที่ที่มีข้อมูลและตั้งค่าวันที่ล่าสุด
+      const uniqueDates = [...new Set(allTickets?.map(t => t.draw_date) || [])].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      setAvailableDates(uniqueDates);
+      
+      // ตั้งค่าวันที่ล่าสุดเป็นค่าเริ่มต้นถ้ายังไม่ได้เลือก
+      if (!filters.selectedDate && uniqueDates.length > 0) {
+        setFilters(prev => ({ ...prev, selectedDate: uniqueDates[0] }));
+      }
+
+      // สร้าง map ของ ticket status และ draw_date
+      const ticketMap = new Map();
       allTickets?.forEach(ticket => {
-        ticketStatusMap.set(ticket.id, ticket.status);
+        ticketMap.set(ticket.id, { status: ticket.status, draw_date: ticket.draw_date });
       });
 
-      // กรองเฉพาะ confirmed tickets
-      const filteredTicketItems = allTicketItems?.filter(item => 
-        ticketStatusMap.get(item.ticket_id) === 'confirmed'
-      ) || [];
+      // กรองเฉพาะ confirmed tickets และตามวันที่ที่เลือก
+      const filteredTicketItems = allTicketItems?.filter(item => {
+        const ticketInfo = ticketMap.get(item.ticket_id);
+        if (!ticketInfo || ticketInfo.status !== 'confirmed') return false;
+        
+        // ถ้าเลือกวันที่แล้ว ให้กรองตามวันที่
+        if (filters.selectedDate && ticketInfo.draw_date !== filters.selectedDate) return false;
+        
+        return true;
+      }) || [];
 
 
 
@@ -293,10 +314,10 @@ export default function NumberAnalysisPage() {
     setRefreshing(false);
   };
 
-  // Load data on component mount
+  // Load data on component mount and when filters change
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [filters.selectedDate]);
 
   // Filter and sort data
   const filteredData = analysisData
@@ -363,16 +384,37 @@ export default function NumberAnalysisPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="container mx-auto p-6 space-y-8">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6"
       >
         <div>
           <h1 className="text-2xl font-bold text-gray-900">การวิเคราะห์หมายเลขหวย</h1>
           <p className="text-gray-600">วิเคราะห์จำนวนและเปอร์เซ็นต์ของหมายเลขหวยแต่ละประเภท</p>
+          {(filters.selectedDate || availableDates.length === 0) && (
+            <div className={`mt-2 flex items-center gap-2 text-sm ${
+              availableDates.length === 0 
+                ? 'text-red-600' 
+                : 'text-blue-600'
+            }`}>
+              <Calendar className="h-4 w-4" />
+              {availableDates.length === 0 ? (
+                <>
+                  <span>ไม่มีข้อมูล: ไม่พบข้อมูลบิลที่ยืนยันแล้ว</span>
+                </>
+              ) : (
+                <>
+                  <span>วันที่: {filters.selectedDate ? format(new Date(filters.selectedDate), 'PPP', { locale: th }) : 'ยังไม่ได้เลือก'}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {availableDates.length} วันที่มีข้อมูล
+                  </Badge>
+                </>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <Button
@@ -402,9 +444,9 @@ export default function NumberAnalysisPage() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="bg-white rounded-lg border p-4 space-y-4"
+            className="bg-white rounded-lg border shadow-sm p-6 space-y-6"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
                 <Label>ประเภทหวย</Label>
                 <Select
@@ -484,9 +526,47 @@ export default function NumberAnalysisPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div>
+                <Label>วันที่ ({availableDates.length} วัน)</Label>
+                <Select
+                  value={filters.selectedDate}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, selectedDate: value }))}
+                  disabled={availableDates.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={availableDates.length === 0 ? "ไม่มีข้อมูล" : "เลือกวันที่"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDates.length === 0 ? (
+                      <SelectItem value="no-data" disabled>
+                        ไม่มีข้อมูลวันที่
+                      </SelectItem>
+                    ) : (
+                      availableDates.map((date, index) => (
+                        <SelectItem key={date} value={date}>
+                          <div className="flex items-center justify-between w-full">
+                            <span>{format(new Date(date), 'PPP', { locale: th })}</span>
+                            {index === 0 && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                ล่าสุด
+                              </Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {filters.selectedDate && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    เลือก: {format(new Date(filters.selectedDate), 'PPP', { locale: th })}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div>
                 <Label>ค้นหาหมายเลข</Label>
                 <div className="relative">
@@ -550,16 +630,26 @@ export default function NumberAnalysisPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
       >
         <motion.div variants={cardVariants}>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">จำนวนหมายเลขทั้งหมด</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <Hash className="h-4 w-4" />
+                จำนวนหมายเลขทั้งหมด
+                {filters.selectedDate && (
+                  <Badge variant="secondary" className="text-xs">
+                    {format(new Date(filters.selectedDate), 'dd/MM', { locale: th })}
+                  </Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">{summaryStats.totalNumbers.toLocaleString()}</div>
-              <p className="text-xs text-gray-500">หมายเลขที่พบ</p>
+              <p className="text-xs text-gray-500">
+                {filters.selectedDate ? 'หมายเลขที่พบในวันที่เลือก' : 'หมายเลขที่พบทั้งหมด'}
+              </p>
             </CardContent>
           </Card>
         </motion.div>
@@ -567,11 +657,21 @@ export default function NumberAnalysisPage() {
         <motion.div variants={cardVariants}>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">จำนวนการซื้อทั้งหมด</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                จำนวนการซื้อทั้งหมด
+                {filters.selectedDate && (
+                  <Badge variant="secondary" className="text-xs">
+                    {format(new Date(filters.selectedDate), 'dd/MM', { locale: th })}
+                  </Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">{summaryStats.totalCount.toLocaleString()}</div>
-              <p className="text-xs text-gray-500">ครั้ง</p>
+              <p className="text-xs text-gray-500">
+                {filters.selectedDate ? 'ครั้งในวันที่เลือก' : 'ครั้งทั้งหมด'}
+              </p>
             </CardContent>
           </Card>
         </motion.div>
@@ -579,11 +679,21 @@ export default function NumberAnalysisPage() {
         <motion.div variants={cardVariants}>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">มูลค่าทั้งหมด</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                มูลค่าทั้งหมด
+                {filters.selectedDate && (
+                  <Badge variant="secondary" className="text-xs">
+                    {format(new Date(filters.selectedDate), 'dd/MM', { locale: th })}
+                  </Badge>
+                )}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{formatCurrency(summaryStats.totalAmount)}</div>
-              <p className="text-xs text-gray-500">บาท</p>
+              <p className="text-xs text-gray-500">
+                {filters.selectedDate ? 'บาทในวันที่เลือก' : 'บาททั้งหมด'}
+              </p>
             </CardContent>
           </Card>
         </motion.div>
@@ -606,7 +716,7 @@ export default function NumberAnalysisPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-6"
       >
         <motion.div variants={cardVariants}>
           <Card className="border-green-200 bg-green-50">
@@ -659,16 +769,23 @@ export default function NumberAnalysisPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="space-y-4"
+        className="space-y-6"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">ผลการวิเคราะห์</h2>
-          <Badge variant="secondary">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">ผลการวิเคราะห์</h2>
+            {filters.selectedDate && (
+              <p className="text-sm text-gray-600 mt-1">
+                สำหรับวันที่: {format(new Date(filters.selectedDate), 'PPP', { locale: th })}
+              </p>
+            )}
+          </div>
+          <Badge variant="secondary" className="text-sm">
             แสดง {filteredData.length} รายการ
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 auto-rows-fr">
           {filteredData.map((item, index) => {
             const RiskIcon = getRiskIcon(item.risk_level);
             const riskColor = getRiskColor(item.risk_level);
@@ -677,52 +794,56 @@ export default function NumberAnalysisPage() {
               <motion.div
                 key={`${item.lottery_sub_type_id}-${item.digit_number}-${item.type_number}-${item.number}`}
                 variants={itemVariants}
-                className="group"
+                className="group h-full"
               >
-                <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-2 ${riskColor}`}>
-                  <CardHeader className="pb-2">
+                <Card className={`hover:shadow-lg transition-all duration-200 cursor-pointer border-2 h-full flex flex-col ${riskColor}`}>
+                  <CardHeader className="pb-2 flex-shrink-0">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg font-bold text-gray-900">
                         {item.number}
                       </CardTitle>
-                      <RiskIcon className="h-5 w-5" />
+                      <RiskIcon className="h-5 w-5 flex-shrink-0" />
                     </div>
                     <CardDescription className="text-sm">
                       {item.sub_type_name} - {item.digit_number}หลัก {item.type_number}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">จำนวน:</span>
-                      <span className="font-semibold text-blue-600">{item.count.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">เปอร์เซ็นต์:</span>
-                      <span className="font-semibold text-purple-600">{formatPercentage(item.percentage)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">มูลค่า:</span>
-                      <span className="font-semibold text-green-600">{formatCurrency(item.total_amount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">จากทั้งหมด:</span>
-                      <span className="font-semibold text-gray-700">{item.total_possible.toLocaleString()}</span>
-                    </div>
-                    
-                    {/* Progress bar */}
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          item.risk_level === 'low' ? 'bg-green-500' :
-                          item.risk_level === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                      />
+                  <CardContent className="space-y-2 flex-grow flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">จำนวน:</span>
+                        <span className="font-semibold text-blue-600">{item.count.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">เปอร์เซ็นต์:</span>
+                        <span className="font-semibold text-purple-600">{formatPercentage(item.percentage)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">มูลค่า:</span>
+                        <span className="font-semibold text-green-600">{formatCurrency(item.total_amount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">จากทั้งหมด:</span>
+                        <span className="font-semibold text-gray-700">{item.total_possible.toLocaleString()}</span>
+                      </div>
                     </div>
                     
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{item.count}/{item.total_possible}</span>
-                      <span>{formatPercentage(item.percentage)}</span>
+                    <div className="space-y-2 mt-auto">
+                      {/* Progress bar */}
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            item.risk_level === 'low' ? 'bg-green-500' :
+                            item.risk_level === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>{item.count}/{item.total_possible}</span>
+                        <span>{formatPercentage(item.percentage)}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -735,11 +856,28 @@ export default function NumberAnalysisPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-12"
+            className="text-center py-16 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200"
           >
-            <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">ไม่พบข้อมูล</h3>
-            <p className="text-gray-500">ลองปรับตัวกรองหรือค้นหาใหม่</p>
+            <AlertTriangle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-medium text-gray-900 mb-3">ไม่พบข้อมูลการวิเคราะห์</h3>
+            <p className="text-gray-500 mb-4">
+              {filters.selectedDate 
+                ? `สำหรับวันที่: ${format(new Date(filters.selectedDate), 'PPP', { locale: th })}`
+                : 'ลองปรับตัวกรองหรือค้นหาใหม่'
+              }
+            </p>
+            {availableDates.length === 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md mx-auto">
+                <p className="text-sm text-red-600 font-medium">ไม่มีข้อมูลบิลที่ยืนยันแล้ว</p>
+                <p className="text-xs text-red-500 mt-1">กรุณาตรวจสอบข้อมูลในระบบ</p>
+              </div>
+            )}
+            {availableDates.length > 0 && !filters.selectedDate && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                <p className="text-sm text-blue-600 font-medium">กรุณาเลือกวันที่เพื่อดูข้อมูล</p>
+                <p className="text-xs text-blue-500 mt-1">มีข้อมูล {availableDates.length} วันให้เลือก</p>
+              </div>
+            )}
           </motion.div>
         )}
       </motion.div>

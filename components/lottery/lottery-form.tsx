@@ -305,7 +305,7 @@ useEffect(() => {
         </FormControl>
         <SelectContent>
           {isLoading ? (
-            <SelectItem value="loading">
+            <SelectItem value="loading-state">
               <Skeleton className="h-4 w-[100px]" />
             </SelectItem>
           ) : (

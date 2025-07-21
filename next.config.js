@@ -34,6 +34,15 @@ const nextConfig = {
         'playwright': 'commonjs playwright',
       });
     }
+    
+    // แก้ไขปัญหา binary dependencies สำหรับ Vercel
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    };
+    
     return config;
   },
   async redirects() {

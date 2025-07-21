@@ -165,14 +165,24 @@ const calculateWinningsForItem = (
 
 
 // 🔧 **ปรับปรุง**: แก้ไขฟังก์ชันดึงข้อมูลสรุปทั้งหมด
-const fetchDailySummary = async (supabase: any, resultsMap: Record<string, LotteryResult>): Promise<DailySummary[]> => {
+const fetchDailySummary = async (supabase: any, resultsMap: Record<string, LotteryResult>, drawDate?: string): Promise<DailySummary[]> => {
   try {
-    const { data: tickets, error: ticketError } = await supabase
+    let ticketQuery = supabase
       .from('lottery_tickets')
       .select('id, draw_date, total_amount, user_id, lottery_ticket_items(*, lottery_sub_number(*))')
       .eq('status', 'confirmed');
+    
+    if (drawDate) {
+      ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
     if (ticketError) throw ticketError;
     if (!tickets || tickets.length === 0) return [];
+
+    console.log('fetchDailySummary - drawDate:', drawDate);
+    console.log('fetchDailySummary - tickets count:', tickets.length);
+    console.log('fetchDailySummary - tickets dates:', tickets.map(t => t.draw_date));
 
     const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
     const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
@@ -425,20 +435,14 @@ const LotterySummaryPage: React.FC = () => {
   const [resultsMap, setResultsMap] = useState<Record<string, LotteryResult>>({}); // 🔧 ใหม่
 
   // Filter states
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedLotteryType, setSelectedLotteryType] = useState<number | null>(null);
   const [selectedBillNumber, setSelectedBillNumber] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
  
   useRequireAuth();
-
-  // Load initial data
-  useEffect(() => {
-    if (!supabase) return;
-    loadData();
-  }, [supabase]);
 
   // 🔧 **ปรับปรุง**: แยกฟังก์ชัน loadData ออกมา
   const loadData = async () => {
@@ -450,26 +454,42 @@ const LotterySummaryPage: React.FC = () => {
       const { data: ticketsData, error: ticketsError } = await supabase
         .from('lottery_tickets')
         .select('draw_date')
-        .eq('status', 'confirmed');
+        .eq('status', 'confirmed')
+        .order('draw_date', { ascending: false });
       
       if (ticketsError) throw ticketsError;
+      
+      // 🔧 ใหม่: ดึงวันที่ที่มีข้อมูลและตั้งค่าวันที่ล่าสุด
+      const uniqueDates = [...new Set(ticketsData?.map(t => t.draw_date) || [])].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      setAvailableDates(uniqueDates);
+      
+      // 🔧 ใหม่: ตั้งค่าวันที่ล่าสุดเป็นค่าเริ่มต้นถ้ายังไม่ได้เลือก
+      if (!selectedDate && uniqueDates.length > 0) {
+        setSelectedDate(uniqueDates[0]);
+        return; // ออกจากฟังก์ชันเพื่อให้ useEffect ที่สองจัดการการโหลดข้อมูล
+      }
+      
+      // ถ้าไม่มีวันที่ให้เลือก ให้ออกจากฟังก์ชัน
+      if (uniqueDates.length === 0) {
+        setIsLoading(false);
+        return;
+      }
       
       // 🔧 แก้ไข: กรองผลหวยตามวันที่ที่มีบิล
       const { data: resultsData, error: resultsError } = await supabase
         .from('lottery_results')
         .select('*')
-        .in('draw_date', ticketsData?.map(t => t.draw_date) || [])
+        .in('draw_date', uniqueDates)
         .order('draw_date', { ascending: false });
         
       if (resultsError) throw resultsError;
       
       // 🔧 Debug: ตรวจสอบข้อมูลที่โหลด
       console.log('=== SUMMARY DEBUG ===');
+      console.log('Selected Date:', selectedDate);
+      console.log('Available Dates:', uniqueDates);
       console.log('Tickets dates:', ticketsData?.map(t => t.draw_date));
       console.log('Results count:', resultsData?.length);
-      console.log('Results for 2025-07-18:', resultsData?.filter(r => r.draw_date === '2025-07-18'));
-      console.log('Results for lottery_sub_type_id = 2:', resultsData?.filter(r => r.lottery_sub_type_id === 2));
-      console.log('Results for 2 ตัวล่าง:', resultsData?.filter(r => r.prize_code === '2 ตัวล่าง'));
       
       const newResultsMap: Record<string, LotteryResult> = (resultsData || []).reduce((acc, res) => {
         const key = `${res.draw_date}|${res.lottery_sub_type_id}|${res.prize_code}`;
@@ -479,7 +499,7 @@ const LotterySummaryPage: React.FC = () => {
       setResultsMap(newResultsMap);
 
       const [dailyData, typeData, billData, numberData] = await Promise.all([
-        fetchDailySummary(supabase, newResultsMap),
+        fetchDailySummary(supabase, newResultsMap, selectedDate || undefined),
         fetchLotteryTypeSummary(supabase, newResultsMap, selectedDate || undefined),
         fetchBillSummary(supabase, newResultsMap, selectedDate || undefined, selectedLotteryType || undefined, selectedUserId === 'all' ? undefined : selectedUserId || undefined),
         fetchNumberDetails(supabase, newResultsMap, selectedBillNumber || undefined)
@@ -502,9 +522,15 @@ const LotterySummaryPage: React.FC = () => {
     }
   };
 
-  // Refresh data when filters change
+  // Load initial data
   useEffect(() => {
     if (!supabase) return;
+    loadData();
+  }, [supabase]);
+
+  // Refresh data when filters change
+  useEffect(() => {
+    if (!supabase || !selectedDate) return;
     const timeoutId = setTimeout(() => {
       loadData();
     }, 500);
@@ -532,7 +558,10 @@ const LotterySummaryPage: React.FC = () => {
   };
 
   const clearFilters = () => {
-    setSelectedDate('');
+    // 🔧 ใหม่: ตั้งค่าวันที่ล่าสุดแทนที่จะล้าง
+    if (availableDates.length > 0) {
+      setSelectedDate(availableDates[0]);
+    }
     setSelectedLotteryType(null);
     setSelectedBillNumber('');
     setSelectedUserId('all');
@@ -566,8 +595,24 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence>
-                  {dailySummary.map((item, index) => (
+                {dailySummary.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={role === 'admin' ? 9 : 6} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
+                        <p>ไม่พบข้อมูลสรุปรายวัน</p>
+                        {selectedDate && (
+                          <p className="text-xs">สำหรับวันที่: {formatDate(selectedDate)}</p>
+                        )}
+                        {availableDates.length === 0 && (
+                          <p className="text-xs">ไม่มีข้อมูลบิลที่ยืนยันแล้ว</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <AnimatePresence>
+                    {dailySummary.map((item, index) => (
                     <motion.tr 
                       key={item.draw_date + '__' + (item.user_id || '')}
                       layout
@@ -620,6 +665,7 @@ const LotterySummaryPage: React.FC = () => {
                     </motion.tr>
                   ))}
                 </AnimatePresence>
+                )}
                 {role === 'admin' && dailySummary.length > 0 && (
                   <tr className="font-bold bg-gray-100 dark:bg-gray-800 dark:text-white text-black">
                     <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
@@ -769,8 +815,21 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence>
-                  {lotteryTypeSummary.map((item, index) => (
+                {lotteryTypeSummary.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={role === 'admin' ? 8 : 7} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
+                        <p>ไม่พบข้อมูลสรุปตามประเภทหวย</p>
+                        {selectedDate && (
+                          <p className="text-xs">สำหรับวันที่: {formatDate(selectedDate)}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <AnimatePresence>
+                    {lotteryTypeSummary.map((item, index) => (
                     <motion.tr 
                       key={item.lottery_sub_type_id}
                       layout
@@ -803,6 +862,7 @@ const LotterySummaryPage: React.FC = () => {
                     </motion.tr>
                   ))}
                 </AnimatePresence>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -985,8 +1045,24 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence>
-                  {numberDetails.map((item, index) => (
+                {numberDetails.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
+                        <p>ไม่พบข้อมูลรายละเอียดเลข</p>
+                        {selectedBillNumber && (
+                          <p className="text-xs">สำหรับบิล: {selectedBillNumber}</p>
+                        )}
+                        {!selectedBillNumber && (
+                          <p className="text-xs">กรุณาเลือกบิลเพื่อดูรายละเอียด</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <AnimatePresence>
+                    {numberDetails.map((item, index) => (
                     <motion.tr 
                       key={item.id} 
                       layout
@@ -1030,6 +1106,7 @@ const LotterySummaryPage: React.FC = () => {
                     </motion.tr>
                   ))}
                 </AnimatePresence>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -1079,6 +1156,47 @@ const LotterySummaryPage: React.FC = () => {
                 >
                   สรุปและวิเคราะห์ข้อมูลการขายหวยแบบละเอียด
                 </motion.p>
+                {(selectedDate || availableDates.length === 0) && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.4 }}
+                    className={`mt-4 p-3 rounded-lg border ${
+                      availableDates.length === 0 
+                        ? 'bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800'
+                        : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-center gap-4 text-sm">
+                      {availableDates.length === 0 ? (
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                          <span className="font-medium text-red-700 dark:text-red-300">ไม่มีข้อมูล:</span>
+                          <span className="text-red-700 dark:text-red-300 font-semibold">
+                            ไม่พบข้อมูลบิลที่ยืนยันแล้ว
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-blue-600" />
+                            <span className="font-medium">วันที่เลือก:</span>
+                            <span className="text-blue-700 dark:text-blue-300 font-semibold">
+                              {selectedDate ? formatDate(selectedDate) : 'ยังไม่ได้เลือก'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-green-600" />
+                            <span className="font-medium">ข้อมูลทั้งหมด:</span>
+                            <span className="text-green-700 dark:text-green-300 font-semibold">
+                              {availableDates.length} วัน
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
               </header>
 
               {/* Filter Controls */}
@@ -1097,13 +1215,39 @@ const LotterySummaryPage: React.FC = () => {
                   <CardContent>
                     <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-6' : 'md:grid-cols-4'} gap-4`}>
                       <div>
-                        <label className="block text-sm font-medium mb-2">วันที่</label>
-                        <Input
-                          type="date"
-                          value={selectedDate}
-                          onChange={(e) => setSelectedDate(e.target.value)}
-                          className="w-full"
-                        />
+                        <label className="block text-sm font-medium mb-2">
+                          วันที่ ({availableDates.length} วัน)
+                        </label>
+                        <Select value={selectedDate} onValueChange={setSelectedDate} disabled={availableDates.length === 0}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={availableDates.length === 0 ? "ไม่มีข้อมูล" : "เลือกวันที่"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableDates.length === 0 ? (
+                              <SelectItem value="no-data" disabled>
+                                ไม่มีข้อมูลวันที่
+                              </SelectItem>
+                            ) : (
+                              availableDates.map((date, index) => (
+                                <SelectItem key={date} value={date}>
+                                  <div className="flex items-center justify-between w-full">
+                                    <span>{formatDate(date)}</span>
+                                    {index === 0 && (
+                                      <Badge variant="secondary" className="ml-2 text-xs">
+                                        ล่าสุด
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {selectedDate && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            เลือก: {formatDate(selectedDate)}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-2">ประเภทหวย ID</label>
