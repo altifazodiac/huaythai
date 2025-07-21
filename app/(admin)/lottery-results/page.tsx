@@ -424,6 +424,24 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
     const resultData = resultInputs[subType.lottery_sub_type_id] || {};
     const prizeKeyMapping = { '3_บน': '3 ตัวบน', '2_ล่าง': '2 ตัวล่าง', '3_โต๊ด': '3 ตัวโต๊ด', '2_บน': '2 ตัวบน', '1_วิ่งบน': 'วิ่งบน', '1_วิ่งล่าง': 'วิ่งล่าง' };
     
+    // ดึง schedule_id สำหรับ sub_type นี้
+    const { data: schedules, error: scheduleError } = await supabase
+      .from('drawing_schedules')
+      .select('schedule_id')
+      .eq('lottery_sub_type_id', subType.lottery_sub_type_id)
+      .limit(1);
+    
+    if (scheduleError) {
+      toast.error(`ไม่สามารถดึงข้อมูล schedule ได้: ${scheduleError.message}`);
+      return false;
+    }
+    
+    const scheduleId = schedules?.[0]?.schedule_id;
+    if (!scheduleId) {
+      toast.error(`ไม่พบ schedule สำหรับ ${subType.sub_type_name}`);
+      return false;
+    }
+    
     const upsertPayload = Object.entries(resultData)
       .filter(([_, val]) => val !== "" && val !== null && val !== undefined)
       .map(([key, winning_number]) => {
@@ -432,9 +450,9 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
           return {
               lottery_type_id: subType.lottery_type_id,
               lottery_sub_type_id: subType.lottery_sub_type_id,
-              schedule_id: null, // ไม่ใช้ schedule_id แล้ว
+              schedule_id: scheduleId,
               draw_date: selectedDate,
-              draw_time: null, // ไม่ใช้ draw_time แล้ว
+              draw_time: null, // ใช้ null สำหรับ draw_time
               prize_code: prize_code,
               winning_number: String(winning_number),
           };
@@ -444,7 +462,10 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
 
     setSaveInProgressForSubTypeId(subType.lottery_sub_type_id);
 
-    const { error } = await supabase.from("lottery_results").upsert(upsertPayload, { onConflict: 'lottery_sub_type_id, draw_date, prize_code' });
+    // ใช้ unique constraint ที่มีอยู่จริงในฐานข้อมูล
+    const { error } = await supabase.from("lottery_results").upsert(upsertPayload, { 
+      onConflict: 'lottery_sub_type_id, schedule_id, draw_date, draw_time, prize_code' 
+    });
 
     setSaveInProgressForSubTypeId(null);
     if (error) { toast.error(`บันทึกผิดพลาด: ${error.message}`); return false; }

@@ -69,7 +69,7 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { useIsMobile } from '@/hooks/use-mobile';
-import { createResultsMap, calculateWinningsForItem } from '@/lib/utils/lottery-utils';
+import { createResultsMap } from '@/lib/utils/lottery-utils';
 
 // Enhanced interfaces for lottery report summary
 interface LotteryResult {
@@ -195,8 +195,18 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
     const { data: tickets, error } = await query;
     if (error) throw error;
 
+    // 🔧 Debug: เพิ่ม logging ชั่วคราว
+    console.log('🔍 fetchLotteryReportData:', {
+      startDate,
+      endDate,
+      ticketsCount: tickets?.length || 0,
+      resultsMapKeys: Object.keys(resultsMap).length,
+      resultsMapSample: Object.keys(resultsMap).slice(0, 5)
+    });
+
     return (tickets || []).map((ticket: any) => {
       let total_reward_amount = 0;
+      
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
         const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
         total_reward_amount += prize;
@@ -210,6 +220,17 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       const commission_amount = total_purchase_amount * (commission_percentage / 100);
       const remaining_balance = profit_loss - commission_amount;
       const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
+
+      // 🔧 Debug: เพิ่ม logging สำหรับวันที่ 2025-07-21
+      if (ticket.draw_date === '2025-07-21') {
+        console.log('🔍 Ticket calculation for 2025-07-21:', {
+          ticketId: ticket.id,
+          totalAmount: ticket.total_amount,
+          totalRewardAmount: total_reward_amount,
+          itemsCount: ticket.lottery_ticket_items?.length || 0,
+          userName: ticket.profiles?.name
+        });
+      }
 
       return {
         id: ticket.id,
@@ -236,6 +257,151 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   }
 };
 
+// 🔧 ฟังก์ชันทดสอบการคำนวณรางวัล
+const testWinningsCalculation = (resultsMap: Record<string, LotteryResult>) => {
+  console.log('🧪 Testing winnings calculation...');
+  
+  // ทดสอบกับข้อมูลจริง
+  const testItem = {
+    lottery_sub_number: {
+      digit_number: 3,
+      type_number: 'บน',
+      price_paid: 800
+    },
+    numbers: ['942'],
+    lottery_sub_type_id: 59,
+    amount: 10,
+    effective_prize_rate: 800
+  };
+  
+  const result = calculateWinningsForItem(testItem, '2025-07-21', resultsMap);
+  console.log('🧪 Test result:', result);
+  
+  // ทดสอบกับข้อมูลจริงอีกชุด
+  const testItem2 = {
+    lottery_sub_number: {
+      digit_number: 2,
+      type_number: 'บน',
+      price_paid: 90
+    },
+    numbers: ['42'],
+    lottery_sub_type_id: 59,
+    amount: 10,
+    effective_prize_rate: 90
+  };
+  
+  const result2 = calculateWinningsForItem(testItem2, '2025-07-21', resultsMap);
+  console.log('🧪 Test result 2:', result2);
+};
+
+// 🔧 ฟังก์ชันคำนวณรางวัลที่เหมือนกับ LotterySummaryPage
+const calculateWinningsForItem = (
+  item: any,
+  ticketDrawDate: string,
+  resultsMap: Record<string, LotteryResult>
+): { prize: number; isWinning: boolean; winningNumberDisplay?: string, matchedNumber?: string } => {
+  if (!item.lottery_sub_number || !item.numbers) {
+    return { prize: 0, isWinning: false };
+  }
+
+  const { digit_number, type_number, price_paid } = item.lottery_sub_number;
+
+  // 🔧 แก้ไข: สร้าง prizeCodePattern ให้ตรงกับข้อมูลในฐานข้อมูล
+  let prizeCodePattern = '';
+  if (type_number === 'โต๊ด') {
+    prizeCodePattern = `${digit_number} ตัวโต๊ด`;
+  } else if (type_number === 'บน') {
+    prizeCodePattern = `${digit_number} ตัวบน`;
+  } else if (type_number === 'ล่าง') {
+    prizeCodePattern = `${digit_number} ตัวล่าง`;
+  } else if (type_number === 'วิ่งบน') {
+    prizeCodePattern = 'วิ่งบน';
+  } else if (type_number === 'วิ่งล่าง') {
+    prizeCodePattern = 'วิ่งล่าง';
+  }
+
+  const resultMapKey = `${ticketDrawDate}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
+  const matchingResult = resultsMap[resultMapKey];
+
+  // 🔧 Debug: เพิ่ม logging ชั่วคราว
+  if (ticketDrawDate === '2025-07-21' && item.lottery_sub_type_id === 59) {
+    console.log('🔍 Debug calculateWinningsForItem:', {
+      digit_number,
+      type_number,
+      lottery_sub_type_id: item.lottery_sub_type_id,
+      numbers: item.numbers,
+      prizeCodePattern,
+      resultMapKey,
+      matchingResult,
+      availableKeys: Object.keys(resultsMap).filter(k => k.startsWith(`${ticketDrawDate}|${item.lottery_sub_type_id}`)),
+      allKeysForDate21: Object.keys(resultsMap).filter(k => k.includes('2025-07-21')),
+      resultsMapSize: Object.keys(resultsMap).length
+    });
+  }
+
+  if (!matchingResult || !matchingResult.winning_number) {
+    return { prize: 0, isWinning: false };
+  }
+
+  let matchedNumbers: string[] = [];
+  
+  if (type_number === 'โต๊ด') {
+    const winningSet = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    matchedNumbers = item.numbers.filter((num: string) => winningSet.has(num));
+  } else if (type_number === 'วิ่งบน' || type_number === 'วิ่งล่าง') {
+    const winningDigits = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    item.numbers.forEach((num: string) => {
+      for (const digit of num) {
+        if (winningDigits.has(digit)) {
+          matchedNumbers.push(num);
+          break;
+        }
+      }
+    });
+  } else {
+    // 🔧 แก้ไข: สำหรับ 2 ตัวบน, 2 ตัวล่าง, 3 ตัวบน ให้เปรียบเทียบหมายเลขโดยตรง
+    matchedNumbers = item.numbers.filter((num: string) => {
+      // ตรวจสอบว่าหมายเลขตรงกับผลรางวัลหรือไม่
+      return num === matchingResult.winning_number;
+    });
+  }
+
+  // 🔧 Debug: เพิ่ม logging สำหรับการจับคู่หมายเลข
+  if (ticketDrawDate === '2025-07-21' && item.lottery_sub_type_id === 59) {
+    console.log('🔍 Number matching:', {
+      type_number,
+      itemNumbers: item.numbers,
+      winningNumber: matchingResult.winning_number,
+      matchedNumbers
+    });
+  }
+
+  if (matchedNumbers.length > 0) {
+    const effectiveRate = item.effective_prize_rate ?? price_paid ?? 0;
+    const prize = parseFloat(item.amount.toString()) * parseFloat(String(effectiveRate)) * matchedNumbers.length;
+    
+    // 🔧 Debug: เพิ่ม logging เมื่อถูกรางวัล
+    if (ticketDrawDate === '2025-07-21' && item.lottery_sub_type_id === 59) {
+      console.log('🎉 WINNING!', {
+        matchedNumbers,
+        effectiveRate,
+        amount: item.amount,
+        prize,
+        price_paid
+      });
+    }
+    
+    return { 
+      prize, 
+      isWinning: true, 
+      winningNumberDisplay: matchingResult.winning_number, 
+      matchedNumber: matchedNumbers.join(', ')
+    };
+  }
+
+  return { prize: 0, isWinning: false };
+};
+
 // Function to get the latest draw date
 const getLatestDrawDate = async (supabase: any): Promise<string> => {
   try {
@@ -254,6 +420,7 @@ const getLatestDrawDate = async (supabase: any): Promise<string> => {
   }
 };
 
+ 
 const LotteryReportSummaryPage: React.FC = () => {
   const { user } = useAuth();
   const [reportData, setReportData] = useState<LotteryTransactionData[]>([]);
@@ -373,77 +540,10 @@ const LotteryReportSummaryPage: React.FC = () => {
   };
 
   // Enhanced data fetching function
-  const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, LotteryResult>, startDate?: string, endDate?: string): Promise<LotteryTransactionData[]> => {
-    try {
-      let query = supabase
-        .from('lottery_tickets')
-        .select('*, lottery_ticket_items(*, lottery_sub_number(*)), profiles(name, percent)')
-        .eq('status', 'confirmed');
 
-      if (startDate && startDate.trim() !== '') query = query.gte('draw_date', startDate);
-      if (endDate && endDate.trim() !== '') query = query.lte('draw_date', endDate);
-
-      const { data: tickets, error } = await query;
-      if (error) throw error;
-
-      return (tickets || []).map((ticket: any) => {
-        let total_reward_amount = 0;
-        (ticket.lottery_ticket_items || []).forEach((item: any) => {
-          const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
-          total_reward_amount += prize;
-        });
-        
-        const total_purchase_amount = Number(ticket.total_amount || 0);
-        const profit_loss = total_purchase_amount - total_reward_amount;
-        
-        // คำนวณ commission และอื่นๆ
-        const commission_percentage = ticket.profiles?.percent || 0;
-        const commission_amount = total_purchase_amount * (commission_percentage / 100);
-        const remaining_balance = profit_loss - commission_amount;
-        const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
-
-        return {
-          id: ticket.id,
-          draw_date: ticket.draw_date,
-          purchase_date: ticket.created_at,
-          user_name: ticket.profiles?.name || 'ไม่ระบุ',
-          user_id: ticket.user_id,
-          total_purchase_amount,
-          total_reward_amount,
-          commission_percentage,
-          commission_amount,
-          remaining_balance,
-          profit_loss,
-          net_amount,
-          bill_count: 1,
-          ticket_count: (ticket.lottery_ticket_items || []).length,
-          status: ticket.status,
-          deleted_at: ticket.deleted_at
-        };
-      });
-    } catch (err) {
-      console.error('Error fetching lottery report data:', err);
-      return [];
-    }
-  };
 
   // Function to get the latest draw date
-  const getLatestDrawDate = async (supabase: any): Promise<string> => {
-    try {
-      const { data, error } = await supabase
-        .from('lottery_tickets')
-        .select('draw_date')
-        .eq('status', 'confirmed')
-        .order('draw_date', { ascending: false })
-        .limit(1);
 
-      if (error) throw error;
-      return data?.[0]?.draw_date || new Date().toISOString().split('T')[0];
-    } catch (err) {
-      console.error('Error fetching latest draw date:', err);
-      return new Date().toISOString().split('T')[0];
-    }
-  };
 
   // Calculate overall summary
   const overallSummary = useMemo((): OverallSummary => {
@@ -501,8 +601,30 @@ const LotteryReportSummaryPage: React.FC = () => {
       let startDate: string | undefined = selectedDate || undefined;
       let endDate: string | undefined = selectedDate || undefined;
 
-      const resultsMap = await createResultsMap(supabase, startDate);
+      // 🔧 Debug: เพิ่ม logging ชั่วคราว
+      console.log('🔍 loadData - Parameters:', { selectedDate, startDate, endDate });
+
+      // แก้ไขการเรียกใช้ createResultsMap ให้ส่งทั้ง startDate และ endDate
+      const resultsMap = await createResultsMap(supabase, startDate, endDate);
+      
+      // 🔧 Debug: เพิ่ม logging ชั่วคราว
+      console.log('🔍 loadData - ResultsMap:', {
+        keysCount: Object.keys(resultsMap).length,
+        keysForDate21: Object.keys(resultsMap).filter(k => k.includes('2025-07-21')),
+        keysForSubType59: Object.keys(resultsMap).filter(k => k.includes('|59|'))
+      });
+      
+      // 🔧 ทดสอบการคำนวณรางวัล
+      testWinningsCalculation(resultsMap);
+      
       const data = await fetchLotteryReportData(supabase, resultsMap, startDate, endDate);
+      
+      // 🔧 Debug: เพิ่ม logging ชั่วคราว
+      console.log('🔍 loadData - Fetched data:', {
+        dataCount: data.length,
+        dataForDate21: data.filter(d => d.draw_date === '2025-07-21').length,
+        sampleDataForDate21: data.filter(d => d.draw_date === '2025-07-21').slice(0, 2)
+      });
       
       setReportData(data);
 
@@ -680,6 +802,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                       <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                       รีเฟรช
                     </Button>
+                    
                     <Button variant="outline" size="sm">
                       <Download className="h-4 w-4 mr-2" />
                       ส่งออก
@@ -746,7 +869,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                           </Button>
                         </div>
                         {selectedDate && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs  ">
                             กำลังดูข้อมูลวันที่: {formatDate(selectedDate)}
                           </p>
                         )}
@@ -1215,11 +1338,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                           {formatCurrency(dateReport.total_final_balance)}
                                         </span>
                                       </TableCell>
-                                      <TableCell className="text-right">
-                                        <Badge variant={dateReport.profit_margin_percentage >= 0 ? 'default' : 'destructive'}>
-                                          {dateReport.profit_margin_percentage.toFixed(1)}%
-                                        </Badge>
-                                      </TableCell>
+                                      <TableCell></TableCell>
                                     </TableRow>
                                   ))}
                                 </TableBody>

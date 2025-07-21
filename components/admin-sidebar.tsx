@@ -78,10 +78,11 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       href: "/lotterysubtype",
       icon: Ticket,
     },
+ 
     {
-      title: "วิเคราะห์หมายเลขหวย",
-      href: "/number_analysis",
-      icon: Calculator,
+      title: "วิเคราะห์ข้อมูลการซื้อหวย",
+      href: "/paid-analysis",
+      icon: BarChart3,
     },
     {
       title: "ประวัติการทำธุรกรรมเครดิต",
@@ -93,11 +94,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
       href: "/lottery-report-summary",
       icon: BarChart3,
     },
-    {
-      title: "ค่าบริหารระบบ",
-      href: "/management-fee",
-      icon: Calculator,
-    },
+ 
    /* {
       title: "รายงานหวยแบบรายละเอียด",
       href: "/lottery-report",

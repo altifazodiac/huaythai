@@ -104,7 +104,49 @@ interface NumberDetail {
   matched_number?: string;
 }
 
-// 🔧 **ใหม่**: ฟังก์ชันกลางสำหรับคำนวณรางวัล
+// 🔧 **ใหม่**: Interface สำหรับการวิเคราะห์หมายเลขหวย
+interface NumberAnalysis {
+  number: string;
+  digit_count: number;
+  type_number: string;
+  lottery_sub_type_id: number;
+  sub_type_name: string;
+  country_origin: string;
+  total_purchases: number;
+  total_amount: number;
+  average_amount: number;
+  purchase_frequency: number;
+  risk_level: 'low' | 'medium' | 'high';
+  last_purchased_date: string;
+  purchase_trend: 'increasing' | 'decreasing' | 'stable';
+}
+
+// 🔧 **ใหม่**: Interface สำหรับการวิเคราะห์หมายเลขหวยแบบละเอียด
+interface DetailedNumberAnalysis {
+  number: string;
+  digit_count: number;
+  type_number: string;
+  lottery_sub_type_id: number;
+  sub_type_name: string;
+  country_origin: string;
+  total_purchases: number;
+  total_amount: number;
+  average_amount: number;
+  purchase_frequency: number;
+  risk_level: 'low' | 'medium' | 'high';
+  last_purchased_date: string;
+  purchase_trend: 'increasing' | 'decreasing' | 'stable';
+  // 🔧 ใหม่: ข้อมูลเพิ่มเติม
+  max_single_purchase: number;
+  min_single_purchase: number;
+  purchase_times: string[];
+  user_count: number;
+  bill_count: number;
+  popularity_rank: number;
+  category: 'hot' | 'cold' | 'trending' | 'stable';
+}
+
+//  **ใหม่**: ฟังก์ชันกลางสำหรับคำนวณรางวัล
 const calculateWinningsForItem = (
   item: any,
   ticketDrawDate: string,
@@ -182,7 +224,7 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
 
     console.log('fetchDailySummary - drawDate:', drawDate);
     console.log('fetchDailySummary - tickets count:', tickets.length);
-    console.log('fetchDailySummary - tickets dates:', tickets.map(t => t.draw_date));
+    console.log('fetchDailySummary - tickets dates:', tickets.map((t: any) => t.draw_date));
 
     const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
     const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
@@ -419,6 +461,272 @@ const fetchUsers = async (supabase: any): Promise<{ id: string; name: string; ph
   }
 };
 
+// �� **ใหม่**: ฟังก์ชันวิเคราะห์หมายเลขหวย
+const analyzeLotteryNumbers = async (supabase: any, drawDate?: string): Promise<NumberAnalysis[]> => {
+  try {
+    let ticketQuery = supabase
+      .from('lottery_tickets')
+      .select(`
+        id, 
+        draw_date, 
+        lottery_ticket_items!inner(
+          id,
+          numbers,
+          amount,
+          lottery_sub_number!inner(
+            digit_number,
+            type_number
+          ),
+          lottery_sub_types!inner(
+            lottery_sub_type_id,
+            sub_type_name,
+            country_origin
+          )
+        )
+      `)
+      .eq('status', 'confirmed');
+    
+    if (drawDate) {
+      ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
+    if (ticketError) throw ticketError;
+    if (!tickets || tickets.length === 0) return [];
+
+    // 🔧 วิเคราะห์ข้อมูลหมายเลขหวย
+    const numberAnalysis: Record<string, NumberAnalysis> = {};
+    
+    tickets.forEach((ticket: any) => {
+      ticket.lottery_ticket_items.forEach((item: any) => {
+        const { digit_number, type_number } = item.lottery_sub_number;
+        const { lottery_sub_type_id, sub_type_name, country_origin } = item.lottery_sub_types;
+        
+        item.numbers.forEach((number: string) => {
+          const key = `${number}_${digit_number}_${type_number}_${lottery_sub_type_id}`;
+          
+          if (!numberAnalysis[key]) {
+            numberAnalysis[key] = {
+              number,
+              digit_count: digit_number,
+              type_number,
+              lottery_sub_type_id,
+              sub_type_name,
+              country_origin,
+              total_purchases: 0,
+              total_amount: 0,
+              average_amount: 0,
+              purchase_frequency: 0,
+              risk_level: 'low',
+              last_purchased_date: ticket.draw_date,
+              purchase_trend: 'stable'
+            };
+          }
+          
+          numberAnalysis[key].total_purchases += 1;
+          numberAnalysis[key].total_amount += Number(item.amount || 0);
+          numberAnalysis[key].last_purchased_date = ticket.draw_date;
+        });
+      });
+    });
+
+    // 🔧 คำนวณสถิติเพิ่มเติม
+    const analysisResults = Object.values(numberAnalysis).map((analysis: any) => {
+      analysis.average_amount = analysis.total_amount / analysis.total_purchases;
+      
+      // 🔧 กำหนดระดับความเสี่ยง
+      if (analysis.total_amount > 10000) {
+        analysis.risk_level = 'high';
+      } else if (analysis.total_amount > 5000) {
+        analysis.risk_level = 'medium';
+      } else {
+        analysis.risk_level = 'low';
+      }
+      
+      // 🔧 คำนวณความถี่การซื้อ
+      analysis.purchase_frequency = analysis.total_purchases;
+      
+      return analysis;
+    });
+
+    // 🔧 เรียงลำดับตามยอดซื้อรวม
+    return analysisResults.sort((a: any, b: any) => b.total_amount - a.total_amount);
+  } catch (err) {
+    console.error('Error in analyzeLotteryNumbers:', err);
+    throw err;
+  }
+};
+
+// 🔧 **ใหม่**: ฟังก์ชันวิเคราะห์หมายเลขหวยแบบละเอียด
+const analyzeLotteryNumbersDetailed = async (supabase: any, drawDate?: string): Promise<DetailedNumberAnalysis[]> => {
+  try {
+    let ticketQuery = supabase
+      .from('lottery_tickets')
+      .select(`
+        id, 
+        draw_date,
+        user_id,
+        bill_number,
+        lottery_ticket_items!inner(
+          id,
+          numbers,
+          amount,
+          lottery_sub_number!inner(
+            digit_number,
+            type_number
+          ),
+          lottery_sub_types!inner(
+            lottery_sub_type_id,
+            sub_type_name,
+            country_origin
+          )
+        )
+      `)
+      .eq('status', 'confirmed');
+    
+    if (drawDate) {
+      ticketQuery = ticketQuery.eq('draw_date', drawDate);
+    }
+    
+    const { data: tickets, error: ticketError } = await ticketQuery;
+    if (ticketError) throw ticketError;
+    if (!tickets || tickets.length === 0) return [];
+
+    // 🔧 วิเคราะห์ข้อมูลหมายเลขหวยแบบละเอียด
+    const numberAnalysis: Record<string, DetailedNumberAnalysis> = {};
+    const userSets: Record<string, Set<string>> = {};
+    const billSets: Record<string, Set<string>> = {};
+    const purchaseAmounts: Record<string, number[]> = {};
+    const purchaseDates: Record<string, string[]> = {};
+    
+    tickets.forEach((ticket: any) => {
+      ticket.lottery_ticket_items.forEach((item: any) => {
+        const { digit_number, type_number } = item.lottery_sub_number;
+        const { lottery_sub_type_id, sub_type_name, country_origin } = item.lottery_sub_types;
+        
+        item.numbers.forEach((number: string) => {
+          const key = `${number}_${digit_number}_${type_number}_${lottery_sub_type_id}`;
+          
+          if (!numberAnalysis[key]) {
+            numberAnalysis[key] = {
+              number,
+              digit_count: digit_number,
+              type_number,
+              lottery_sub_type_id,
+              sub_type_name,
+              country_origin,
+              total_purchases: 0,
+              total_amount: 0,
+              average_amount: 0,
+              purchase_frequency: 0,
+              risk_level: 'low',
+              last_purchased_date: ticket.draw_date,
+              purchase_trend: 'stable',
+              max_single_purchase: 0,
+              min_single_purchase: Number.MAX_SAFE_INTEGER,
+              purchase_times: [],
+              user_count: 0,
+              bill_count: 0,
+              popularity_rank: 0,
+              category: 'stable'
+            };
+            userSets[key] = new Set();
+            billSets[key] = new Set();
+            purchaseAmounts[key] = [];
+            purchaseDates[key] = [];
+          }
+          
+          const amount = Number(item.amount || 0);
+          numberAnalysis[key].total_purchases += 1;
+          numberAnalysis[key].total_amount += amount;
+          numberAnalysis[key].last_purchased_date = ticket.draw_date;
+          
+          // 🔧 เก็บข้อมูลเพิ่มเติม
+          userSets[key].add(ticket.user_id);
+          billSets[key].add(ticket.bill_number);
+          purchaseAmounts[key].push(amount);
+          purchaseDates[key].push(ticket.draw_date);
+          
+          // 🔧 อัพเดทค่าสูงสุดและต่ำสุด
+          if (amount > numberAnalysis[key].max_single_purchase) {
+            numberAnalysis[key].max_single_purchase = amount;
+          }
+          if (amount < numberAnalysis[key].min_single_purchase) {
+            numberAnalysis[key].min_single_purchase = amount;
+          }
+        });
+      });
+    });
+
+    // 🔧 คำนวณสถิติเพิ่มเติม
+    const analysisResults = Object.values(numberAnalysis).map((analysis: any, index: number) => {
+      const key = `${analysis.number}_${analysis.digit_count}_${analysis.type_number}_${analysis.lottery_sub_type_id}`;
+      
+      analysis.average_amount = analysis.total_amount / analysis.total_purchases;
+      analysis.user_count = userSets[key]?.size || 0;
+      analysis.bill_count = billSets[key]?.size || 0;
+      analysis.purchase_times = purchaseDates[key] || [];
+      
+      // 🔧 กำหนดระดับความเสี่ยง
+      if (analysis.total_amount > 15000 || analysis.total_purchases > 10) {
+        analysis.risk_level = 'high';
+      } else if (analysis.total_amount > 5000 || analysis.total_purchases > 5) {
+        analysis.risk_level = 'medium';
+      } else {
+        analysis.risk_level = 'low';
+      }
+      
+      // 🔧 กำหนดหมวดหมู่ความนิยม
+      if (analysis.total_purchases >= 8) {
+        analysis.category = 'hot';
+      } else if (analysis.total_purchases >= 4) {
+        analysis.category = 'trending';
+      } else if (analysis.total_purchases <= 1) {
+        analysis.category = 'cold';
+      } else {
+        analysis.category = 'stable';
+      }
+      
+      // 🔧 คำนวณแนวโน้ม
+      if (analysis.purchase_times.length >= 2) {
+        const sortedDates = analysis.purchase_times.sort();
+        const firstHalf = sortedDates.slice(0, Math.floor(sortedDates.length / 2));
+        const secondHalf = sortedDates.slice(Math.floor(sortedDates.length / 2));
+        
+        if (secondHalf.length > firstHalf.length * 1.5) {
+          analysis.purchase_trend = 'increasing';
+        } else if (firstHalf.length > secondHalf.length * 1.5) {
+          analysis.purchase_trend = 'decreasing';
+        } else {
+          analysis.purchase_trend = 'stable';
+        }
+      }
+      
+      return analysis;
+    });
+
+    // 🔧 เรียงลำดับตามความนิยม
+    const sortedResults = analysisResults.sort((a: any, b: any) => {
+      // เรียงตามยอดซื้อรวมก่อน
+      if (b.total_amount !== a.total_amount) {
+        return b.total_amount - a.total_amount;
+      }
+      // ถ้ายอดเท่ากัน เรียงตามจำนวนครั้ง
+      return b.total_purchases - a.total_purchases;
+    });
+
+    // 🔧 กำหนดอันดับความนิยม
+    sortedResults.forEach((analysis: any, index: number) => {
+      analysis.popularity_rank = index + 1;
+    });
+
+    return sortedResults;
+  } catch (err) {
+    console.error('Error in analyzeLotteryNumbersDetailed:', err);
+    throw err;
+  }
+};
+
 const LotterySummaryPage: React.FC = () => {
   const { supabase, user } = useAuth();
   const { role } = useUserRole();
@@ -433,7 +741,11 @@ const LotterySummaryPage: React.FC = () => {
   const [numberDetails, setNumberDetails] = useState<NumberDetail[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string; phone: string; percent: number }[]>([]);
   const [resultsMap, setResultsMap] = useState<Record<string, LotteryResult>>({}); // 🔧 ใหม่
-
+  // 🔧 **ใหม่**: เพิ่ม state สำหรับการวิเคราะห์หมายเลขหวย
+  const [numberAnalysis, setNumberAnalysis] = useState<NumberAnalysis[]>([]);
+  // 🔧 **ใหม่**: เพิ่ม state สำหรับการวิเคราะห์หมายเลขหวยแบบละเอียด
+  const [detailedNumberAnalysis, setDetailedNumberAnalysis] = useState<DetailedNumberAnalysis[]>([]);
+  
   // Filter states
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedLotteryType, setSelectedLotteryType] = useState<number | null>(null);
@@ -498,17 +810,21 @@ const LotterySummaryPage: React.FC = () => {
       }, {});
       setResultsMap(newResultsMap);
 
-      const [dailyData, typeData, billData, numberData] = await Promise.all([
+      const [dailyData, typeData, billData, numberData, analysisData, detailedAnalysisData] = await Promise.all([
         fetchDailySummary(supabase, newResultsMap, selectedDate || undefined),
         fetchLotteryTypeSummary(supabase, newResultsMap, selectedDate || undefined),
         fetchBillSummary(supabase, newResultsMap, selectedDate || undefined, selectedLotteryType || undefined, selectedUserId === 'all' ? undefined : selectedUserId || undefined),
-        fetchNumberDetails(supabase, newResultsMap, selectedBillNumber || undefined)
+        fetchNumberDetails(supabase, newResultsMap, selectedBillNumber || undefined),
+        analyzeLotteryNumbers(supabase, selectedDate || undefined),
+        analyzeLotteryNumbersDetailed(supabase, selectedDate || undefined) // 🔧 ใหม่
       ] as const);
       
       setDailySummary(dailyData as DailySummary[]);
       setLotteryTypeSummary(typeData as LotteryTypeSummary[]);
       setBillSummary(billData as BillSummary[]);
       setNumberDetails(numberData as NumberDetail[]);
+      setNumberAnalysis(analysisData as NumberAnalysis[]);
+      setDetailedNumberAnalysis(detailedAnalysisData as DetailedNumberAnalysis[]); // 🔧 ใหม่
       
       if (role === 'admin') {
         const usersData = await fetchUsers(supabase);
@@ -1115,6 +1431,456 @@ const LotterySummaryPage: React.FC = () => {
     </div>
   );
 
+  // 🔧 **ใหม่**: แสดงผลการวิเคราะห์หมายเลขหวย
+  const renderNumberAnalysisTab = () => (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Hash className="h-5 w-5" />
+            วิเคราะห์หมายเลขหวย
+            {selectedDate && (
+              <span className="text-sm font-normal text-muted-foreground">
+                - {formatDate(selectedDate)}
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            วิเคราะห์การซื้อหมายเลขหวยตามหลักการตรวจวิเคราะห์หมายเลขหวยมาตรฐานสากล
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>หมายเลข</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>หวย</TableHead>
+                  <TableHead>ประเทศ</TableHead>
+                  <TableHead className="text-right">จำนวนครั้ง</TableHead>
+                  <TableHead className="text-right">ยอดซื้อรวม</TableHead>
+                  <TableHead className="text-right">ยอดเฉลี่ย</TableHead>
+                  <TableHead className="text-center">ระดับความเสี่ยง</TableHead>
+                  <TableHead>วันที่ซื้อล่าสุด</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {numberAnalysis.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
+                        <p>ไม่พบข้อมูลการวิเคราะห์หมายเลขหวย</p>
+                        {selectedDate && (
+                          <p className="text-xs">สำหรับวันที่: {formatDate(selectedDate)}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <AnimatePresence>
+                    {numberAnalysis.map((item, index) => (
+                      <motion.tr 
+                        key={`${item.number}_${item.lottery_sub_type_id}_${item.type_number}`}
+                        layout
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="border-b transition-colors hover:bg-muted/50"
+                      >
+                        <TableCell className="font-mono font-bold text-lg">
+                          {item.number}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {item.digit_count} ตัว{item.type_number}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {item.sub_type_name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{item.country_origin}</span>
+                            {item.country_origin === 'Laos' && (
+                              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">ลาว</span>
+                            )}
+                            {item.country_origin === 'Vietnam' && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">ฮานอย</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {item.total_purchases.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(Number(item.total_amount))}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatCurrency(Number(item.average_amount))}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant={
+                              item.risk_level === 'high' ? 'destructive' : 
+                              item.risk_level === 'medium' ? 'secondary' : 'default'
+                            }
+                          >
+                            {item.risk_level === 'high' ? 'สูง' : 
+                             item.risk_level === 'medium' ? 'ปานกลาง' : 'ต่ำ'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(item.last_purchased_date)}
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {/* 🔧 สรุปสถิติการวิเคราะห์ */}
+          {numberAnalysis.length > 0 && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* จำนวนหมายเลขทั้งหมด */}
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <Hash className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-700 dark:text-blue-300">หมายเลขทั้งหมด</p>
+                        <p className="text-xs text-blue-600/70 dark:text-blue-400/70">Total Numbers</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                        {numberAnalysis.length.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ยอดซื้อรวม */}
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">ยอดซื้อรวม</p>
+                        <p className="text-xs text-green-600/70 dark:text-green-400/70">Total Amount</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                        {formatCurrency(numberAnalysis.reduce((sum, item) => sum + Number(item.total_amount), 0))}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* หมายเลขความเสี่ยงสูง */}
+              <Card className="bg-gradient-to-br from-red-50 to-orange-100 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-red-700 dark:text-red-300">ความเสี่ยงสูง</p>
+                        <p className="text-xs text-red-600/70 dark:text-red-400/70">High Risk</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-red-700 dark:text-red-300">
+                        {numberAnalysis.filter(item => item.risk_level === 'high').length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ยอดเฉลี่ยต่อหมายเลข */}
+              <Card className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                        <BarChart3 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-purple-700 dark:text-purple-300">ยอดเฉลี่ย</p>
+                        <p className="text-xs text-purple-600/70 dark:text-purple-400/70">Average</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                        {formatCurrency(
+                          numberAnalysis.length > 0 
+                            ? numberAnalysis.reduce((sum, item) => sum + Number(item.total_amount), 0) / numberAnalysis.length
+                            : 0
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // 🔧 **ใหม่**: แสดงผลการวิเคราะห์หมายเลขหวยแบบละเอียด
+  const renderDetailedNumberAnalysisTab = () => (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            วิเคราะห์หมายเลขหวยแบบละเอียด
+            {selectedDate && (
+              <span className="text-sm font-normal text-muted-foreground">
+                - {formatDate(selectedDate)}
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>
+            วิเคราะห์การซื้อหมายเลขหวยแบบละเอียดตามหลักการตรวจวิเคราะห์หมายเลขหวยมาตรฐานสากล
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>อันดับ</TableHead>
+                  <TableHead>หมายเลข</TableHead>
+                  <TableHead>ประเภท</TableHead>
+                  <TableHead>หวย</TableHead>
+                  <TableHead>ประเทศ</TableHead>
+                  <TableHead className="text-right">จำนวนครั้ง</TableHead>
+                  <TableHead className="text-right">ยอดซื้อรวม</TableHead>
+                  <TableHead className="text-right">ยอดเฉลี่ย</TableHead>
+                  <TableHead className="text-center">หมวดหมู่</TableHead>
+                  <TableHead className="text-center">ระดับความเสี่ยง</TableHead>
+                  <TableHead className="text-center">ผู้ซื้อ</TableHead>
+                  <TableHead className="text-center">จำนวนบิล</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailedNumberAnalysis.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                      <div className="flex flex-col items-center gap-2">
+                        <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
+                        <p>ไม่พบข้อมูลการวิเคราะห์หมายเลขหวยแบบละเอียด</p>
+                        {selectedDate && (
+                          <p className="text-xs">สำหรับวันที่: {formatDate(selectedDate)}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <AnimatePresence>
+                    {detailedNumberAnalysis.map((item, index) => (
+                      <motion.tr 
+                        key={`${item.number}_${item.lottery_sub_type_id}_${item.type_number}`}
+                        layout
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className="border-b transition-colors hover:bg-muted/50"
+                      >
+                        <TableCell className="text-center">
+                          <Badge variant={item.popularity_rank <= 3 ? "default" : "outline"}>
+                            #{item.popularity_rank}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono font-bold text-lg">
+                          {item.number}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {item.digit_count} ตัว{item.type_number}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {item.sub_type_name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{item.country_origin}</span>
+                            {item.country_origin === 'Laos' && (
+                              <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">ลาว</span>
+                            )}
+                            {item.country_origin === 'Vietnam' && (
+                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">ฮานอย</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {item.total_purchases.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {formatCurrency(Number(item.total_amount))}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatCurrency(Number(item.average_amount))}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant={
+                              item.category === 'hot' ? 'destructive' : 
+                              item.category === 'trending' ? 'default' : 
+                              item.category === 'cold' ? 'secondary' : 'outline'
+                            }
+                          >
+                            {item.category === 'hot' ? 'ร้อนแรง' : 
+                             item.category === 'trending' ? 'มาแรง' : 
+                             item.category === 'cold' ? 'เย็น' : 'ปกติ'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant={
+                              item.risk_level === 'high' ? 'destructive' : 
+                              item.risk_level === 'medium' ? 'secondary' : 'default'
+                            }
+                          >
+                            {item.risk_level === 'high' ? 'สูง' : 
+                             item.risk_level === 'medium' ? 'ปานกลาง' : 'ต่ำ'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">
+                            {item.user_count} คน
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">
+                            {item.bill_count} บิล
+                          </Badge>
+                        </TableCell>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {/* 🔧 สรุปสถิติการวิเคราะห์แบบละเอียด */}
+          {detailedNumberAnalysis.length > 0 && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* หมายเลขร้อนแรง */}
+              <Card className="bg-gradient-to-br from-red-50 to-orange-100 dark:from-red-900/20 dark:to-orange-900/20 border-red-200 dark:border-red-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                        <TrendingUp className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-red-700 dark:text-red-300">หมายเลขร้อนแรง</p>
+                        <p className="text-xs text-red-600/70 dark:text-red-400/70">Hot Numbers</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-red-700 dark:text-red-300">
+                        {detailedNumberAnalysis.filter(item => item.category === 'hot').length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* หมายเลขมาแรง */}
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <BarChart3 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-700 dark:text-blue-300">หมายเลขมาแรง</p>
+                        <p className="text-xs text-blue-600/70 dark:text-blue-400/70">Trending</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                        {detailedNumberAnalysis.filter(item => item.category === 'trending').length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* หมายเลขเย็น */}
+              <Card className="bg-gradient-to-br from-gray-50 to-slate-100 dark:from-gray-900/20 dark:to-slate-900/20 border-gray-200 dark:border-gray-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-gray-100 dark:bg-gray-900/30 rounded-lg">
+                        <TrendingDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">หมายเลขเย็น</p>
+                        <p className="text-xs text-gray-600/70 dark:text-gray-400/70">Cold Numbers</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-gray-700 dark:text-gray-300">
+                        {detailedNumberAnalysis.filter(item => item.category === 'cold').length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ผู้ซื้อทั้งหมด */}
+              <Card className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                        <Hash className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-purple-700 dark:text-purple-300">ผู้ซื้อทั้งหมด</p>
+                        <p className="text-xs text-purple-600/70 dark:text-purple-400/70">Total Users</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                        {new Set(detailedNumberAnalysis.flatMap(item => Array(item.user_count).fill(item.number))).size}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   return (
     <DirectionProvider dir="ltr">
       <SidebarProvider>
@@ -1337,7 +2103,7 @@ const LotterySummaryPage: React.FC = () => {
               {/* Main Content - Tabbed Interface */}
               {!isLoading && !error && (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-5"> {/* 🔧 เปลี่ยนจาก 4 เป็น 5 */}
                     <TabsTrigger value="daily" className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
                       รายวัน
@@ -1354,6 +2120,10 @@ const LotterySummaryPage: React.FC = () => {
                       <Hash className="h-4 w-4" />
                       เลข
                     </TabsTrigger>
+                    <TabsTrigger value="analysis" className="flex items-center gap-2"> {/* 🔧 ใหม่ */}
+                      <TrendingUp className="h-4 w-4" />
+                      วิเคราะห์
+                    </TabsTrigger>
                   </TabsList>
 
                   <div className="mt-6">
@@ -1369,6 +2139,7 @@ const LotterySummaryPage: React.FC = () => {
                         {activeTab === "types" && renderLotteryTypesTab()}
                         {activeTab === "bills" && renderBillsTab()}
                         {activeTab === "numbers" && renderNumbersTab()}
+                        {activeTab === "analysis" && renderDetailedNumberAnalysisTab()} {/* 🔧 ใหม่ */}
                       </motion.div>
                     </AnimatePresence>
                   </div>

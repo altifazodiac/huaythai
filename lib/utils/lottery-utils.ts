@@ -9,29 +9,46 @@ interface LotteryResult {
 }
 
 // Function to create a map of lottery results for quick lookup
-export const createResultsMap = async (supabase: SupabaseClient, startDate?: string): Promise<Record<string, LotteryResult>> => {
-  let query = supabase
-    .from('lottery_results')
-    .select('draw_date, lottery_sub_type_id, prize_code, winning_number');
-  
-  if (startDate && startDate.trim() !== '') {
-    query = query.gte('draw_date', startDate);
-  }
-  
-  const { data, error } = await query;
+export const createResultsMap = async (supabase: any, startDate?: string, endDate?: string): Promise<Record<string, LotteryResult>> => {
+  try {
+    let query = supabase
+      .from('lottery_results')
+      .select('*');
 
-  if (error) {
-    console.error('Error fetching lottery results:', error);
+    if (startDate) query = query.gte('draw_date', startDate);
+    if (endDate) query = query.lte('draw_date', endDate);
+
+    const { data: results, error } = await query;
+    if (error) throw error;
+
+    // 🔧 Debug: เพิ่ม logging ชั่วคราว
+    console.log('🔍 createResultsMap:', {
+      startDate,
+      endDate,
+      resultsCount: results?.length || 0,
+      resultsForDate21: results?.filter((r: any) => r.draw_date === '2025-07-21') || [],
+      sampleResults: results?.slice(0, 5) || []
+    });
+
+    const resultsMap: Record<string, LotteryResult> = {};
+    
+    (results || []).forEach((result: any) => {
+      const key = `${result.draw_date}|${result.lottery_sub_type_id}|${result.prize_code}`;
+      resultsMap[key] = result;
+    });
+
+    // 🔧 Debug: เพิ่ม logging ชั่วคราว
+    console.log('🔍 createResultsMap - Generated keys:', {
+      totalKeys: Object.keys(resultsMap).length,
+      keysForDate21: Object.keys(resultsMap).filter(k => k.includes('2025-07-21')),
+      keysForSubType59: Object.keys(resultsMap).filter(k => k.includes('|59|'))
+    });
+
+    return resultsMap;
+  } catch (err) {
+    console.error('Error creating results map:', err);
     return {};
   }
-
-  const resultsMap: Record<string, LotteryResult> = {};
-  (data || []).forEach(res => {
-    const key = `${res.draw_date}|${res.lottery_sub_type_id}|${res.prize_code}`;
-    resultsMap[key] = res;
-  });
-
-  return resultsMap;
 };
 
 // Central function to calculate winnings for a single ticket item
@@ -45,16 +62,52 @@ export const calculateWinningsForItem = (
   }
 
   const { digit_number, type_number, price_paid } = item.lottery_sub_number;
-  let prizeCodePattern = '';
+  
+  // 🔧 สร้าง prize_code patterns ทั้งแบบไทยและภาษาอังกฤษ
+  const prizeCodePatterns = [];
+  
+  if (type_number === 'โต๊ด') {
+    prizeCodePatterns.push(`${digit_number} ตัวโต๊ด`);
+  } else if (type_number === 'บน') {
+    prizeCodePatterns.push(`${digit_number} ตัวบน`);
+    // สำหรับ 2 ตัวบน อาจมีในรูปแบบ 2nd
+    if (digit_number === 2) {
+      prizeCodePatterns.push('2nd');
+    }
+    // สำหรับ 3 ตัวบน อาจมีในรูปแบบ 1st
+    if (digit_number === 3) {
+      prizeCodePatterns.push('1st');
+    }
+  } else if (type_number === 'ล่าง') {
+    prizeCodePatterns.push(`${digit_number} ตัวล่าง`);
+    // สำหรับ 2 ตัวล่าง อาจมีในรูปแบบ 2nd
+    if (digit_number === 2) {
+      prizeCodePatterns.push('2nd');
+    }
+  } else if (type_number === 'วิ่งบน') {
+    prizeCodePatterns.push('วิ่งบน');
+    // อาจมีในรูปแบบ 3rd, 4th, 5th
+    prizeCodePatterns.push('3rd', '4th', '5th');
+  } else if (type_number === 'วิ่งล่าง') {
+    prizeCodePatterns.push('วิ่งล่าง');
+    // อาจมีในรูปแบบ 3rd, 4th, 5th
+    prizeCodePatterns.push('3rd', '4th', '5th');
+  }
 
-  if (type_number === 'โต๊ด') prizeCodePattern = `${digit_number} ตัวโต๊ด`;
-  else if (type_number === 'บน') prizeCodePattern = `${digit_number} ตัวบน`;
-  else if (type_number === 'ล่าง') prizeCodePattern = `${digit_number} ตัวล่าง`;
-  else if (type_number === 'วิ่งบน') prizeCodePattern = 'วิ่งบน';
-  else if (type_number === 'วิ่งล่าง') prizeCodePattern = 'วิ่งล่าง';
+  // 🔧 ลองหาผลรางวัลจาก patterns ทั้งหมด
+  let matchingResult: LotteryResult | undefined;
+  let usedPattern = '';
 
-  const resultMapKey = `${ticketDrawDate}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
-  const matchingResult = resultsMap[resultMapKey];
+  for (const pattern of prizeCodePatterns) {
+    const resultMapKey = `${ticketDrawDate}|${item.lottery_sub_type_id}|${pattern}`;
+    const result = resultsMap[resultMapKey];
+    
+    if (result && result.winning_number) {
+      matchingResult = result;
+      usedPattern = pattern;
+      break;
+    }
+  }
 
   if (!matchingResult || !matchingResult.winning_number) {
     return { prize: 0, isWinning: false };
@@ -82,6 +135,7 @@ export const calculateWinningsForItem = (
   if (matchedNumbers.length > 0) {
     const effectiveRate = item.effective_prize_rate ?? price_paid ?? 0;
     const prize = parseFloat(item.amount.toString()) * parseFloat(String(effectiveRate)) * matchedNumbers.length;
+    
     return { 
       prize, 
       isWinning: true, 
