@@ -21,27 +21,11 @@ export const createResultsMap = async (supabase: any, startDate?: string, endDat
     const { data: results, error } = await query;
     if (error) throw error;
 
-    // 🔧 Debug: เพิ่ม logging ชั่วคราว
-    console.log('🔍 createResultsMap:', {
-      startDate,
-      endDate,
-      resultsCount: results?.length || 0,
-      resultsForDate21: results?.filter((r: any) => r.draw_date === '2025-07-21') || [],
-      sampleResults: results?.slice(0, 5) || []
-    });
-
     const resultsMap: Record<string, LotteryResult> = {};
     
     (results || []).forEach((result: any) => {
       const key = `${result.draw_date}|${result.lottery_sub_type_id}|${result.prize_code}`;
       resultsMap[key] = result;
-    });
-
-    // 🔧 Debug: เพิ่ม logging ชั่วคราว
-    console.log('🔍 createResultsMap - Generated keys:', {
-      totalKeys: Object.keys(resultsMap).length,
-      keysForDate21: Object.keys(resultsMap).filter(k => k.includes('2025-07-21')),
-      keysForSubType59: Object.keys(resultsMap).filter(k => k.includes('|59|'))
     });
 
     return resultsMap;
