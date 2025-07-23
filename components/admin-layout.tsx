@@ -4,26 +4,36 @@ import React, { useState, useEffect } from "react"
 import { AdminSidebar } from "@/components/admin-sidebar"
 import { LoadingProvider } from "@/components/LoadingProvider"
 import { Menu } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   // Responsive: ปิด sidebar อัตโนมัติบน mobile
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) setSidebarOpen(false)
-      else setSidebarOpen(true)
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false)
+        setSidebarCollapsed(false)
+      } else {
+        setSidebarOpen(true)
+      }
     }
     window.addEventListener("resize", handleResize)
     handleResize()
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
+  const handleToggleCollapse = () => {
+    setSidebarCollapsed(!sidebarCollapsed)
+  }
+
   return (
     <LoadingProvider>
       {/* Navbar */}
       <header
-        className="h-14 flex items-center px-4 border-b dark:border-warning-800 fixed w-full z-30 top-0 left-0"
+        className="h-14 flex items-center px-4 border-b dark:border-warning-800 fixed w-full z-50 top-0 left-0"
         style={{
           background: "var(--sidebar)",
           color: "var(--sidebar-foreground)"
@@ -38,22 +48,36 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         </button>
         <span className="font-bold text-lg">Admin Panel</span>
       </header>
+      
       {/* Layout */}
       <div
-        className="flex pt-14 min-h-screen"
+        className="flex min-h-screen"
         style={{ background: "var(--background)", color: "var(--foreground)" }}
       >
         {/* Sidebar + Overlay */}
-        <AdminSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <AdminSidebar 
+          open={sidebarOpen} 
+          onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
+        
         {sidebarOpen && (
           <div
-            className="fixed inset-0 bg-black/40 z-40 md:hidden"
+            className="fixed inset-0 bg-black/40 z-30 md:hidden"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar overlay"
           />
         )}
+        
         {/* Main content */}
-        <main className="flex-1 p-4 md:p-8 transition-all w-full" style={{ color: "var(--foreground)" }}>
+        <main 
+          className={cn(
+            "flex-1 p-4 md:p-8 transition-all duration-300",
+            sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+          )} 
+          style={{ color: "var(--foreground)" }}
+        >
           {children}
         </main>
       </div>

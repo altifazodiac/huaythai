@@ -42,9 +42,18 @@ import {
   SelectTrigger,
 } from "@/components/ui/select"
 
-export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => void }) {
+export function AdminSidebar({ 
+  open, 
+  onClose, 
+  collapsed, 
+  onToggleCollapse 
+}: { 
+  open: boolean, 
+  onClose: () => void,
+  collapsed: boolean,
+  onToggleCollapse: () => void
+}) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null)
   const { setTheme } = useTheme()
 
@@ -150,9 +159,10 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
   return (
     <aside
       className={cn(
-        "fixed z-50 top-0 left-0 h-full border-r dark:border-warning-800 shadow-lg transition-transform duration-300 flex flex-col",
+        "fixed z-40 top-14 left-0 h-[calc(100vh-3.5rem)] border-r dark:border-warning-800 shadow-lg transition-all duration-300 flex flex-col",
         open ? "translate-x-0" : "-translate-x-full",
-        "w-64 md:translate-x-0 md:static md:block"
+        collapsed ? "w-16" : "w-64",
+        "md:translate-x-0 md:static md:block"
       )}
       style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
       aria-label="Sidebar"
@@ -160,22 +170,41 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
     >
       {/* Sidebar Header */}
       <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b dark:border-warning-800">
-        <span className={cn("font-bold")}>เมนู</span>
-        <button
-          onClick={onClose}
-          className="md:hidden p-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800"
-          aria-label="Close sidebar"
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </button>
+        {!collapsed && <span className="font-bold">เมนู</span>}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleCollapse}
+            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 hidden md:block"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+          <button
+            onClick={onClose}
+            className="md:hidden p-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800"
+            aria-label="Close sidebar"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        </div>
       </div>
+      
       {/* Back to Home Link */}
       <div className="flex-shrink-0 px-4 py-3 border-b dark:border-warning-800">
-        <Link href="/" className="flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500   font-medium" onClick={handleNavClick}>
-          <Home className="h-5 w-5" />
-          <span>กลับหน้าหลัก</span>
+        <Link 
+          href="/" 
+          className={cn(
+            "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500 font-medium",
+            collapsed && "justify-center"
+          )} 
+          onClick={handleNavClick}
+          title={collapsed ? "กลับหน้าหลัก" : undefined}
+        >
+          <Home className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span>กลับหน้าหลัก</span>}
         </Link>
       </div>
+      
       {/* Nav Items */}
       <nav className="flex-1 overflow-y-auto space-y-1 mt-4 px-4 pb-20">
         {navItems.map((item) =>
@@ -183,19 +212,25 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
             <div key={item.title}>
               <button
                 onClick={() => {
-                   setOpenSubMenu(openSubMenu === item.title ? null : item.title)
+                  if (!collapsed) {
+                    setOpenSubMenu(openSubMenu === item.title ? null : item.title)
+                  }
                 }}
                 className={cn(
-                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:text-red-500 hover:text-red-500 dark:hover:bg-warning-800 transition-colors"
+                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:text-red-500 hover:text-red-500 dark:hover:bg-warning-800 transition-colors",
+                  collapsed && "justify-center"
                 )}
+                title={collapsed ? item.title : undefined}
               >
                 <div className="flex items-center gap-2">
                   <item.icon className="h-5 w-5 flex-shrink-0 dark:hover:text-red-500" />
-                  <span className="whitespace-nowrap dark:hover:text-red-500">{item.title}</span>
+                  {!collapsed && <span className="whitespace-nowrap dark:hover:text-red-500">{item.title}</span>}
                 </div>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", openSubMenu === item.title && "rotate-180")} />
+                {!collapsed && (
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", openSubMenu === item.title && "rotate-180")} />
+                )}
               </button>
-              {openSubMenu === item.title && (
+              {!collapsed && openSubMenu === item.title && (
                 <div className="pl-5 space-y-1 py-1">
                   {item.items.map((subItem) => (
                     <Link
@@ -219,16 +254,19 @@ export function AdminSidebar({ open, onClose }: { open: boolean, onClose: () => 
               href={item.href!}
               className={cn(
                 "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500  transition-colors",
+                collapsed && "justify-center",
                 pathname === item.href && "bg-gray-100 dark:bg-warning-800"
               )}
               onClick={handleNavClick}
+              title={collapsed ? item.title : undefined}
             >
               <item.icon className="h-5 w-5 flex-shrink-0" />
-              <span className="whitespace-nowrap">{item.title}</span>
+              {!collapsed && <span className="whitespace-nowrap">{item.title}</span>}
             </Link>
           )
         )}
       </nav>
+      
       {/* Theme Switcher */}
       <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t dark:border-warning-800 p-3 flex justify-center"
         style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
