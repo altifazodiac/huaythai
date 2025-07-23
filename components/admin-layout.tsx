@@ -74,7 +74,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         <main 
           className={cn(
             "flex-1 p-4 md:p-8 transition-all duration-300",
-            sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+            sidebarCollapsed ? "md:ml-1" : "md:ml-2"
           )} 
           style={{ color: "var(--foreground)" }}
         >
