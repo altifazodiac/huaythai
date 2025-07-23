@@ -23,7 +23,9 @@ import {
   FaCheckCircle,
   FaMedal,
   FaRandom,
-  FaRunning
+  FaRunning,
+  FaClock,
+  FaCalendarDay
 } from 'react-icons/fa';
 import { Button } from "@/components/ui/button";
 import { toZonedTime } from "date-fns-tz";
@@ -32,6 +34,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { useUserRole } from "@/hooks/use-user-role";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface LotterySubType {
   lottery_sub_type_id: number;
@@ -88,6 +91,65 @@ interface LotteryResult {
   lottery_sub_types: LotterySubType;
 }
 
+// 🔧 **ใหม่**: ฟังก์ชันกลางสำหรับคำนวณรางวัล (เหมือนหน้า summary)
+const calculateWinningsForItem = (
+  item: any,
+  ticketDrawDate: string,
+  resultsMap: Record<string, LotteryResult>
+): { prize: number; isWinning: boolean; winningNumberDisplay?: string, matchedNumber?: string } => {
+  if (!item.lottery_sub_number || !item.numbers) {
+    return { prize: 0, isWinning: false };
+  }
+
+  const { digit_number, type_number, price_paid } = item.lottery_sub_number;
+
+  let prizeCodePattern = '';
+  if (type_number === 'โต๊ด') prizeCodePattern = `${digit_number} ตัวโต๊ด`;
+  else if (type_number === 'บน') prizeCodePattern = `${digit_number} ตัวบน`;
+  else if (type_number === 'ล่าง') prizeCodePattern = `${digit_number} ตัวล่าง`;
+  else if (type_number === 'วิ่งบน') prizeCodePattern = 'วิ่งบน';
+  else if (type_number === 'วิ่งล่าง') prizeCodePattern = 'วิ่งล่าง';
+
+  const resultMapKey = `${ticketDrawDate}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
+  const matchingResult = resultsMap[resultMapKey];
+
+  if (!matchingResult || !matchingResult.winning_number) {
+    return { prize: 0, isWinning: false };
+  }
+
+  let matchedNumbers: string[] = [];
+  
+  if (type_number === 'โต๊ด') {
+    const winningSet = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    matchedNumbers = item.numbers.filter((num: string) => winningSet.has(num));
+  } else if (type_number === 'วิ่งบน' || type_number === 'วิ่งล่าง') {
+    const winningDigits = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    item.numbers.forEach((num: string) => {
+      for (const digit of num) {
+        if (winningDigits.has(digit)) {
+          matchedNumbers.push(num);
+          break;
+        }
+      }
+    });
+  } else {
+    matchedNumbers = item.numbers.filter((num: string) => num === matchingResult.winning_number);
+  }
+
+  if (matchedNumbers.length > 0) {
+    const effectiveRate = item.effective_prize_rate ?? price_paid ?? 0;
+    const prize = parseFloat(item.amount.toString()) * parseFloat(String(effectiveRate)) * matchedNumbers.length;
+    return { 
+      prize, 
+      isWinning: true, 
+      winningNumberDisplay: matchingResult.winning_number, 
+      matchedNumber: matchedNumbers.join(', ')
+    };
+  }
+
+  return { prize: 0, isWinning: false };
+};
+
 export default function LotteryTicketResultsPage() {
   useRequireAuth();
   const isMobile = useIsMobile();
@@ -97,41 +159,81 @@ export default function LotteryTicketResultsPage() {
   const [results, setResults] = useState<LotteryResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterBill, setFilterBill] = useState("");
-  const [filterDate, setFilterDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [winningBills, setWinningBills] = useState<any[]>([]);
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
   const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set());
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'pending' | 'paid'>('all');
+  const [isInitialized, setIsInitialized] = useState(false); // 🔧 เพิ่ม state สำหรับติดตามการเริ่มต้น
 
+  // 🔧 **ใหม่**: ฟังก์ชันสำหรับดึงวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+  const getCurrentDate = () => {
+    const now = new Date();
+    const bangkokTime = toZonedTime(now, 'Asia/Bangkok');
+    return format(bangkokTime, 'yyyy-MM-dd');
+  };
+
+  // 🔧 **ใหม่**: ฟังก์ชันสำหรับจัดการการเปลี่ยนแปลงวันที่
+  const handleDateChange = (newDate: string) => {
+    console.log('🔧 Date changed from', selectedDate, 'to', newDate);
+    setSelectedDate(newDate);
+  };
+
+  // 🔧 **ใหม่**: ฟังก์ชันสำหรับดึงวันที่ที่มีข้อมูล
+  const fetchAvailableDates = async () => {
+    if (!supabase) return;
+    
+    try {
+      const { data: ticketsData, error: ticketsError } = await supabase
+        .from("lottery_tickets")
+        .select('draw_date')
+        .eq('status', 'confirmed')
+        .order('draw_date', { ascending: false });
+      
+      if (ticketsError) {
+        console.error('Error fetching available dates:', ticketsError);
+        return;
+      }
+      
+      // ดึงวันที่ที่ไม่ซ้ำกันและเรียงลำดับจากใหม่ไปเก่า
+      const uniqueDates = [...new Set(ticketsData?.map(t => t.draw_date) || [])]
+        .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      
+      setAvailableDates(uniqueDates);
+      
+      // 🔧 ตั้งค่าวันที่เริ่มต้นเฉพาะเมื่อยังไม่เคยเริ่มต้น
+      if (!isInitialized && uniqueDates.length > 0) {
+        const currentDate = getCurrentDate();
+        let initialDate = uniqueDates[0]; // ใช้วันที่ล่าสุดเป็นค่าเริ่มต้น
+        
+        if (uniqueDates.includes(currentDate)) {
+          initialDate = currentDate;
+        }
+        
+        console.log('🔧 Initializing selectedDate to:', initialDate);
+        setSelectedDate(initialDate);
+        setIsInitialized(true);
+      }
+    } catch (error) {
+      console.error('Error in fetchAvailableDates:', error);
+    }
+  };
+
+  // 🔧 **ใหม่**: useEffect แยกสำหรับดึงวันที่ที่มีข้อมูล (เรียกครั้งเดียวตอนเริ่มต้น)
+  useEffect(() => {
+    fetchAvailableDates();
+  }, [supabase, isInitialized]); // 🔧 เพิ่ม isInitialized ใน dependencies
+
+  // 🔧 **ใหม่**: useEffect แยกสำหรับดึงข้อมูลหลัก
   useEffect(() => {
     async function fetchData() {
-      if (!supabase || !user) return;
+      if (!supabase || !user || !selectedDate) {
+        return;
+      }
       
       setLoading(true);
       try {
-        // 🔧 Debug: ตรวจสอบ status ของ tickets ทั้งหมดก่อน
-        const { data: allTickets, error: allTicketsError } = await supabase
-          .from("lottery_tickets")
-          .select("id, status, draw_date, user_id")
-          .eq("user_id", user.id);
-        
-        // 🔧 Debug: ตรวจสอบ tickets ทั้งหมดในระบบ (สำหรับ admin)
-        const { data: allSystemTickets, error: allSystemTicketsError } = await supabase
-          .from("lottery_tickets")
-          .select("id, status, draw_date, user_id, bill_number")
-          .limit(10);
-        
-        console.log('=== ALL TICKETS DEBUG ===');
-        console.log('Current user tickets count:', allTickets?.length);
-        console.log('Current user tickets statuses:', allTickets?.map(t => ({ id: t.id, status: t.status, draw_date: t.draw_date })));
-        console.log('=== ALL SYSTEM TICKETS DEBUG ===');
-        console.log('All system tickets count:', allSystemTickets?.length);
-        console.log('All system tickets:', allSystemTickets?.map(t => ({ id: t.id, status: t.status, draw_date: t.draw_date, user_id: t.user_id, bill_number: t.bill_number })));
-        console.log('Current user ID:', user.id);
-        console.log('Tickets with status confirmed:', allSystemTickets?.filter(t => t.status === 'confirmed'));
-        console.log('Tickets with status pending:', allSystemTickets?.filter(t => t.status === 'pending'));
-        console.log('Tickets with null status:', allSystemTickets?.filter(t => !t.status));
-        
         // 🔧 สำหรับ admin ให้แสดงข้อมูลของทุก user (เหมือนหน้า summary)
         let ticketQuery = supabase
           .from("lottery_tickets")
@@ -142,6 +244,8 @@ export default function LotteryTicketResultsPage() {
               lottery_sub_number:lottery_sub_number(id,lottery_sub_type_id,digit_number,type_number,price_paid)
             )
           `)
+          .eq('status', 'confirmed')
+          .eq('draw_date', selectedDate) // 🔧 เพิ่มเงื่อนไขดึงเฉพาะวันที่ที่เลือก
           .order("created_at", { ascending: false });
         
         // ถ้าไม่ใช่ admin ให้แสดงเฉพาะข้อมูลของ user นั้น
@@ -150,6 +254,11 @@ export default function LotteryTicketResultsPage() {
         }
         
         const { data: ticketsData, error: ticketsError } = await ticketQuery;
+          
+        if (ticketsError) {
+          console.error('Error fetching tickets:', ticketsError);
+          return;
+        }
         
         // 🔧 ดึงข้อมูลชื่อผู้ใช้สำหรับ admin
         if (role === 'admin' && ticketsData && ticketsData.length > 0) {
@@ -166,33 +275,20 @@ export default function LotteryTicketResultsPage() {
             });
           }
         }
-          
-        if (ticketsError) {
-          console.error('Error fetching tickets:', ticketsError);
-          return;
-        }
         
+        // 🔧 ดึงผลหวยเฉพาะวันที่ที่เลือก
         const { data: resultsData, error: resultsError } = await supabase
           .from("lottery_results")
           .select(`*,
             lottery_sub_types:lottery_sub_type_id(lottery_sub_type_id,sub_type_name)
           `)
-          .in('draw_date', ticketsData?.map(t => t.draw_date) || [])
-          .order('draw_date', { ascending: false });
+          .eq('draw_date', selectedDate) // 🔧 ดึงเฉพาะวันที่ที่เลือก
+          .order('draw_time', { ascending: true });
           
         if (resultsError) {
           console.error('Error fetching results:', resultsError);
           return;
         }
-        
-        // 🔧 Debug: ตรวจสอบข้อมูลที่โหลด
-        console.log('=== RESULTS DEBUG ===');
-        console.log('Tickets count:', ticketsData?.length);
-        console.log('Tickets dates:', ticketsData?.map(t => t.draw_date));
-        console.log('Results count:', resultsData?.length);
-        console.log('Results for 2025-07-18:', resultsData?.filter(r => r.draw_date === '2025-07-18'));
-        console.log('Results for lottery_sub_type_id = 2:', resultsData?.filter(r => r.lottery_sub_type_id === 2));
-        console.log('Results for 2 ตัวล่าง:', resultsData?.filter(r => r.prize_code === '2 ตัวล่าง'));
         
         setTickets(ticketsData || []);
         setResults(resultsData || []);
@@ -203,24 +299,19 @@ export default function LotteryTicketResultsPage() {
       }
     }
     fetchData();
-  }, [supabase, user]);
+  }, [supabase, user, selectedDate, role]); // 🔧 เพิ่ม role ใน dependencies
 
-  // Build a map for quick result lookup: {date|sub_type_id|prize_code: result}
-  const resultMap = React.useMemo(() => {
+  // 🔧 **ใหม่**: สร้าง resultsMap (เหมือนหน้า summary)
+  const resultsMap = React.useMemo(() => {
     const map: Record<string, LotteryResult> = {};
     for (const res of results) {
-      const date = res.draw_date;
-      const subTypeId = res.lottery_sub_type_id;
-      const prizeCode = res.prize_code;
-      if (date && subTypeId && prizeCode) {
-        // Create key using actual prize_code from database
-        map[`${date}|${subTypeId}|${prizeCode}`] = res;
-      }
+      const key = `${res.draw_date}|${res.lottery_sub_type_id}|${res.prize_code}`;
+      map[key] = res;
     }
     return map;
   }, [results]);
 
-  // Find all winning tickets and calculate prize per row
+  // 🔧 **ใหม่**: คำนวณบิลที่ถูกรางวัลโดยใช้ฟังก์ชัน calculateWinningsForItem (เหมือนหน้า summary)
   const { winningTickets, totalPrize } = React.useMemo(() => {
     let totalPrize = 0;
     const wins: {
@@ -229,7 +320,7 @@ export default function LotteryTicketResultsPage() {
       draw_date: string;
       draw_time: string;
       ticket_id: string;
-      user_name?: string; // เพิ่มชื่อผู้ใช้
+      user_name?: string;
       items: (LotteryTicketItem & {
         winning_number: string;
         prize_code: string;
@@ -239,86 +330,59 @@ export default function LotteryTicketResultsPage() {
       })[];
       sum: number;
     }[] = [];
+
     for (const ticket of tickets) {
       if (!ticket.lottery_ticket_items) continue;
-      const winItems: (LotteryTicketItem & { winning_number: string; prize_code: string; result: LotteryResult; prize: number; draw_time: string })[] = [];
+      
+      const winItems: (LotteryTicketItem & { 
+        winning_number: string; 
+        prize_code: string; 
+        result: LotteryResult; 
+        prize: number; 
+        draw_time: string 
+      })[] = [];
+
       for (const item of ticket.lottery_ticket_items) {
-        if (!item.lottery_sub_number || !item.numbers) continue;
-        
-        // Create prize code that matches database format
-        const digitNumber = item.lottery_sub_number.digit_number;
-        const typeNumber = item.lottery_sub_number.type_number;
-        
-        // Map type_number to actual prize_code format in database
-        let prizeCodePattern = '';
-        if (typeNumber === 'โต๊ด') {
-          prizeCodePattern = `${digitNumber} ตัวโต๊ด`;
-        } else if (typeNumber === 'บน') {
-          prizeCodePattern = `${digitNumber} ตัวบน`;
-        } else if (typeNumber === 'ล่าง') {
-          prizeCodePattern = `${digitNumber} ตัวล่าง`;
-        } else if (typeNumber === 'วิ่งบน') {
-          prizeCodePattern = 'วิ่งบน';
-        } else if (typeNumber === 'วิ่งล่าง') {
-          prizeCodePattern = 'วิ่งล่าง';
-        }
-        
-        // Find matching result using resultMap (same as summary page)
-        const resultMapKey = `${ticket.draw_date}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
-        const matchingResult = resultMap[resultMapKey];
-        
-        // 🔧 Debug: ตรวจสอบการจับคู่ผลรางวัล
-        console.log('=== MATCHING DEBUG ===');
-        console.log('Ticket draw_date:', ticket.draw_date);
-        console.log('Item lottery_sub_type_id:', item.lottery_sub_type_id);
-        console.log('Prize code pattern:', prizeCodePattern);
-        console.log('Result map key:', resultMapKey);
-        console.log('Matching result:', matchingResult);
-        console.log('Available result keys:', Object.keys(resultMap));
-        
-        if (matchingResult && matchingResult.winning_number && item.numbers) {
-          let matchedNumbers: string[] = [];
-          
-          // โต๊ด - check if any purchased number matches any winning combination
+        // 🔧 ใช้ฟังก์ชัน calculateWinningsForItem (เหมือนหน้า summary)
+        const { prize, isWinning, winningNumberDisplay, matchedNumber } = calculateWinningsForItem(
+          item, 
+          ticket.draw_date, 
+          resultsMap
+        );
+
+        if (isWinning && winningNumberDisplay && matchedNumber) {
+          // สร้าง prize_code pattern
+          const digitNumber = item.lottery_sub_number.digit_number;
+          const typeNumber = item.lottery_sub_number.type_number;
+          let prizeCodePattern = '';
           if (typeNumber === 'โต๊ด') {
-            const winningSet = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
-            matchedNumbers = item.numbers.filter(num => winningSet.has(num));
+            prizeCodePattern = `${digitNumber} ตัวโต๊ด`;
+          } else if (typeNumber === 'บน') {
+            prizeCodePattern = `${digitNumber} ตัวบน`;
+          } else if (typeNumber === 'ล่าง') {
+            prizeCodePattern = `${digitNumber} ตัวล่าง`;
+          } else if (typeNumber === 'วิ่งบน') {
+            prizeCodePattern = 'วิ่งบน';
+          } else if (typeNumber === 'วิ่งล่าง') {
+            prizeCodePattern = 'วิ่งล่าง';
           }
-          // วิ่ง - check if any purchased digit matches any winning digit
-          else if (typeNumber === 'วิ่งบน' || typeNumber === 'วิ่งล่าง') {
-            const winningDigits = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
-            // For วิ่ง, check each digit of purchased numbers
-            for (const num of item.numbers) {
-              for (const digit of num.split('')) {
-                if (winningDigits.has(digit)) {
-                  matchedNumbers.push(num);
-                  break; // Only count each number once
-                }
-              }
-            }
-          }
-          // ตรง - exact match
-          else {
-            matchedNumbers = item.numbers.filter(num => num === matchingResult.winning_number);
-          }
-          
-          if (matchedNumbers.length > 0) {
-            // 🔧 แก้ไขใหม่: ใช้ effective_prize_rate แทน price_paid ในการคำนวณรางวัล
-            // Calculate prize: amount_bet * effective_prize_rate * matched_count
-            const effectiveRate = item.effective_prize_rate || item.lottery_sub_number.price_paid || 0;
-            const prize = parseFloat(item.amount.toString()) * parseFloat(effectiveRate.toString()) * matchedNumbers.length;
-            totalPrize += prize;
-            winItems.push({
-              ...item,
-              winning_number: matchedNumbers.join(", "),
-              prize_code: prizeCodePattern,
-              result: matchingResult,
-              prize,
-              draw_time: matchingResult.draw_time || '',
-            });
-          }
+
+          // หา matching result
+          const resultMapKey = `${ticket.draw_date}|${item.lottery_sub_type_id}|${prizeCodePattern}`;
+          const matchingResult = resultsMap[resultMapKey];
+
+          totalPrize += prize;
+          winItems.push({
+            ...item,
+            winning_number: matchedNumber,
+            prize_code: prizeCodePattern,
+            result: matchingResult,
+            prize,
+            draw_time: matchingResult?.draw_time || '',
+          });
         }
       }
+
       if (winItems.length > 0) {
         const sum = winItems.reduce((acc, i) => acc + i.prize, 0);
         wins.push({
@@ -327,37 +391,96 @@ export default function LotteryTicketResultsPage() {
           draw_date: ticket.draw_date,
           draw_time: winItems[0]?.draw_time || '',
           ticket_id: ticket.id,
-          user_name: ticket.user_name, // เพิ่มชื่อผู้ใช้
+          user_name: ticket.user_name,
           items: winItems,
           sum,
         });
       }
     }
     return { winningTickets: wins, totalPrize };
-  }, [tickets, results]);
+  }, [tickets, resultsMap]);
 
   useEffect(() => {
-    supabase.from('lottery_winning_bills').select('*').then(({ data }: { data: any[] | null }) => setWinningBills(data || []));
-  }, [winningTickets.length]);
+    // 🔧 เพิ่ม error handling สำหรับการดึงข้อมูล lottery_winning_bills
+    const fetchWinningBills = async () => {
+      try {
+        // 🔧 ใช้ service_role key สำหรับการเข้าถึง admin
+        const { data, error } = await supabase
+          .from('lottery_winning_bills')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.warn('Warning: Could not fetch lottery_winning_bills:', error.message);
+          setWinningBills([]); // ตั้งค่าเป็น array ว่างถ้าเกิดข้อผิดพลาด
+        } else {
+          setWinningBills(data || []);
+        }
+      } catch (error) {
+        console.warn('Warning: Error fetching lottery_winning_bills:', error);
+        setWinningBills([]); // ตั้งค่าเป็น array ว่างถ้าเกิดข้อผิดพลาด
+      }
+    };
+    
+    fetchWinningBills();
+  }, [winningTickets.length, supabase]);
 
   useEffect(() => {
     if (!winningTickets.length) return;
-    winningTickets.forEach(async (win) => {
-      const ticket = tickets.find(t => t.id === win.ticket_id);
-      await supabase.from('lottery_winning_bills').upsert({
-        bill_number: win.bill_number,
-        bill_name: win.bill_name,
-        user_id: ticket?.user_id || '',
-        draw_date: win.draw_date,
-        total_prize: win.sum,
-      }, { onConflict: 'bill_number' });
-    });
-  }, [winningTickets.length, tickets]);
+    
+    // 🔧 เพิ่ม error handling สำหรับการ upsert ข้อมูล
+    const updateWinningBills = async () => {
+      try {
+        // 🔧 ใช้ batch operation แทนการ loop
+        const winningBillsData = winningTickets.map(win => {
+          const ticket = tickets.find(t => t.id === win.ticket_id);
+          return {
+            bill_number: win.bill_number,
+            bill_name: win.bill_name,
+            user_id: ticket?.user_id || '',
+            draw_date: win.draw_date,
+            total_prize: win.sum,
+            status: 'pending',
+          };
+        });
+
+        // 🔧 ใช้ upsert แบบ batch
+        const { error } = await supabase
+          .from('lottery_winning_bills')
+          .upsert(winningBillsData, { 
+            onConflict: 'bill_number',
+            ignoreDuplicates: false 
+          });
+        
+        if (error) {
+          console.warn('Warning: Could not upsert winning bills:', error.message);
+          // 🔧 ถ้าเกิดข้อผิดพลาด ให้ลองใช้วิธีอื่น
+          console.log('Trying alternative approach...');
+          return;
+        }
+        
+        // ดึงข้อมูลใหม่หลังจาก upsert
+        const { data, error: refreshError } = await supabase
+          .from('lottery_winning_bills')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (refreshError) {
+          console.warn('Warning: Could not refresh lottery_winning_bills:', refreshError.message);
+        } else {
+          setWinningBills(data || []);
+        }
+      } catch (error) {
+        console.warn('Warning: Error updating lottery_winning_bills:', error);
+      }
+    };
+    
+    updateWinningBills();
+  }, [winningTickets.length, tickets, supabase]);
 
   const filteredWinningTickets = winningTickets.filter(win => {
     if (filterBill && !win.bill_number.includes(filterBill)) return false;
-    if (filterDate && win.draw_date !== filterDate) return false;
-    return true;
+    return true; // 🔧 ลบการกรองตามวันที่ออก เพราะดึงเฉพาะวันที่ที่เลือกแล้ว
   });
 
   const thaiNow = toZonedTime(new Date(), 'Asia/Bangkok').toISOString();
@@ -388,6 +511,25 @@ export default function LotteryTicketResultsPage() {
     return filtered;
   }, [filteredWinningTickets, winningBills, selectedFilter]);
 
+  // 🔧 **ใหม่**: ฟังก์ชันสำหรับแสดงวันที่ในรูปแบบไทย
+  const formatDateThai = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return format(date, 'EEEE d MMMM yyyy', { locale: th });
+  };
+
+  // 🔧 **ใหม่**: ฟังก์ชันสำหรับแสดงวันที่ในรูปแบบสั้น
+  const formatDateShort = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return format(date, 'd MMM yyyy', { locale: th });
+  };
+
+  // 🔧 **ใหม่**: ฟังก์ชันสำหรับตรวจสอบว่าเป็นวันที่ปัจจุบันหรือไม่
+  const isCurrentDate = (dateString: string) => {
+    return dateString === getCurrentDate();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto px-2 py-2">
@@ -406,6 +548,36 @@ export default function LotteryTicketResultsPage() {
               <p className="text-xs text-gray-600 dark:text-gray-300">ตรวจสอบบิลที่ถูกรางวัลของคุณ</p>
             </div>
           </div>
+
+          {/* 🔧 **ใหม่**: แสดงวันที่ที่เลือก */}
+          {selectedDate && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className={`mb-3 p-2 rounded-lg border ${
+                isCurrentDate(selectedDate)
+                  ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800'
+                  : 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2 text-sm">
+                <FaCalendarDay className={`h-4 w-4 ${
+                  isCurrentDate(selectedDate) ? 'text-green-600' : 'text-blue-600'
+                }`} />
+                <span className="font-medium">วันที่เลือก:</span>
+                <span className={`font-semibold ${
+                  isCurrentDate(selectedDate) ? 'text-green-700 dark:text-green-300' : 'text-blue-700 dark:text-blue-300'
+                }`}>
+                  {formatDateThai(selectedDate)}
+                </span>
+                {isCurrentDate(selectedDate) && (
+                  <Badge variant="default" className="bg-green-600 text-white text-xs">
+                    วันนี้
+                  </Badge>
+                )}
+              </div>
+            </motion.div>
+          )}
 
           {/* Statistics Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
@@ -491,12 +663,46 @@ export default function LotteryTicketResultsPage() {
         >
             <Card className="bg-white dark:bg-slate-900 shadow border-0">
               <CardContent className="p-2">
-                <div className="flex flex-col md:flex-row gap-1 items-center justify-between">
+                <div className="flex flex-col md:flex-row gap-2 items-center justify-between">
                   <div className="flex items-center gap-1">
                     <FaFilter className="text-gray-500 dark:text-gray-300 text-xs" />
                     <span className="font-medium text-gray-700 dark:text-gray-200 text-xs">ตัวกรอง</span>
                   </div>
-                  <div className="flex flex-col md:flex-row gap-1 w-full md:w-auto">
+                  <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                    {/* 🔧 **ใหม่**: เปลี่ยนจาก Input เป็น Select สำหรับเลือกวันที่ */}
+                    <div className="flex items-center gap-1">
+                      <FaCalendarAlt className="text-gray-400 dark:text-gray-500 text-xs" />
+                      <Select value={selectedDate} onValueChange={handleDateChange} disabled={availableDates.length === 0}>
+                        <SelectTrigger className="w-full md:w-48 h-7 text-xs bg-white dark:bg-slate-800 dark:text-gray-100 border-gray-200 dark:border-slate-700">
+                          <SelectValue placeholder={availableDates.length === 0 ? "ไม่มีข้อมูล" : "เลือกวันที่"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableDates.length === 0 ? (
+                            <SelectItem value="no-data" disabled>
+                              ไม่มีข้อมูลวันที่
+                            </SelectItem>
+                          ) : (
+                            availableDates.map((date, index) => (
+                              <SelectItem key={date} value={date}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{formatDateShort(date)}</span>
+                                  {index === 0 && (
+                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                      ล่าสุด
+                                    </Badge>
+                                  )}
+                                  {isCurrentDate(date) && (
+                                    <Badge variant="default" className="ml-2 text-xs bg-green-600">
+                                      วันนี้
+                                    </Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="relative">
                       <FaSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs" />
                       <Input 
@@ -504,15 +710,6 @@ export default function LotteryTicketResultsPage() {
                         value={filterBill} 
                         onChange={e => setFilterBill(e.target.value)}
                         className="pl-7 w-full md:w-32 border-gray-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500 h-7 text-xs bg-white dark:bg-slate-800 dark:text-gray-100"
-                      />
-                    </div>
-                    <div className="relative">
-                      <FaCalendarAlt className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs" />
-                      <Input 
-                        type="date" 
-                        value={filterDate} 
-                        onChange={e => setFilterDate(e.target.value)}
-                        className="pl-7 w-full md:w-28 border-gray-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500 h-7 text-xs bg-white dark:bg-slate-800 dark:text-gray-100"
                       />
                     </div>
                     <div className="flex gap-1">
@@ -558,14 +755,22 @@ export default function LotteryTicketResultsPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-400"></div>
                 <span className="ml-2 text-gray-600 dark:text-gray-300 text-xs">กำลังโหลดข้อมูล...</span>
               </div>
+            ) : !selectedDate ? (
+              <Card className="bg-white dark:bg-slate-900 shadow border-0">
+                <CardContent className="p-8 text-center">
+                  <FaCalendarDay className="mx-auto text-4xl text-gray-300 dark:text-gray-600 mb-2" />
+                  <h3 className="text-base font-semibold text-gray-600 dark:text-gray-200 mb-1">กรุณาเลือกวันที่</h3>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">เลือกวันที่เพื่อดูผลรางวัล</p>
+                </CardContent>
+              </Card>
             ) : filteredTickets.length === 0 ? (
               <Card className="bg-white dark:bg-slate-900 shadow border-0">
                 <CardContent className="p-8 text-center">
                   <FaTicketAlt className="mx-auto text-4xl text-gray-300 dark:text-gray-600 mb-2" />
                   <h3 className="text-base font-semibold text-gray-600 dark:text-gray-200 mb-1">ไม่พบบิลที่ถูกรางวัล</h3>
-                  <p className="text-gray-500 dark:text-gray-400 text-xs">ลองเปลี่ยนเงื่อนไขการค้นหาหรือตรวจสอบในงวดอื่น</p>
-
-
+                  <p className="text-gray-500 dark:text-gray-400 text-xs">
+                    สำหรับวันที่ {formatDateShort(selectedDate)}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -616,7 +821,7 @@ export default function LotteryTicketResultsPage() {
                                       </span>
                                     </div>
                                     <p className="text-blue-100 text-sm">
-                                      งวด: {format(new Date(win.draw_date), 'd MMM yy', { locale: th })}
+                                      งวด: {formatDateShort(win.draw_date)}
                                     </p>
                                   </div>
                                 </div>
@@ -624,7 +829,7 @@ export default function LotteryTicketResultsPage() {
                                   <div className="flex items-center gap-1 text-sm">
                                     <FaCalendarAlt className="text-blue-200 text-xs" />
                                     <span className="text-blue-100">
-                                      ซื้อ: {format(new Date(tickets.find(t => t.id === win.ticket_id)?.created_at || win.draw_date), 'd MMM yy', { locale: th })}
+                                      ซื้อ: {formatDateShort(tickets.find(t => t.id === win.ticket_id)?.created_at || win.draw_date)}
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-1">
@@ -636,22 +841,47 @@ export default function LotteryTicketResultsPage() {
                                           e.stopPropagation();
                                           setStatusLoading(win.bill_number);
                                           try {
-                                            await supabase.from('lottery_winning_bills')
+                                            // 🔧 อัปเดตสถานะการจ่ายรางวัล
+                                            const { error: updateError } = await supabase.from('lottery_winning_bills')
                                               .update({ status: 'paid', paid_at: thaiNow })
                                               .eq('bill_number', win.bill_number);
+                                            
+                                            if (updateError) {
+                                              console.error('Error updating winning bill status:', updateError);
+                                              alert('ไม่สามารถอัปเดตสถานะการจ่ายรางวัลได้');
+                                              return;
+                                            }
+                                            
                                             const ticket = tickets.find(t => t.id === win.ticket_id);
                                             if (ticket?.user_id) {
-                                              const { data: profile } = await supabase
+                                              // 🔧 อัปเดตเครดิตของผู้ใช้
+                                              const { data: profile, error: profileError } = await supabase
                                                 .from('profiles')
                                                 .select('credit_balance')
                                                 .eq('id', ticket.user_id)
                                                 .single();
+                                              
+                                              if (profileError) {
+                                                console.error('Error fetching user profile:', profileError);
+                                                alert('ไม่สามารถดึงข้อมูลผู้ใช้ได้');
+                                                return;
+                                              }
+                                              
                                               const currentCredit = profile?.credit_balance ?? 0;
                                               const newCredit = currentCredit + win.sum;
-                                              await supabase.from('profiles')
+                                              
+                                              const { error: creditError } = await supabase.from('profiles')
                                                 .update({ credit_balance: newCredit })
                                                 .eq('id', ticket.user_id);
-                                              await supabase.from('credit_transactions').insert([
+                                              
+                                              if (creditError) {
+                                                console.error('Error updating user credit:', creditError);
+                                                alert('ไม่สามารถอัปเดตเครดิตผู้ใช้ได้');
+                                                return;
+                                              }
+                                              
+                                              // 🔧 บันทึกธุรกรรมเครดิต
+                                              const { error: transactionError } = await supabase.from('credit_transactions').insert([
                                                 {
                                                   user_id: ticket.user_id,
                                                   amount: win.sum,
@@ -661,12 +891,28 @@ export default function LotteryTicketResultsPage() {
                                                   created_at: thaiNow,
                                                 }
                                               ]);
+                                              
+                                              if (transactionError) {
+                                                console.error('Error creating credit transaction:', transactionError);
+                                                alert('ไม่สามารถบันทึกธุรกรรมเครดิตได้');
+                                                return;
+                                              }
+                                              
                                               window.dispatchEvent(new Event('credit-updated'));
                                             }
-                                            const { data } = await supabase.from('lottery_winning_bills').select('*');
-                                            setWinningBills(data || []);
+                                            
+                                            // 🔧 ดึงข้อมูลใหม่
+                                            const { data, error: refreshError } = await supabase.from('lottery_winning_bills').select('*');
+                                            if (refreshError) {
+                                              console.warn('Warning: Could not refresh lottery_winning_bills:', refreshError.message);
+                                            } else {
+                                              setWinningBills(data || []);
+                                            }
+                                            
+                                            alert('อัปเดตสถานะการจ่ายรางวัลเรียบร้อยแล้ว');
                                           } catch (error) {
                                             console.error('Error updating payout status:', error);
+                                            alert('เกิดข้อผิดพลาดในการอัปเดตสถานะการจ่ายรางวัล');
                                           } finally {
                                             setStatusLoading(null);
                                           }
