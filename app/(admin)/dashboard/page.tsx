@@ -39,9 +39,12 @@ import {
   Calculator,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAuth } from '@/lib/contexts/AuthContext';
+import { useTheme } from 'next-themes';
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 
@@ -50,6 +53,7 @@ import RevenueChart from './RevenueChart';
 import UserChart from './UserChart';
 import TicketChart from './TicketChart';
 import LotteryTypePie from './LotteryTypePie';
+import CommissionChart from './CommissionChart';
 import DetailModal from './DetailModal';
 import ExportButton from './ExportButton';
 
@@ -111,57 +115,74 @@ const PerformanceIndicator = ({ value, previousValue, label, isInverted = false 
   label: string;
   isInverted?: boolean;
 }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  
   const change = value - previousValue;
-  const changePercent = previousValue > 0 ? ((change / previousValue) * 100) : 0;
-  const isPositive = isInverted ? change < 0 : change >= 0;
-
+  const changePercent = previousValue !== 0 ? (change / previousValue) * 100 : 0;
+  const isPositive = isInverted ? change < 0 : change > 0;
+  
   return (
     <div className="flex items-center space-x-2">
-      <div className={`flex items-center space-x-1 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-        {isPositive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+      <div className={`flex items-center space-x-1 ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+        {isPositive ? (
+          <ArrowUp className="h-3 w-3" />
+        ) : (
+          <ArrowDown className="h-3 w-3" />
+        )}
         <span className="text-xs font-medium">
           {Math.abs(changePercent).toFixed(1)}%
         </span>
       </div>
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+        {label}
+      </span>
     </div>
   );
 };
 
 // Risk indicator component
 const RiskIndicator = ({ level, value }: { level: 'low' | 'medium' | 'high'; value: string }) => {
-  const colors = {
-    low: 'text-green-600 bg-green-50',
-    medium: 'text-yellow-600 bg-yellow-50',
-    high: 'text-red-600 bg-red-50'
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  
+  const getRiskColor = () => {
+    switch (level) {
+      case 'low':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+      case 'high':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+    }
   };
-
-  const icons = {
-    low: CheckCircle2,
-    medium: AlertCircle,
-    high: XCircle
-  };
-
-  const Icon = icons[level];
 
   return (
-    <div className={`flex items-center space-x-2 px-2 py-1 rounded-full ${colors[level]}`}>
-      <Icon className="h-3 w-3" />
-      <span className="text-xs font-medium">{value}</span>
+    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRiskColor()}`}>
+      <div className={`w-2 h-2 rounded-full mr-2 ${
+        level === 'low' ? 'bg-green-500 dark:bg-green-400' :
+        level === 'medium' ? 'bg-yellow-500 dark:bg-yellow-400' :
+        'bg-red-500 dark:bg-red-400'
+      }`} />
+      {value}
     </div>
   );
 };
 
 export default function AdminDashboard() {
   const { user } = useAuth();
-  const [selectedDetail, setSelectedDetail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { theme, setTheme } = useTheme();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [dateRange, setDateRange] = useState('week');
-  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
-  const [showFilters, setShowFilters] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState('week');
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('overview');
+  const [selectedDetail, setSelectedDetail] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
 
   // Fetch data function
   const loadData = async () => {
@@ -242,6 +263,19 @@ export default function AdminDashboard() {
         </div>
         
         <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="flex items-center space-x-2"
+          >
+            {theme === 'dark' ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+            <span>{theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -335,8 +369,8 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
             <span>ภาพรวม</span>
@@ -349,6 +383,10 @@ export default function AdminDashboard() {
             <Target className="h-4 w-4" />
             <span>ประสิทธิภาพ</span>
           </TabsTrigger>
+          <TabsTrigger value="commission" className="flex items-center space-x-2">
+            <Award className="h-4 w-4" />
+            <span>ค่าคอมมิชชั่น</span>
+          </TabsTrigger>
           <TabsTrigger value="reports" className="flex items-center space-x-2">
             <FileText className="h-4 w-4" />
             <span>รายงาน</span>
@@ -356,22 +394,31 @@ export default function AdminDashboard() {
         </TabsList>
         
         <TabsContent value="overview" className="space-y-6">
+          {/* Debug log */}
+          {console.log('🔍 Dashboard lotteryTypes data:', {
+            total: dashboardData.lotteryTypes.total,
+            popular: dashboardData.lotteryTypes.popular,
+            popularLength: dashboardData.lotteryTypes.popular.length,
+            labels: dashboardData.lotteryTypes.popular.map(item => item.name),
+            values: dashboardData.lotteryTypes.popular.map(item => item.revenue)
+          })}
+          
           {/* Executive Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-blue-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ยอดซื้อรวม</CardTitle>
-                  <div className="p-2 bg-blue-100 rounded-full">
-                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ยอดซื้อรวม</CardTitle>
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                    <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold dark:text-white">
                     {formatCurrency(dashboardData.performance.totalSales)}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Calculator className="h-3 w-3" />
                     <span>เฉลี่ย: {formatCurrency(dashboardData.performance.averageDailySales)}/วัน</span>
                   </div>
@@ -380,19 +427,19 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-green-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ยอดจ่ายรางวัล</CardTitle>
-                  <div className="p-2 bg-green-100 rounded-full">
-                    <Award className="h-4 w-4 text-green-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ยอดจ่ายรางวัล</CardTitle>
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                    <Award className="h-4 w-4 text-green-600 dark:text-green-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
+                  <div className="text-2xl font-bold dark:text-white">
                     {formatCurrency(dashboardData.performance.totalPayout)}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Percent className="h-3 w-3" />
                     <span>อัตราจ่าย: {formatPercentage(dashboardData.performance.payoutRate)}</span>
                   </div>
@@ -401,17 +448,38 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-amber-600"></div>
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-purple-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">จำนวนบิล</CardTitle>
-                  <div className="p-2 bg-amber-100 rounded-full">
-                    <Ticket className="h-4 w-4 text-amber-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ค่าคอมมิชชั่น</CardTitle>
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                    <Award className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{dashboardData.tickets.sold.toLocaleString()}</div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {formatCurrency(dashboardData.commission.total)}
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
+                    <Percent className="h-3 w-3" />
+                    <span>อัตรา: {formatPercentage(dashboardData.commission.commissionRate)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+            
+            <motion.div variants={cardVariants}>
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-amber-600"></div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">จำนวนบิล</CardTitle>
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                    <Ticket className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold dark:text-white">{dashboardData.tickets.sold.toLocaleString()}</div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Clock className="h-3 w-3" />
                     <span>รอ: {dashboardData.tickets.pending.toLocaleString()}</span>
                   </div>
@@ -420,25 +488,25 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
-                <div className={`absolute top-0 left-0 w-full h-1 ${dashboardData.performance.netProfit >= 0 ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'}`}></div>
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
+                <div className={`absolute top-0 left-0 w-full h-1 ${(dashboardData.performance.netProfit - dashboardData.commission.total) >= 0 ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'}`}></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">กำไร/ขาดทุน</CardTitle>
-                  <div className={`p-2 rounded-full ${dashboardData.performance.netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                    {dashboardData.performance.netProfit >= 0 ? (
-                      <TrendingUp className="h-4 w-4 text-green-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">กำไรสุทธิ</CardTitle>
+                  <div className={`p-2 rounded-full ${(dashboardData.performance.netProfit - dashboardData.commission.total) >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                    {(dashboardData.performance.netProfit - dashboardData.commission.total) >= 0 ? (
+                      <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
                     ) : (
-                      <TrendingDown className="h-4 w-4 text-red-600" />
+                      <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
                     )}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${dashboardData.performance.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(dashboardData.performance.netProfit)}
+                  <div className={`text-2xl font-bold ${(dashboardData.performance.netProfit - dashboardData.commission.total) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {formatCurrency(dashboardData.performance.netProfit - dashboardData.commission.total)}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Zap className="h-3 w-3" />
-                    <span>margin: {formatPercentage(dashboardData.performance.profitMargin)}</span>
+                    <span>หลังหักค่าคอม: {formatPercentage(((dashboardData.performance.netProfit - dashboardData.commission.total) / dashboardData.performance.totalSales) * 100)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -446,21 +514,21 @@ export default function AdminDashboard() {
           </div>
 
           {/* Advanced Performance Metrics */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-orange-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ประหยัดจากเลขอั้น</CardTitle>
-                  <div className="p-2 bg-orange-100 rounded-full">
-                    <Shield className="h-4 w-4 text-orange-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ประหยัดจากเลขอั้น</CardTitle>
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                    <Shield className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">
+                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                     {formatCurrency(dashboardData.performance.numberCapSavings)}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Star className="h-3 w-3" />
                     <span>ลดค่าจ่าย: {formatPercentage(dashboardData.performance.numberCapSavingsPercentage)}</span>
                   </div>
@@ -469,19 +537,19 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-purple-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ROI</CardTitle>
-                  <div className="p-2 bg-purple-100 rounded-full">
-                    <TrendingUp className="h-4 w-4 text-purple-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ROI</CardTitle>
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                    <TrendingUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-purple-600">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                     {formatPercentage(dashboardData.performance.roi)}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Star className="h-3 w-3" />
                     <span>ผลตอบแทน</span>
                   </div>
@@ -490,19 +558,19 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-indigo-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ความเสี่ยง</CardTitle>
-                  <div className="p-2 bg-indigo-100 rounded-full">
-                    <AlertTriangle className="h-4 w-4 text-indigo-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ความเสี่ยง</CardTitle>
+                  <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-full">
+                    <AlertTriangle className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-indigo-600">
+                  <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                     {dashboardData.performance.riskMetrics.sharpeRatio.toFixed(2)}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Star className="h-3 w-3" />
                     <span>Sharpe Ratio</span>
                   </div>
@@ -511,21 +579,42 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={cardVariants}>
-              <Card className="relative overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-500 to-pink-600"></div>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">ผู้ใช้งาน</CardTitle>
-                  <div className="p-2 bg-pink-100 rounded-full">
-                    <Users className="h-4 w-4 text-pink-600" />
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ผู้ใช้งาน</CardTitle>
+                  <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-full">
+                    <Users className="h-4 w-4 text-pink-600 dark:text-pink-400" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-pink-600">
+                  <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
                     {dashboardData.users.total.toLocaleString()}
                   </div>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                    <Building className="h-3 w-3" />
-                    <span>ใหม่: {dashboardData.users.newThisMonth.toLocaleString()}</span>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
+                    <Star className="h-3 w-3" />
+                    <span>ใหม่: {dashboardData.users.newThisMonth}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+            
+            <motion.div variants={cardVariants}>
+              <Card className="relative overflow-hidden border-0 shadow-lg dark:shadow-gray-800/20">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-teal-600"></div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium dark:text-gray-100">ค่าคอมเฉลี่ย</CardTitle>
+                  <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-full">
+                    <Award className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                    {formatCurrency(dashboardData.commission.averageCommission)}
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
+                    <Star className="h-3 w-3" />
+                    <span>ต่อบิล</span>
                   </div>
                 </CardContent>
               </Card>
@@ -534,41 +623,47 @@ export default function AdminDashboard() {
 
           {/* ยอดถูกรางวัลรายละเอียด */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center dark:text-gray-100">
                   <Award className="h-5 w-5 mr-2" />
-                  รายละเอียดยอดถูกรางวัล
+                  รายละเอียดยอดถูกรางวัลและค่าคอมมิชชั่น
                 </CardTitle>
-                <CardDescription>
-                  ข้อมูลการถูกรางวัลและอัตราการจ่ายรางวัล
+                <CardDescription className="dark:text-gray-400">
+                  ข้อมูลการถูกรางวัล อัตราการจ่ายรางวัล และค่าคอมมิชชั่น
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(dashboardData.performance.totalPayout)}
                     </div>
-                    <div className="text-sm text-green-800">ยอดจ่ายรางวัลรวม</div>
+                    <div className="text-sm text-green-800 dark:text-green-300">ยอดจ่ายรางวัลรวม</div>
                   </div>
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {formatCurrency(dashboardData.performance.totalOriginalPayout)}
                     </div>
-                    <div className="text-sm text-blue-800">ยอดจ่ายรางวัลเดิม</div>
+                    <div className="text-sm text-blue-800 dark:text-blue-300">ยอดจ่ายรางวัลเดิม</div>
                   </div>
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">
+                  <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                       {formatPercentage(dashboardData.performance.payoutRate)}
                     </div>
-                    <div className="text-sm text-orange-800">อัตราการจ่ายรางวัล</div>
+                    <div className="text-sm text-orange-800 dark:text-orange-300">อัตราการจ่ายรางวัล</div>
                   </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {dashboardData.performance.numberCapAffectedTickets}
+                  <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      {formatCurrency(dashboardData.commission.total)}
                     </div>
-                    <div className="text-sm text-purple-800">บิลที่ใช้เลขอั้น</div>
+                    <div className="text-sm text-purple-800 dark:text-purple-300">ค่าคอมมิชชั่นรวม</div>
+                  </div>
+                  <div className="text-center p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                      {formatPercentage(dashboardData.commission.commissionRate)}
+                    </div>
+                    <div className="text-sm text-teal-800 dark:text-teal-300">อัตราค่าคอมมิชชั่น</div>
                   </div>
                 </div>
               </CardContent>
@@ -577,33 +672,33 @@ export default function AdminDashboard() {
 
           {/* Risk Assessment */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center dark:text-gray-100">
                   <AlertTriangle className="h-5 w-5 mr-2" />
                   การประเมินความเสี่ยงและยอดถูกรางวัล
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="dark:text-gray-400">
                   ข้อมูลความเสี่ยงและสถิติการถูกรางวัล
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="text-center">
-                    <div className="text-lg font-bold text-red-600">
+                    <div className="text-lg font-bold text-red-600 dark:text-red-400">
                       {formatCurrency(dashboardData.performance.riskMetrics.maxDailyLoss)}
                     </div>
-                    <div className="text-sm text-muted-foreground">ขาดทุนสูงสุด/วัน</div>
+                    <div className="text-sm text-muted-foreground dark:text-gray-400">ขาดทุนสูงสุด/วัน</div>
                     <RiskIndicator 
                       level={Math.abs(dashboardData.performance.riskMetrics.maxDailyLoss) > 100000 ? 'high' : 'medium'} 
                       value="ติดตาม" 
                     />
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-bold text-green-600">
+                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(dashboardData.performance.riskMetrics.maxDailyProfit)}
                     </div>
-                    <div className="text-sm text-muted-foreground">กำไรสูงสุด/วัน</div>
+                    <div className="text-sm text-muted-foreground dark:text-gray-400">กำไรสูงสุด/วัน</div>
                     <RiskIndicator level="low" value="ปกติ" />
                   </div>
                   <div className="text-center">
@@ -627,8 +722,8 @@ export default function AdminDashboard() {
                 
                 {/* ยอดถูกรางวัล */}
                 <div className="mt-6 pt-6 border-t">
-                  <h4 className="text-lg font-semibold mb-4 text-center">สถิติการถูกรางวัล</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <h4 className="text-lg font-semibold mb-4 text-center">สถิติการถูกรางวัลและค่าคอมมิชชั่น</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="text-center">
                       <div className="text-lg font-bold text-green-600">
                         {formatCurrency(dashboardData.performance.totalPayout)}
@@ -649,9 +744,15 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-bold text-purple-600">
-                        {dashboardData.performance.numberCapAffectedTickets}
+                        {formatCurrency(dashboardData.commission.total)}
                       </div>
-                      <div className="text-sm text-muted-foreground">บิลที่ใช้เลขอั้น</div>
+                      <div className="text-sm text-muted-foreground">ค่าคอมมิชชั่นรวม</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-teal-600">
+                        {formatPercentage(dashboardData.commission.commissionRate)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">อัตราค่าคอมมิชชั่น</div>
                     </div>
                   </div>
                 </div>
@@ -662,15 +763,15 @@ export default function AdminDashboard() {
           {/* Charts */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <motion.div variants={itemVariants} className="lg:col-span-2">
-              <Card>
+              <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
                 <CardHeader>
                   <div className="flex justify-between items-center">
-                    <CardTitle className="flex items-center">
+                    <CardTitle className="flex items-center dark:text-gray-100">
                       <BarChart3 className="h-5 w-5 mr-2" />
                       ยอดซื้อและยอดจ่ายรางวัลประจำวัน
                     </CardTitle>
                     <div className="flex items-center space-x-2">
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="dark:border-gray-600 dark:text-gray-300">
                         {dashboardData.revenue.dailyRevenue.length} วัน
                       </Badge>
                       <Badge variant={dashboardData.revenue.growth >= 0 ? 'default' : 'destructive'}>
@@ -678,7 +779,7 @@ export default function AdminDashboard() {
                       </Badge>
                     </div>
                   </div>
-                  <CardDescription>
+                  <CardDescription className="dark:text-gray-400">
                     แสดงยอดซื้อและยอดจ่ายรางวัลรายวัน พร้อมกำไร/ขาดทุน
                   </CardDescription>
                 </CardHeader>
@@ -701,13 +802,13 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={itemVariants}>
-              <Card>
+              <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center dark:text-gray-100">
                     <PieChart className="h-5 w-5 mr-2" />
                     สัดส่วนประเภทหวย
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="dark:text-gray-400">
                     ตามยอดขาย ({dashboardData.lotteryTypes.total} ประเภท)
                   </CardDescription>
                 </CardHeader>
@@ -715,7 +816,7 @@ export default function AdminDashboard() {
                   <div className="h-80">
                     <LotteryTypePie
                       labels={dashboardData.lotteryTypes.popular.map(item => item.name)}
-                      values={dashboardData.lotteryTypes.popular.map(item => item.revenue)}
+                      values={dashboardData.lotteryTypes.popular.map(item => item.count)}
                       chartType="doughnut"
                       title=""
                       showPercentage={true}
@@ -728,9 +829,9 @@ export default function AdminDashboard() {
 
           {/* Top Users */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center dark:text-gray-100">
                   <Users className="h-5 w-5 mr-2" />
                   ผู้ใช้ที่มียอดขายสูงสุด
                 </CardTitle>
@@ -738,19 +839,19 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="space-y-4">
                   {dashboardData.users.topUsers.map((user, index) => (
-                    <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{index + 1}</span>
                         </div>
                         <div>
-                          <div className="font-medium">{user.name}</div>
-                          <div className="text-sm text-gray-500">{user.branch} • {user.ticketCount} บิล</div>
+                          <div className="font-medium dark:text-gray-100">{user.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{user.branch} • {user.ticketCount} บิล</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{formatCurrency(user.totalSpent)}</div>
-                        <div className="text-sm text-gray-500">
+                        <div className="font-bold dark:text-gray-100">{formatCurrency(user.totalSpent)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
                           เฉลี่ย: {formatCurrency(user.avgSpent)}
                         </div>
                       </div>
@@ -765,13 +866,13 @@ export default function AdminDashboard() {
         <TabsContent value="analytics" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <motion.div variants={itemVariants}>
-              <Card>
+              <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center dark:text-gray-100">
                     <Users className="h-5 w-5 mr-2" />
                     สถิติผู้ใช้งาน
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="dark:text-gray-400">
                     จำนวนผู้ใช้งานรายวัน ({dashboardData.users.total} คนทั้งหมด)
                   </CardDescription>
                 </CardHeader>
@@ -792,13 +893,13 @@ export default function AdminDashboard() {
             </motion.div>
             
             <motion.div variants={itemVariants}>
-              <Card>
+              <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center dark:text-gray-100">
                     <Ticket className="h-5 w-5 mr-2" />
                     จำนวนบิลที่ขาย
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="dark:text-gray-400">
                     จำนวนบิลที่ขายได้ในแต่ละวัน
                   </CardDescription>
                 </CardHeader>
@@ -852,9 +953,9 @@ export default function AdminDashboard() {
         <TabsContent value="performance" className="space-y-6">
           {/* Performance Metrics */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center dark:text-gray-100">
                   <Star className="h-5 w-5 mr-2" />
                   ตัวชี้วัดประสิทธิภาพ
                 </CardTitle>
@@ -862,30 +963,30 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                       {dashboardData.performance.bestPerformingDay 
                         ? format(new Date(dashboardData.performance.bestPerformingDay), 'dd MMM', { locale: th })
                         : '-'}
                     </div>
-                    <div className="text-sm text-muted-foreground">วันที่ดีที่สุด</div>
+                    <div className="text-sm text-muted-foreground dark:text-gray-400">วันที่ดีที่สุด</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {formatCurrency(dashboardData.performance.averageDailySales)}
                     </div>
-                    <div className="text-sm text-muted-foreground">ยอดขายเฉลี่ย/วัน</div>
+                    <div className="text-sm text-muted-foreground dark:text-gray-400">ยอดขายเฉลี่ย/วัน</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                       {dashboardData.winning.total}
                     </div>
-                    <div className="text-sm text-muted-foreground">รางวัลที่จ่าย</div>
+                    <div className="text-sm text-muted-foreground dark:text-gray-400">รางวัลที่จ่าย</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                       {formatCurrency(dashboardData.winning.largestWin)}
                     </div>
-                    <div className="text-sm text-muted-foreground">รางวัลใหญ่สุด</div>
+                    <div className="text-sm text-muted-foreground dark:text-gray-400">รางวัลใหญ่สุด</div>
                   </div>
                 </div>
               </CardContent>
@@ -894,9 +995,9 @@ export default function AdminDashboard() {
 
           {/* Lottery Type Performance */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center dark:text-gray-100">
                   <Target className="h-5 w-5 mr-2" />
                   ประสิทธิภาพตามประเภทหวย
                 </CardTitle>
@@ -907,16 +1008,16 @@ export default function AdminDashboard() {
                     <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-bold text-blue-600">{index + 1}</span>
+                          <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{index + 1}</span>
                         </div>
                         <div>
-                          <div className="font-medium">{type.name}</div>
-                          <div className="text-sm text-gray-500">{type.country}</div>
+                          <div className="font-medium dark:text-gray-100">{type.name}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{type.country}</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{formatCurrency(type.revenue)}</div>
-                        <div className="text-sm text-gray-500">
+                        <div className="font-bold dark:text-gray-100">{formatCurrency(type.revenue)}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
                           กำไร: {formatCurrency(type.netProfit)} ({formatPercentage(type.profitMargin)})
                         </div>
                       </div>
@@ -928,6 +1029,12 @@ export default function AdminDashboard() {
           </motion.div>
         </TabsContent>
         
+        <TabsContent value="commission" className="space-y-6">
+          <motion.div variants={itemVariants}>
+            <CommissionChart data={dashboardData.commission} />
+          </motion.div>
+        </TabsContent>
+        
         <TabsContent value="reports" className="space-y-6">
           <motion.div variants={itemVariants}>
             <Card>
@@ -936,7 +1043,7 @@ export default function AdminDashboard() {
                   <FileText className="h-5 w-5 mr-2" />
                   รายงานและข้อมูลสถิติ
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="dark:text-gray-400">
                   เข้าถึงรายงานต่างๆ และข้อมูลโดยรวม
                 </CardDescription>
               </CardHeader>
@@ -1027,23 +1134,23 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {selectedDetail === 'revenue' && (
               <div>
-                <h4 className="font-semibold mb-4 flex items-center">
+                <h4 className="font-semibold mb-4 flex items-center dark:text-gray-100">
                   <TrendingUp className="h-5 w-5 mr-2" />
                   ยอดซื้อและยอดจ่ายรางวัลรายวัน
                 </h4>
                 <div className="space-y-3">
                   {dashboardData.revenue.dailyRevenue.map((day, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <div>
-                        <div className="font-medium">{format(new Date(day.date), 'EEEE dd MMMM yyyy', { locale: th })}</div>
-                        <div className="text-sm text-gray-500">{day.tickets} บิล • ยอดซื้อ: {formatCurrency(day.revenue)}</div>
+                        <div className="font-medium dark:text-gray-100">{format(new Date(day.date), 'EEEE dd MMMM yyyy', { locale: th })}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{day.tickets} บิล • ยอดซื้อ: {formatCurrency(day.revenue)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-green-600">{formatCurrency(day.payout)}</div>
-                        <div className={`text-sm ${day.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="font-bold text-green-600 dark:text-green-400">{formatCurrency(day.payout)}</div>
+                        <div className={`text-sm ${day.netProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           กำไร: {formatCurrency(day.netProfit)} ({formatPercentage(day.profitMargin)})
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           อัตราจ่าย: {formatPercentage(day.payoutRate)}
                         </div>
                       </div>
@@ -1055,26 +1162,26 @@ export default function AdminDashboard() {
             
             {selectedDetail === 'users' && (
               <div>
-                <h4 className="font-semibold mb-4 flex items-center">
+                <h4 className="font-semibold mb-4 flex items-center dark:text-gray-100">
                   <Users className="h-5 w-5 mr-2" />
                   สถิติผู้ใช้งาน
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{dashboardData.users.total}</div>
-                    <div className="text-sm text-blue-800">ผู้ใช้งานทั้งหมด</div>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{dashboardData.users.total}</div>
+                    <div className="text-sm text-blue-800 dark:text-blue-300">ผู้ใช้งานทั้งหมด</div>
                   </div>
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{dashboardData.users.active}</div>
-                    <div className="text-sm text-green-800">ผู้ใช้งานที่ใช้งาน</div>
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{dashboardData.users.active}</div>
+                    <div className="text-sm text-green-800 dark:text-green-300">ผู้ใช้งานที่ใช้งาน</div>
                   </div>
-                  <div className="p-4 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">{dashboardData.users.newThisMonth}</div>
-                    <div className="text-sm text-purple-800">ผู้ใช้งานใหม่เดือนนี้</div>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dashboardData.users.newThisMonth}</div>
+                    <div className="text-sm text-purple-800 dark:text-purple-300">ผู้ใช้งานใหม่เดือนนี้</div>
                   </div>
-                  <div className="p-4 bg-orange-50 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">{formatPercentage(dashboardData.users.growthRate)}</div>
-                    <div className="text-sm text-orange-800">อัตราการเติบโต</div>
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatPercentage(dashboardData.users.growthRate)}</div>
+                    <div className="text-sm text-orange-800 dark:text-orange-300">อัตราการเติบโต</div>
                   </div>
                 </div>
               </div>
@@ -1082,65 +1189,63 @@ export default function AdminDashboard() {
             
             {selectedDetail === 'performance' && (
               <div>
-                <h4 className="font-semibold mb-4 flex items-center">
+                <h4 className="font-semibold mb-4 flex items-center dark:text-gray-100">
                   <Target className="h-5 w-5 mr-2" />
-                  ตัวชี้วัดประสิทธิภาพ
+                  ข้อมูลประสิทธิภาพ
                 </h4>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <div className="text-lg font-bold text-green-600">
-                        {formatPercentage(dashboardData.performance.profitMargin)}
-                      </div>
-                      <div className="text-sm text-green-800">Profit Margin</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                      {formatPercentage(dashboardData.performance.profitMargin)}
                     </div>
-                    <div className="p-4 bg-blue-50 rounded-lg">
-                      <div className="text-lg font-bold text-blue-600">
-                        {formatPercentage(dashboardData.performance.roi)}
-                      </div>
-                      <div className="text-sm text-blue-800">ROI</div>
-                    </div>
-                    <div className="p-4 bg-orange-50 rounded-lg">
-                      <div className="text-lg font-bold text-orange-600">
-                        {formatCurrency(dashboardData.performance.averageDailyProfit)}
-                      </div>
-                      <div className="text-sm text-orange-800">กำไรเฉลี่ย/วัน</div>
-                    </div>
-                    <div className="p-4 bg-purple-50 rounded-lg">
-                      <div className="text-lg font-bold text-purple-600">
-                        {dashboardData.performance.breakEvenPoint.toFixed(1)}
-                      </div>
-                      <div className="text-sm text-purple-800">จุดคุ้มทุน (วัน)</div>
-                    </div>
+                    <div className="text-sm text-green-800 dark:text-green-300">Profit Margin</div>
                   </div>
-                  
-                  <div className="p-4 bg-indigo-50 rounded-lg">
-                    <h5 className="font-semibold text-indigo-800 mb-2">ข้อมูลยอดถูกรางวัล</h5>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-lg font-bold text-indigo-600">
-                          {formatCurrency(dashboardData.performance.totalPayout)}
-                        </div>
-                        <div className="text-sm text-indigo-800">ยอดจ่ายรางวัลรวม</div>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                      {formatPercentage(dashboardData.performance.roi)}
+                    </div>
+                    <div className="text-sm text-blue-800 dark:text-blue-300">ROI</div>
+                  </div>
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                      {formatCurrency(dashboardData.performance.averageDailyProfit)}
+                    </div>
+                    <div className="text-sm text-orange-800 dark:text-orange-300">กำไรเฉลี่ย/วัน</div>
+                  </div>
+                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                      {dashboardData.performance.breakEvenPoint.toFixed(1)}
+                    </div>
+                    <div className="text-sm text-purple-800 dark:text-purple-300">จุดคุ้มทุน (วัน)</div>
+                  </div>
+                </div>
+                
+                <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg mt-4">
+                  <h5 className="font-semibold text-indigo-800 dark:text-indigo-300 mb-2">ข้อมูลยอดถูกรางวัล</h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                        {formatCurrency(dashboardData.performance.totalPayout)}
                       </div>
-                      <div>
-                        <div className="text-lg font-bold text-indigo-600">
-                          {formatPercentage(dashboardData.performance.payoutRate)}
-                        </div>
-                        <div className="text-sm text-indigo-800">อัตราการจ่ายรางวัล</div>
+                      <div className="text-sm text-indigo-800 dark:text-indigo-300">ยอดจ่ายรางวัลรวม</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                        {formatPercentage(dashboardData.performance.payoutRate)}
                       </div>
-                      <div>
-                        <div className="text-lg font-bold text-indigo-600">
-                          {formatCurrency(dashboardData.performance.totalOriginalPayout)}
-                        </div>
-                        <div className="text-sm text-indigo-800">ยอดจ่ายรางวัลเดิม</div>
+                      <div className="text-sm text-indigo-800 dark:text-indigo-300">อัตราการจ่ายรางวัล</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                        {formatCurrency(dashboardData.performance.totalOriginalPayout)}
                       </div>
-                      <div>
-                        <div className="text-lg font-bold text-indigo-600">
-                          {formatCurrency(dashboardData.performance.numberCapSavings)}
-                        </div>
-                        <div className="text-sm text-indigo-800">ประหยัดจากเลขอั้น</div>
+                      <div className="text-sm text-indigo-800 dark:text-indigo-300">ยอดจ่ายรางวัลเดิม</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+                        {formatCurrency(dashboardData.performance.numberCapSavings)}
                       </div>
+                      <div className="text-sm text-indigo-800 dark:text-indigo-300">ประหยัดจากเลขอั้น</div>
                     </div>
                   </div>
                 </div>
@@ -1149,44 +1254,44 @@ export default function AdminDashboard() {
 
             {selectedDetail === 'analytics' && (
               <div>
-                <h4 className="font-semibold mb-4 flex items-center">
+                <h4 className="font-semibold mb-4 flex items-center dark:text-gray-100">
                   <Star className="h-5 w-5 mr-2" />
                   การวิเคราะห์ขั้นสูง
                 </h4>
                 <div className="space-y-4">
-                  <div className="p-4 bg-indigo-50 rounded-lg">
-                    <div className="text-lg font-bold text-indigo-600">
+                  <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
                       การวิเคราะห์ความเสี่ยง
                     </div>
-                    <div className="text-sm text-indigo-800 mt-2">
+                    <div className="text-sm text-indigo-800 dark:text-indigo-300 mt-2">
                       Sharpe Ratio: {dashboardData.performance.riskMetrics.sharpeRatio.toFixed(2)}
                     </div>
-                    <div className="text-sm text-indigo-800">
+                    <div className="text-sm text-indigo-800 dark:text-indigo-300">
                       Volatility: {dashboardData.performance.riskMetrics.volatility.toFixed(2)}
                     </div>
                   </div>
-                  <div className="p-4 bg-teal-50 rounded-lg">
-                    <div className="text-lg font-bold text-teal-600">
+                  <div className="p-4 bg-teal-50 dark:bg-teal-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-teal-600 dark:text-teal-400">
                       การประหยัดจากเลขอั้น
                     </div>
-                    <div className="text-sm text-teal-800 mt-2">
+                    <div className="text-sm text-teal-800 dark:text-teal-300 mt-2">
                       ประหยัด: {formatCurrency(dashboardData.performance.numberCapSavings)}
                     </div>
-                    <div className="text-sm text-teal-800">
+                    <div className="text-sm text-teal-800 dark:text-teal-300">
                       เปอร์เซ็นต์: {formatPercentage(dashboardData.performance.numberCapSavingsPercentage)}
                     </div>
                   </div>
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <div className="text-lg font-bold text-green-600">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="text-lg font-bold text-green-600 dark:text-green-400">
                       ข้อมูลยอดถูกรางวัล
                     </div>
-                    <div className="text-sm text-green-800 mt-2">
+                    <div className="text-sm text-green-800 dark:text-green-300 mt-2">
                       ยอดจ่ายรางวัลรวม: {formatCurrency(dashboardData.performance.totalPayout)}
                     </div>
-                    <div className="text-sm text-green-800">
+                    <div className="text-sm text-green-800 dark:text-green-300">
                       อัตราการจ่าย: {formatPercentage(dashboardData.performance.payoutRate)}
                     </div>
-                    <div className="text-sm text-green-800">
+                    <div className="text-sm text-green-800 dark:text-green-300">
                       ยอดจ่ายรางวัลเดิม: {formatCurrency(dashboardData.performance.totalOriginalPayout)}
                     </div>
                   </div>

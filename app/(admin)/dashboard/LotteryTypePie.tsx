@@ -50,6 +50,24 @@ export default function LotteryTypePie({
 }: LotteryTypePieProps) {
   const total = values.reduce((sum, value) => sum + value, 0)
   
+  // ถ้าไม่มีข้อมูล ให้แสดงข้อความแจ้งเตือน
+  if (!labels || labels.length === 0 || !values || values.length === 0 || total === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-full h-full flex items-center justify-center"
+      >
+        <div className="text-center">
+          <div className="text-6xl font-bold text-gray-300 mb-4">0</div>
+          <div className="text-lg text-gray-500 mb-2">รายการทั้งหมด</div>
+          <div className="text-sm text-gray-400">ไม่มีข้อมูลประเภทหวย</div>
+        </div>
+      </motion.div>
+    )
+  }
+  
   const chartData = {
     labels: labels.map((label, index) => {
       const percentage = total > 0 ? ((values[index] / total) * 100).toFixed(1) : '0'

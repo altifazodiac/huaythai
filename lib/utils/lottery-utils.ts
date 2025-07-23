@@ -11,10 +11,10 @@ interface LotteryResult {
 // Function to create a map of lottery results for quick lookup
 export const createResultsMap = async (supabase: any, startDate?: string, endDate?: string): Promise<Record<string, LotteryResult>> => {
   try {
-    let query = supabase
-      .from('lottery_results')
+  let query = supabase
+    .from('lottery_results')
       .select('*');
-
+  
     if (startDate) query = query.gte('draw_date', startDate);
     if (endDate) query = query.lte('draw_date', endDate);
 

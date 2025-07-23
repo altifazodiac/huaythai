@@ -781,7 +781,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                           </Button>
                         </div>
                         {selectedDate && (
-                          <p className="text-xs  ">
+                          <p className="text-xs text-muted-foreground">
                             กำลังดูข้อมูลวันที่: {formatDate(selectedDate)}
                           </p>
                         )}
@@ -944,7 +944,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                             transition={{ delay: index * 0.1 }}
                           >
                             <Card className="overflow-hidden">
-                              <CardHeader className={`border-b ${period === 'monthly' ? 'bg-gradient-to-r from-purple-50 to-indigo-50 py-4' : 'bg-gradient-to-r from-blue-50 to-purple-50'}`}>
+                              <CardHeader className={`border-b ${period === 'monthly' ? 'bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 py-4' : 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20'}`}>
                                 <div className={`flex items-center ${period === 'monthly' ? 'justify-center' : 'justify-between'}`}>
                                   <div className="flex items-center space-x-4">
                                     <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full">
@@ -985,7 +985,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                           {dateReport.total_profit_loss >= 0 ? 'กำไร' : 'ขาดทุน'}
                                         </div>
                                       </div>
-                                      <div className="text-right rounded-md border border-green-200 bg-green-100 p-4">
+                                      <div className="text-right rounded-md border border-green-200 bg-green-100 dark:border-green-800 dark:bg-green-900/20 p-4">
                                         <div className={`font-semibold text-lg ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
                                           {formatCurrency(dateReport.total_net_amount)}
                                         </div>
@@ -1014,10 +1014,10 @@ const LotteryReportSummaryPage: React.FC = () => {
                                     <TableBody>
                                       {period === 'monthly' ? (
                                         // สำหรับรายเดือน แสดงเฉพาะยอดรวม
-                                        <TableRow className="bg-gradient-to-r from-purple-50 to-indigo-50 font-bold">
+                                        <TableRow className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 font-bold">
                                           <TableCell className="font-medium">
                                             <div className="flex items-center space-x-2">
-                                              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
                                                 <BarChart3 className="h-4 w-4 text-purple-600" />
                                               </div>
                                               <div>
@@ -1061,8 +1061,8 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(dateReport.total_system_fee)}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100 p-2">
-                                            <span className={`font-medium ${dateReport.total_final_balance >= 0 ? 'text-emerald-900' : 'text-orange-600'}`}>
+                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
+                                            <span className={`font-medium ${dateReport.total_final_balance >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
                                               {formatCurrency(dateReport.total_final_balance)}
                                             </span>
                                           </TableCell>
@@ -1098,11 +1098,11 @@ const LotteryReportSummaryPage: React.FC = () => {
                                                   {formatCurrency(user.total_commission)}
                                                 </span>
                                               </TableCell>
-                                              <TableCell className="text-right">
-                                                <span className="text-red-600 font-medium">
-                                                  {formatCurrency(user.total_reward)}
-                                                </span>
-                                              </TableCell>
+                                                                                        <TableCell className="text-right">
+                                            <span className="text-red-600 font-medium">
+                                              {formatCurrency(user.total_reward)}
+                                            </span>
+                                          </TableCell>
                                           <TableCell className="text-right">
                                             <span className={`font-medium ${user.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                               {user.total_profit_loss >= 0 ? (
@@ -1118,8 +1118,8 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(user.total_system_fee)}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100 p-2">
-                                            <span className={`font-medium ${user.total_final_balance >= 0 ? 'text-emerald-900' : 'text-orange-600'}`}>
+                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
+                                            <span className={`font-medium ${user.total_final_balance >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
                                               {formatCurrency(user.total_final_balance)}
                                             </span>
                                           </TableCell>
@@ -1136,9 +1136,9 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               <TableCell className="text-right text-blue-600">
                                                 {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_commission, 0))}
                                               </TableCell>
-                                              <TableCell className="text-right text-red-600">
-                                                {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_reward, 0))}
-                                              </TableCell>
+                                                                                        <TableCell className="text-right text-red-600">
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_reward, 0))}
+                                          </TableCell>
                                           <TableCell className="text-right">
                                             <span className={dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
                                               {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
@@ -1147,7 +1147,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                           <TableCell className="text-right text-blue-600">
                                             {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_system_fee, 0))}
                                           </TableCell>
-                                          <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-100">
+                                          <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100">
                                             {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_final_balance, 0))}
                                           </TableCell>
                                             </TableRow>
@@ -1194,7 +1194,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                 </TableHeader>
                                 <TableBody>
                                   {filteredDateData.map((dateReport, index) => (
-                                    <TableRow key={dateReport.date} className={`hover:bg-muted/30 ${period === 'monthly' ? 'bg-gradient-to-r from-blue-50 to-purple-50 font-bold' : ''}`}>
+                                    <TableRow key={dateReport.date} className={`hover:bg-muted/30 ${period === 'monthly' ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 font-bold' : ''}`}>
                                       <TableCell className="font-medium">
                                         <div className="flex items-center space-x-2">
                                           {period === 'daily' && <Calendar className="h-4 w-4 text-muted-foreground" />}
@@ -1373,7 +1373,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                       </div>
 
                       {/* Summary Bar */}
-                      <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg border">
+                      <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border dark:border-gray-700">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">สรุปการคำนวณ</h3>
                           <Badge variant="outline" className="text-xs">
@@ -1381,19 +1381,19 @@ const LotteryReportSummaryPage: React.FC = () => {
                           </Badge>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">
                             <span className="text-gray-600 dark:text-gray-400">กำไร/ขาดทุนรวม:</span>
                             <span className="font-semibold text-emerald-600">
                               {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0))}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">
                             <span className="text-gray-600 dark:text-gray-400">ค่าบริหารระบบ (5%):</span>
                             <span className="font-semibold text-blue-600">
                               {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05)}
                             </span>
                           </div>
-                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border">
+                          <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">
                             <span className="text-gray-600 dark:text-gray-400">ยอดคงเหลือสุดท้าย:</span>
                             <span className="font-semibold text-purple-600">
                               {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
