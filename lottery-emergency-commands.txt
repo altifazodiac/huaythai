@@ -1,0 +1,75 @@
+# 🎰 คำสั่งฉุกเฉินสำหรับหยุดโปรเจคหวยออนไลน์
+
+# คัดลอกคำสั่งเหล่านี้และรันบน VPS โดยตรง:
+
+# 1. ไปยังโฟลเดอร์โปรเจค
+cd /root/huaylotto
+
+# 2. หยุด PM2 processes ทั้งหมด
+pm2 stop all
+pm2 delete all
+pm2 kill
+pm2 save
+
+# 3. ลบ cron jobs ทั้งหมด
+crontab -r
+
+# 4. หยุด bun processes ทั้งหมด (สาเหตุหลักของปัญหา)
+pkill -9 -f bun
+
+# 5. หยุด background processes ที่เกี่ยวข้อง
+pkill -9 -f "background-task-processor"
+pkill -9 -f "start-background-processor"
+pkill -9 -f "scheduler"
+pkill -9 -f "import-lottery-results"
+pkill -9 -f "send-lottery-results"
+pkill -9 -f "setup-dynamic-cron"
+pkill -9 -f "task-runner"
+pkill -9 -f "lottery"
+
+# 6. หยุด node processes ที่เกี่ยวข้อง
+pkill -9 -f "node.*lottery"
+pkill -9 -f "node.*background"
+pkill -9 -f "node.*scheduler"
+
+# 7. หยุด processes ที่ใช้ port
+lsof -ti:3000 | xargs kill -9
+lsof -ti:3001 | xargs kill -9
+lsof -ti:3002 | xargs kill -9
+
+# 8. หยุด Next.js server
+pkill -9 -f "next"
+pkill -9 -f "npm"
+pkill -9 -f "bun.*dev"
+
+# 9. ตรวจสอบสถานะ
+echo "=== ตรวจสอบ bun processes ==="
+ps aux | grep bun | grep -v grep
+
+echo "=== ตรวจสอบ node processes ==="
+ps aux | grep node | grep -v grep
+
+echo "=== ตรวจสอบ background processes ==="
+ps aux | grep -E "(background|scheduler|lottery)" | grep -v grep
+
+echo "=== ตรวจสอบ PM2 status ==="
+pm2 status
+
+echo "=== ตรวจสอบ cron jobs ==="
+crontab -l
+
+echo "=== ตรวจสอบ load average ==="
+uptime
+
+echo "=== ตรวจสอบ memory usage ==="
+free -h
+
+# 10. หากยังมี processes อยู่ ให้ใช้คำสั่งนี้
+# killall -9 bun
+# killall -9 node
+
+# 11. หากต้องการรีสตาร์ทระบบ
+# reboot
+
+# 12. หลังจากรีสตาร์ท ให้ตรวจสอบว่าไม่มี processes ทำงาน
+# ps aux | grep -E "(bun|node)" | grep -v grep 
