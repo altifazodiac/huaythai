@@ -1,0 +1,34 @@
+# 🚨 Emergency PM2 Reset
+
+# 1. หยุด PM2 daemon
+pm2 kill
+
+# 2. ลบ PM2 cache และ data
+rm -rf ~/.pm2
+rm -rf /root/.pm2
+
+# 3. Kill processes ที่เกี่ยวข้อง
+pkill -f "pm2"
+pkill -f "next"
+pkill -f "node.*lottery"
+pkill -f "bun.*lottery"
+
+# 4. ตรวจสอบ port
+lsof -i:3000
+lsof -i:3001
+lsof -i:3002
+
+# 5. เริ่มต้นใหม่
+pm2 start ecosystem.config.js
+
+# 6. ตรวจสอบสถานะ
+pm2 status
+pm2 logs --lines 5
+
+# 7. ทดสอบเว็บไซต์
+curl -I http://localhost:3000
+
+# หากยังไม่ได้ ให้ลอง:
+# - รีสตาร์ทระบบ: reboot
+# - ตรวจสอบ nginx: systemctl status nginx
+# - รีสตาร์ท nginx: systemctl restart nginx 
