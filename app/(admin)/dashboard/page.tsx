@@ -108,6 +108,38 @@ const formatPercentage = (value: number) => {
   return `${value.toFixed(1)}%`;
 };
 
+// Utility function to get date range display text
+const getDateRangeDisplay = (dateRange: string) => {
+  switch (dateRange) {
+    case 'day':
+      return 'วันนี้';
+    case 'week':
+      return '7 วันล่าสุด';
+    case 'month':
+      return '30 วันล่าสุด';
+    case 'quarter':
+      return '90 วันล่าสุด';
+    default:
+      return '7 วันล่าสุด';
+  }
+};
+
+// Utility function to get date range suffix
+const getDateRangeSuffix = (dateRange: string) => {
+  switch (dateRange) {
+    case 'day':
+      return ' (วันนี้)';
+    case 'week':
+      return ' (7 วันล่าสุด)';
+    case 'month':
+      return ' (30 วันล่าสุด)';
+    case 'quarter':
+      return ' (90 วันล่าสุด)';
+    default:
+      return ' (7 วันล่าสุด)';
+  }
+};
+
 // Performance indicator component
 const PerformanceIndicator = ({ value, previousValue, label, isInverted = false }: { 
   value: number; 
@@ -260,6 +292,15 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">
             ภาพรวมข้อมูลการขายหวยและสถิติต่างๆ แบบครบถ้วนและละเอียด
           </p>
+          <div className="flex items-center space-x-2 mt-2">
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+              <Calendar className="h-3 w-3 mr-1" />
+              {getDateRangeDisplay(dateRange)}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              ข้อมูลสด
+            </Badge>
+          </div>
         </div>
         
         <div className="flex items-center space-x-3">
@@ -331,6 +372,7 @@ export default function AdminDashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="day">วันนี้</SelectItem>
                         <SelectItem value="week">7 วันล่าสุด</SelectItem>
                         <SelectItem value="month">30 วันล่าสุด</SelectItem>
                         <SelectItem value="quarter">90 วันล่าสุด</SelectItem>
@@ -358,7 +400,7 @@ export default function AdminDashboard() {
                       </Badge>
                       <Badge variant="outline">
                         <Calendar className="h-3 w-3 mr-1" />
-                        {dateRange === 'week' ? '7 วัน' : dateRange === 'month' ? '30 วัน' : '90 วัน'}
+                        {getDateRangeDisplay(dateRange)}
                       </Badge>
                     </div>
                   </div>
@@ -395,13 +437,16 @@ export default function AdminDashboard() {
         
         <TabsContent value="overview" className="space-y-6">
           {/* Debug log */}
-          {console.log('🔍 Dashboard lotteryTypes data:', {
-            total: dashboardData.lotteryTypes.total,
-            popular: dashboardData.lotteryTypes.popular,
-            popularLength: dashboardData.lotteryTypes.popular.length,
-            labels: dashboardData.lotteryTypes.popular.map(item => item.name),
-            values: dashboardData.lotteryTypes.popular.map(item => item.revenue)
-          })}
+          {(() => {
+            console.log('🔍 Dashboard lotteryTypes data:', {
+              total: dashboardData.lotteryTypes.total,
+              popular: dashboardData.lotteryTypes.popular,
+              popularLength: dashboardData.lotteryTypes.popular.length,
+              labels: dashboardData.lotteryTypes.popular.map(item => item.name),
+              values: dashboardData.lotteryTypes.popular.map(item => item.revenue)
+            });
+            return null;
+          })()}
           
           {/* Executive Summary Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -420,7 +465,10 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-gray-400">
                     <Calculator className="h-3 w-3" />
-                    <span>เฉลี่ย: {formatCurrency(dashboardData.performance.averageDailySales)}/วัน</span>
+                    <span>
+                      {dateRange === 'day' ? 'วันนี้' : 
+                       `เฉลี่ย: ${formatCurrency(dashboardData.performance.averageDailySales)}/วัน`}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -780,7 +828,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <CardDescription className="dark:text-gray-400">
-                    แสดงยอดซื้อและยอดจ่ายรางวัลรายวัน พร้อมกำไร/ขาดทุน
+                    แสดงยอดซื้อและยอดจ่ายรางวัลรายวัน พร้อมกำไร/ขาดทุน{getDateRangeSuffix(dateRange)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -809,7 +857,7 @@ export default function AdminDashboard() {
                     สัดส่วนประเภทหวย
                   </CardTitle>
                   <CardDescription className="dark:text-gray-400">
-                    ตามยอดขาย ({dashboardData.lotteryTypes.total} ประเภท)
+                    ตามยอดขาย ({dashboardData.lotteryTypes.total} ประเภท){getDateRangeSuffix(dateRange)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -873,7 +921,7 @@ export default function AdminDashboard() {
                     สถิติผู้ใช้งาน
                   </CardTitle>
                   <CardDescription className="dark:text-gray-400">
-                    จำนวนผู้ใช้งานรายวัน ({dashboardData.users.total} คนทั้งหมด)
+                    จำนวนผู้ใช้งานรายวัน ({dashboardData.users.total} คนทั้งหมด){getDateRangeSuffix(dateRange)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -900,7 +948,7 @@ export default function AdminDashboard() {
                     จำนวนบิลที่ขาย
                   </CardTitle>
                   <CardDescription className="dark:text-gray-400">
-                    จำนวนบิลที่ขายได้ในแต่ละวัน
+                    จำนวนบิลที่ขายได้ในแต่ละวัน{getDateRangeSuffix(dateRange)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -926,10 +974,13 @@ export default function AdminDashboard() {
           <motion.div variants={itemVariants}>
             <Card className="bg-white dark:bg-gray-800 mt-20">
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center dark:text-gray-100">
                   <Activity className="h-5 w-5 mr-2" />
-                  การกระจายตัวของสถานะบิล
+                  การกระจายตัวของสถานะบิล{getDateRangeSuffix(dateRange)}
                 </CardTitle>
+                <CardDescription className="dark:text-gray-400">
+                  สถิติการกระจายตัวของสถานะบิลตามช่วงเวลาที่เลือก
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -957,8 +1008,11 @@ export default function AdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center dark:text-gray-100">
                   <Star className="h-5 w-5 mr-2" />
-                  ตัวชี้วัดประสิทธิภาพ
+                  ตัวชี้วัดประสิทธิภาพ{getDateRangeSuffix(dateRange)}
                 </CardTitle>
+                <CardDescription className="dark:text-gray-400">
+                  ข้อมูลประสิทธิภาพและ KPI ตามช่วงเวลาที่เลือก
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -999,8 +1053,11 @@ export default function AdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center dark:text-gray-100">
                   <Target className="h-5 w-5 mr-2" />
-                  ประสิทธิภาพตามประเภทหวย
+                  ประสิทธิภาพตามประเภทหวย{getDateRangeSuffix(dateRange)}
                 </CardTitle>
+                <CardDescription className="dark:text-gray-400">
+                  การเปรียบเทียบประสิทธิภาพของแต่ละประเภทหวยตามช่วงเวลาที่เลือก
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -1031,7 +1088,20 @@ export default function AdminDashboard() {
         
         <TabsContent value="commission" className="space-y-6">
           <motion.div variants={itemVariants}>
-            <CommissionChart data={dashboardData.commission} />
+            <Card className="border-0 shadow-lg dark:shadow-gray-800/20">
+              <CardHeader>
+                <CardTitle className="flex items-center dark:text-gray-100">
+                  <Award className="h-5 w-5 mr-2" />
+                  ข้อมูลค่าคอมมิชชั่น{getDateRangeSuffix(dateRange)}
+                </CardTitle>
+                <CardDescription className="dark:text-gray-400">
+                  สถิติค่าคอมมิชชั่นและการจ่ายเงินตามช่วงเวลาที่เลือก
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CommissionChart data={dashboardData.commission} />
+              </CardContent>
+            </Card>
           </motion.div>
         </TabsContent>
         
@@ -1128,7 +1198,7 @@ export default function AdminDashboard() {
             selectedDetail === 'winnings' ? 'รางวัล' : 
             selectedDetail === 'analytics' ? 'การวิเคราะห์' : 'รายงาน'
           }`}
-          subtitle={`ข้อมูลรายละเอียดช่วง ${dateRange === 'week' ? '7 วัน' : dateRange === 'month' ? '30 วัน' : '90 วัน'} ล่าสุด`}
+          subtitle={`ข้อมูลรายละเอียดช่วง ${getDateRangeDisplay(dateRange)} ล่าสุด`}
           size="lg"
         >
           <div className="space-y-6">

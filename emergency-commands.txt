@@ -1,0 +1,53 @@
+# 🚨 คำสั่งฉุกเฉินสำหรับหยุดการทำงานบน VPS
+
+# คัดลอกคำสั่งเหล่านี้และรันบน VPS โดยตรง:
+
+# 1. หยุด bun processes ทั้งหมด (ใช้ -9 เพื่อบังคับหยุด)
+pkill -9 -f bun
+
+# 2. หยุด node processes ทั้งหมด
+pkill -9 -f node
+
+# 3. หยุด PM2 processes
+pm2 stop all
+pm2 delete all
+pm2 kill
+
+# 4. ลบ cron jobs
+crontab -r
+
+# 5. หยุด processes ที่ใช้ port
+lsof -ti:3000 | xargs kill -9
+lsof -ti:3001 | xargs kill -9
+lsof -ti:3002 | xargs kill -9
+
+# 6. หยุด background processes ที่เกี่ยวข้อง
+pkill -9 -f "background-task-processor"
+pkill -9 -f "start-background-processor"
+pkill -9 -f "scheduler"
+pkill -9 -f "import-lottery-results"
+pkill -9 -f "send-lottery-results"
+pkill -9 -f "setup-dynamic-cron"
+
+# 7. ตรวจสอบสถานะ
+echo "=== ตรวจสอบ bun processes ==="
+ps aux | grep bun | grep -v grep
+
+echo "=== ตรวจสอบ node processes ==="
+ps aux | grep node | grep -v grep
+
+echo "=== ตรวจสอบ load average ==="
+uptime
+
+echo "=== ตรวจสอบ memory usage ==="
+free -h
+
+# 8. หากยังมี processes อยู่ ให้ใช้คำสั่งนี้
+# killall -9 bun
+# killall -9 node
+
+# 9. หากต้องการรีสตาร์ทระบบ
+# reboot
+
+# 10. หลังจากรีสตาร์ท ให้ตรวจสอบว่าไม่มี processes ทำงาน
+# ps aux | grep -E "(bun|node)" | grep -v grep 

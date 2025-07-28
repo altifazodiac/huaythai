@@ -292,12 +292,13 @@ export interface DashboardData {
   }
 }
 
-export async function fetchDashboardData(dateRange: string = 'week'): Promise<DashboardData> {
+// ฟังก์ชันใหม่: ดึงข้อมูลทั้งหมดแล้ว filter ตามช่วงเวลา
+export async function fetchAllDashboardData(): Promise<DashboardData> {
   try {
     const now = new Date()
-    const daysBack = dateRange === 'week' ? 7 : dateRange === 'month' ? 30 : 90
-    const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
-    const previousStartDate = new Date(startDate.getTime() - daysBack * 24 * 60 * 60 * 1000)
+    // ดึงข้อมูลย้อนหลัง 1 ปี เพื่อให้มีข้อมูลครบถ้วน
+    const startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+    const previousStartDate = new Date(startDate.getTime() - 365 * 24 * 60 * 60 * 1000)
     
     // 🔧 แก้ไข: สร้าง resultsMap เองเหมือนหน้า summary
     // ใช้วิธีการเดียวกับหน้า summary เพื่อให้ "ยอดจ่าย" ตรงกัน
@@ -360,7 +361,7 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
       ticketsData.totalRevenue,
       ticketsData.totalPayout,
       ticketsData.totalOriginalPayout,
-      daysBack,
+      365, // ใช้ 365 วันสำหรับข้อมูลทั้งหมด
       ticketsData.numberCapAffectedTickets || 0
     )
 
@@ -369,7 +370,7 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
       usersData.dailyStats,
       ticketsData.dailyStats,
       performance,
-      daysBack
+      365 // ใช้ 365 วันสำหรับข้อมูลทั้งหมด
     )
 
     return {
@@ -400,6 +401,150 @@ export async function fetchDashboardData(dateRange: string = 'week'): Promise<Da
       commission: commissionData,
       analytics
     }
+  } catch (error) {
+    console.error('Error fetching all dashboard data:', error)
+    return getEmptyDashboardData()
+  }
+}
+
+// ฟังก์ชันใหม่: Filter ข้อมูลตามช่วงเวลา
+export function filterDashboardDataByDateRange(
+  allData: DashboardData, 
+  dateRange: string
+): DashboardData {
+  const now = new Date()
+  const daysBack = dateRange === 'day' ? 1 : dateRange === 'week' ? 7 : dateRange === 'month' ? 30 : 90
+  const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+  
+  // Filter daily revenue data
+  const filteredDailyRevenue = allData.revenue.dailyRevenue.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= startDate
+  })
+  
+  // Filter daily stats for tickets
+  const filteredDailyTicketStats = allData.tickets.dailyStats.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= startDate
+  })
+  
+  // Filter daily stats for users
+  const filteredDailyUserStats = allData.users.dailyStats.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= startDate
+  })
+  
+  // Filter daily commission data
+  const filteredDailyCommission = allData.commission.dailyCommission.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= startDate
+  })
+  
+  // Filter daily winnings data
+  const filteredDailyWinnings = allData.winning.dailyWinnings.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= startDate
+  })
+  
+  // Filter credit daily transactions
+  const filteredDailyCredit = allData.credit.dailyTransactions.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= startDate
+  })
+  
+  // Filter recent activities
+  const filteredRecentActivities = allData.recentActivities.filter(item => {
+    const itemDate = new Date(item.timestamp)
+    return itemDate >= startDate
+  })
+  
+  // Calculate totals for filtered period
+  const filteredTotalRevenue = filteredDailyRevenue.reduce((sum, item) => sum + item.revenue, 0)
+  const filteredTotalPayout = filteredDailyRevenue.reduce((sum, item) => sum + item.payout, 0)
+  const filteredTotalOriginalPayout = filteredDailyRevenue.reduce((sum, item) => sum + item.originalPayout, 0)
+  const filteredTotalSold = filteredDailyTicketStats.reduce((sum, item) => sum + item.sold, 0)
+  const filteredTotalPending = filteredDailyTicketStats.reduce((sum, item) => sum + item.pending, 0)
+  const filteredTotalCancelled = filteredDailyTicketStats.reduce((sum, item) => sum + item.cancelled, 0)
+  const filteredTotalCommission = filteredDailyCommission.reduce((sum, item) => sum + item.totalCommission, 0)
+  const filteredTotalWinnings = filteredDailyWinnings.reduce((sum, item) => sum + item.totalPrize, 0)
+  
+  // Calculate growth rate (compare with previous period)
+  const previousStartDate = new Date(startDate.getTime() - daysBack * 24 * 60 * 60 * 1000)
+  const previousDailyRevenue = allData.revenue.dailyRevenue.filter(item => {
+    const itemDate = new Date(item.date)
+    return itemDate >= previousStartDate && itemDate < startDate
+  })
+  const previousTotalRevenue = previousDailyRevenue.reduce((sum, item) => sum + item.revenue, 0)
+  const revenueGrowth = previousTotalRevenue > 0 ? ((filteredTotalRevenue - previousTotalRevenue) / previousTotalRevenue) * 100 : 0
+  
+  // Recalculate performance metrics for filtered period
+  const filteredPerformance = calculatePerformanceMetrics(
+    filteredDailyRevenue,
+    filteredTotalRevenue,
+    filteredTotalPayout,
+    filteredTotalOriginalPayout,
+    daysBack,
+    allData.performance.numberCapAffectedTickets || 0
+  )
+  
+  // Recalculate analytics for filtered period
+  const filteredAnalytics = calculateAnalytics(
+    filteredDailyUserStats,
+    filteredDailyTicketStats,
+    filteredPerformance,
+    daysBack
+  )
+  
+  return {
+    users: {
+      ...allData.users,
+      dailyStats: filteredDailyUserStats
+    },
+    revenue: {
+      total: filteredTotalRevenue,
+      growth: revenueGrowth,
+      byDrawDate: allData.revenue.byDrawDate, // Keep all for reference
+      dailyRevenue: filteredDailyRevenue,
+      monthlyComparison: allData.revenue.monthlyComparison, // Keep all for reference
+      revenueByLotteryType: allData.revenue.revenueByLotteryType // Keep all for reference
+    },
+    tickets: {
+      sold: filteredTotalSold,
+      sales: filteredTotalRevenue,
+      pending: filteredTotalPending,
+      cancelled: filteredTotalCancelled,
+      growthRate: revenueGrowth,
+      dailyStats: filteredDailyTicketStats,
+      typeDistribution: allData.tickets.typeDistribution, // Keep all for reference
+      statusDistribution: allData.tickets.statusDistribution // Keep all for reference
+    },
+    lotteryTypes: allData.lotteryTypes, // Keep all for reference
+    performance: filteredPerformance,
+    recentActivities: filteredRecentActivities,
+    credit: {
+      ...allData.credit,
+      dailyTransactions: filteredDailyCredit
+    },
+    winning: {
+      ...allData.winning,
+      dailyWinnings: filteredDailyWinnings
+    },
+    commission: {
+      ...allData.commission,
+      total: filteredTotalCommission,
+      dailyCommission: filteredDailyCommission
+    },
+    analytics: filteredAnalytics
+  }
+}
+
+export async function fetchDashboardData(dateRange: string = 'week'): Promise<DashboardData> {
+  try {
+    // ดึงข้อมูลทั้งหมดก่อน
+    const allData = await fetchAllDashboardData()
+    
+    // Filter ข้อมูลตามช่วงเวลาที่เลือก
+    return filterDashboardDataByDateRange(allData, dateRange)
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
     return getEmptyDashboardData()
