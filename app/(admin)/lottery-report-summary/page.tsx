@@ -185,7 +185,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   try {
     let query = supabase
       .from('lottery_tickets')
-      .select('*, lottery_ticket_items(*, lottery_sub_number(*)), profiles(name, percent)')
+      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
       .eq('status', 'confirmed');
 
     if (startDate) query = query.gte('draw_date', startDate);
@@ -194,19 +194,46 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
     const { data: tickets, error } = await query;
     if (error) throw error;
 
+    // ✅ ดึงข้อมูลจาก lottery_winning_bills
+    let winningQuery = supabase
+      .from('lottery_winning_bills')
+      .select('bill_number, total_prize, draw_date');
+
+    if (startDate) winningQuery = winningQuery.gte('draw_date', startDate);
+    if (endDate) winningQuery = winningQuery.lte('draw_date', endDate);
+
+    const { data: winningBills } = await winningQuery;
+
+    // สร้าง Map สำหรับ winningBills เพื่อค้นหาได้เร็ว
+    const winningBillsMap = new Map<string, number>();
+    (winningBills || []).forEach((bill: any) => {
+      winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
+    });
+
+          // ดึงข้อมูล profiles แยก
+    const userIds = [...new Set(tickets?.map((t: any) => t.user_id) || [])];
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, percent')
+      .in('id', userIds);
+    
+    if (profileError) throw profileError;
+    
+    const profilesMap = new Map<string, { name: string, percent: number }>();
+    (profiles || []).forEach((p: {id: string, name: string, percent: number}) => {
+      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+    });
+
     return (tickets || []).map((ticket: any) => {
-      let total_payout = 0; // ยอดจ่าย (payout) - ใช้การคำนวณเดียวกันกับหน้า summary
-      
-      (ticket.lottery_ticket_items || []).forEach((item: any) => {
-        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
-        total_payout += prize;
-      });
+      // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+      const total_payout = winningBillsMap.get(ticket.bill_number) || 0;
       
       const total_purchase_amount = Number(ticket.total_amount || 0);
       const profit_loss = total_purchase_amount - total_payout;
       
       // คำนวณ commission และอื่นๆ
-      const commission_percentage = ticket.profiles?.percent || 0;
+      const userProfile = profilesMap.get(ticket.user_id);
+      const commission_percentage = userProfile?.percent || 0;
       const commission_amount = total_purchase_amount * (commission_percentage / 100);
       const remaining_balance = profit_loss - commission_amount;
       const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
@@ -215,7 +242,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
         id: ticket.id,
         draw_date: ticket.draw_date,
         purchase_date: ticket.created_at,
-        user_name: ticket.profiles?.name || 'ไม่ระบุ',
+        user_name: userProfile?.name || 'ไม่ระบุ',
         user_id: ticket.user_id,
         total_purchase_amount,
         total_payout,
@@ -249,7 +276,7 @@ const calculateWinningsForItem = (
 
   const { digit_number, type_number, price_paid } = item.lottery_sub_number;
 
-  // 🔧 แก้ไข: สร้าง prizeCodePattern ให้ตรงกับข้อมูลในฐานข้อมูล
+  // 🔧 แก้ไข: ใช้ prize_code ที่ถูกต้องตามฐานข้อมูล (ภาษาไทย)
   let prizeCodePattern = '';
   if (type_number === 'โต๊ด') {
     prizeCodePattern = `${digit_number} ตัวโต๊ด`;
@@ -270,42 +297,55 @@ const calculateWinningsForItem = (
     return { prize: 0, isWinning: false };
   }
 
+  // 🔧 แก้ไข: ตรวจสอบรูปแบบของ numbers และเปรียบเทียบให้ถูกต้อง
+  const numbers = Array.isArray(item.numbers) ? item.numbers : [item.numbers];
+  const winningNumbers = Array.isArray(matchingResult.winning_number) 
+    ? matchingResult.winning_number 
+    : [matchingResult.winning_number];
+
   let matchedNumbers: string[] = [];
-  
-  if (type_number === 'โต๊ด') {
-    const winningSet = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
-    matchedNumbers = item.numbers.filter((num: string) => winningSet.has(num));
-  } else if (type_number === 'วิ่งบน' || type_number === 'วิ่งล่าง') {
-    const winningDigits = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
-    item.numbers.forEach((num: string) => {
-      for (const digit of num) {
-        if (winningDigits.has(digit)) {
-          matchedNumbers.push(num);
-          break;
-        }
+  let prize = 0;
+
+  // เปรียบเทียบเลขที่ซื้อกับเลขที่ออก
+  numbers.forEach((purchasedNumber: string) => {
+    winningNumbers.forEach((winningNumber: string) => {
+      // 🔧 แก้ไข: เปรียบเทียบเลขตามประเภทการเล่น
+      let isMatch = false;
+      
+      if (type_number === 'โต๊ด') {
+        // โต๊ด: เปรียบเทียบหมายเลขโดยตรง
+        isMatch = purchasedNumber === winningNumber;
+      } else if (type_number === 'บน' && digit_number === 2) {
+        // 2 ตัวบน: เปรียบเทียบ 2 หลักสุดท้าย
+        isMatch = purchasedNumber.endsWith(winningNumber);
+      } else if (type_number === 'ล่าง' && digit_number === 2) {
+        // 2 ตัวล่าง: เปรียบเทียบ 2 หลักแรก
+        isMatch = purchasedNumber.startsWith(winningNumber);
+      } else if (type_number === 'บน' && digit_number === 3) {
+        // 3 ตัวบน: เปรียบเทียบหมายเลขโดยตรง
+        isMatch = purchasedNumber === winningNumber;
+      } else if (type_number === 'วิ่งบน' || type_number === 'วิ่งล่าง') {
+        // วิ่ง: เปรียบเทียบตัวเลขแต่ละตัว
+        const purchasedDigits = purchasedNumber.split('');
+        const winningDigits = winningNumber.split('');
+        isMatch = purchasedDigits.some(digit => winningDigits.includes(digit));
+      }
+
+      if (isMatch) {
+        matchedNumbers.push(purchasedNumber);
+        // คำนวณเงินรางวัล
+        const effectiveRate = Number(price_paid) || 0;
+        prize += Number(item.amount || 0) * effectiveRate;
       }
     });
-  } else {
-    // 🔧 แก้ไข: สำหรับ 2 ตัวบน, 2 ตัวล่าง, 3 ตัวบน ให้เปรียบเทียบหมายเลขโดยตรง
-    matchedNumbers = item.numbers.filter((num: string) => {
-      // ตรวจสอบว่าหมายเลขตรงกับผลรางวัลหรือไม่
-      return num === matchingResult.winning_number;
-    });
-  }
+  });
 
-  if (matchedNumbers.length > 0) {
-    const effectiveRate = item.effective_prize_rate ?? price_paid ?? 0;
-    const prize = parseFloat(item.amount.toString()) * parseFloat(String(effectiveRate)) * matchedNumbers.length;
-    
-    return { 
-      prize, 
-      isWinning: true, 
-      winningNumberDisplay: matchingResult.winning_number, 
-      matchedNumber: matchedNumbers.join(', ')
-    };
-  }
-
-  return { prize: 0, isWinning: false };
+  return {
+    prize,
+    isWinning: matchedNumbers.length > 0,
+    winningNumberDisplay: winningNumbers.join(', '),
+    matchedNumber: matchedNumbers.join(', ')
+  };
 };
 
 // Function to get the latest draw date
@@ -349,13 +389,12 @@ const LotteryReportSummaryPage: React.FC = () => {
     data.forEach(transaction => {
       let groupKey: string;
       const date = new Date(transaction.draw_date);
-
+      
       switch (period) {
         case 'daily':
           groupKey = transaction.draw_date;
           break;
         case 'weekly':
-          // Get the start of the week (Sunday)
           const weekStart = new Date(date);
           weekStart.setDate(date.getDate() - date.getDay());
           groupKey = weekStart.toISOString().split('T')[0];
@@ -367,69 +406,72 @@ const LotteryReportSummaryPage: React.FC = () => {
           groupKey = transaction.draw_date;
       }
 
-              if (!groups[groupKey]) {
-          groups[groupKey] = {
-            date: groupKey,
-            total_users: 0,
-            total_purchase: 0,
-            total_reward: 0,
-            total_commission: 0,
-            total_remaining: 0,
-            total_profit_loss: 0,
-            total_net_amount: 0,
-            total_system_fee: 0,
-            total_final_balance: 0,
-            total_bills: 0,
-            total_transactions: 0,
-            users: [],
-            commission_rate_average: 0,
-            profit_margin_percentage: 0,
-          };
-        }
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          date: groupKey,
+          total_users: 0,
+          total_purchase: 0,
+          total_reward: 0,
+          total_commission: 0,
+          total_remaining: 0,
+          total_profit_loss: 0,
+          total_net_amount: 0,
+          total_system_fee: 0,
+          total_final_balance: 0,
+          total_bills: 0,
+          total_transactions: 0,
+          users: [],
+          commission_rate_average: 0,
+          profit_margin_percentage: 0
+        };
+      }
 
       const group = groups[groupKey];
       group.total_purchase += transaction.total_purchase_amount;
       group.total_reward += transaction.total_payout;
       group.total_commission += transaction.commission_amount;
       group.total_remaining += transaction.remaining_balance;
-              group.total_profit_loss += transaction.profit_loss;
-        group.total_net_amount += transaction.net_amount;
-        group.total_system_fee = group.total_profit_loss * 0.05;
-        group.total_final_balance = group.total_net_amount - group.total_system_fee;
-        group.total_bills += transaction.bill_count;
-        group.total_transactions += 1;
+      group.total_profit_loss += transaction.profit_loss;
+      group.total_net_amount += transaction.net_amount;
+      group.total_bills += transaction.bill_count;
+      group.total_transactions += 1;
 
-      // Group users within period
-      let userSummary = group.users.find(u => u.user_id === transaction.user_id);
-              if (!userSummary) {
-          userSummary = {
-            user_id: transaction.user_id,
-            user_name: transaction.user_name,
-            commission_percentage: transaction.commission_percentage,
-            total_purchase: 0,
-            total_reward: 0,
-            total_commission: 0,
-            total_remaining: 0,
-            total_profit_loss: 0,
-            total_net_amount: 0,
-            total_system_fee: 0,
-            total_final_balance: 0,
-            bill_count: 0,
-            transaction_count: 0,
-          };
-          group.users.push(userSummary);
-        }
+      // Calculate system fee (5% of net amount)
+      const systemFee = transaction.net_amount * 0.05;
+      group.total_system_fee += systemFee;
+      group.total_final_balance += (transaction.net_amount - systemFee);
+
+      // Find or create user summary
+      let userSummary = group.users.find((u: UserSummary) => u.user_id === transaction.user_id);
+      if (!userSummary) {
+        userSummary = {
+          user_id: transaction.user_id,
+          user_name: transaction.user_name,
+          commission_percentage: transaction.commission_percentage,
+          total_purchase: 0,
+          total_reward: 0,
+          total_commission: 0,
+          total_remaining: 0,
+          total_profit_loss: 0,
+          total_net_amount: 0,
+          total_system_fee: 0,
+          total_final_balance: 0,
+          bill_count: 0,
+          transaction_count: 0
+        };
+        group.users.push(userSummary);
+      }
 
       userSummary.total_purchase += transaction.total_purchase_amount;
       userSummary.total_reward += transaction.total_payout;
       userSummary.total_commission += transaction.commission_amount;
       userSummary.total_remaining += transaction.remaining_balance;
-              userSummary.total_profit_loss += transaction.profit_loss;
-        userSummary.total_net_amount += transaction.net_amount;
-        userSummary.total_system_fee = userSummary.total_profit_loss * 0.05;
-        userSummary.total_final_balance = userSummary.total_net_amount - userSummary.total_system_fee;
-        userSummary.bill_count += transaction.bill_count;
-        userSummary.transaction_count += 1;
+      userSummary.total_profit_loss += transaction.profit_loss;
+      userSummary.total_net_amount += transaction.net_amount;
+      userSummary.total_system_fee += systemFee;
+      userSummary.total_final_balance += (transaction.net_amount - systemFee);
+      userSummary.bill_count += transaction.bill_count;
+      userSummary.transaction_count += 1;
     });
 
     // Calculate percentages and set user count
@@ -536,14 +578,15 @@ const LotteryReportSummaryPage: React.FC = () => {
         return acc;
       }, {});
       
-      const data = await fetchLotteryReportData(supabase, resultsMap, startDate, endDate);
+      // ดึงข้อมูล lottery tickets
+      const reportData = await fetchLotteryReportData(supabase, resultsMap, startDate, endDate);
       
-      setReportData(data);
+      setReportData(reportData);
 
-      // Group data by period
-      const groupedData = groupDataByPeriod(data, period);
+            // Group data by period
+      const groupedData = groupDataByPeriod(reportData, period);
 
-      // Sort grouped data
+            // Sort grouped data
       const sortedGroupedData = groupedData.sort((a, b) => {
         switch (sortBy) {
           case 'date':
@@ -568,7 +611,8 @@ const LotteryReportSummaryPage: React.FC = () => {
       });
 
       setDateGroupedData(sortedGroupedData);
-    } catch (err) {
+      
+            } catch (err) {
       console.error('Error loading data:', err);
       setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
     } finally {

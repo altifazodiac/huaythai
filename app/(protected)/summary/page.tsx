@@ -217,7 +217,7 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
   try {
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount, user_id, lottery_ticket_items(*, lottery_sub_number(*))')
+      .select('id, draw_date, total_amount, user_id, bill_number, lottery_ticket_items(*, lottery_sub_number(*))')
       .eq('status', 'confirmed');
     
     if (drawDate) {
@@ -227,6 +227,23 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
     const { data: tickets, error: ticketError } = await ticketQuery;
     if (ticketError) throw ticketError;
     if (!tickets || tickets.length === 0) return [];
+
+    // ✅ ดึงข้อมูลจาก lottery_winning_bills
+    let winningQuery = supabase
+      .from('lottery_winning_bills')
+      .select('bill_number, total_prize, draw_date');
+
+    if (drawDate) {
+      winningQuery = winningQuery.eq('draw_date', drawDate);
+    }
+
+    const { data: winningBills } = await winningQuery;
+
+    // สร้าง Map สำหรับ winningBills เพื่อค้นหาได้เร็ว
+    const winningBillsMap = new Map<string, number>();
+    (winningBills || []).forEach((bill: any) => {
+      winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
+    });
 
     console.log('fetchDailySummary - drawDate:', drawDate);
     console.log('fetchDailySummary - tickets count:', tickets.length);
@@ -257,10 +274,10 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
         };
       }
 
-      let ticketPayout = 0;
+      // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+      const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
+      
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
-        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
-        ticketPayout += prize;
         acc[key].total_numbers += (item.numbers || []).length;
       });
       
@@ -290,7 +307,7 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
   try {
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
+      .select('id, draw_date, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
       .eq('status', 'confirmed');
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
@@ -298,7 +315,27 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
     const { data: tickets, error: ticketError } = await ticketQuery;
     if (ticketError) throw ticketError;
     
+    // ✅ ดึงข้อมูลจาก lottery_winning_bills
+    let winningQuery = supabase
+      .from('lottery_winning_bills')
+      .select('bill_number, total_prize, draw_date');
+
+    if (drawDate) {
+      winningQuery = winningQuery.eq('draw_date', drawDate);
+    }
+
+    const { data: winningBills } = await winningQuery;
+
+    // สร้าง Map สำหรับ winningBills เพื่อค้นหาได้เร็ว
+    const winningBillsMap = new Map<string, number>();
+    (winningBills || []).forEach((bill: any) => {
+      winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
+    });
+    
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
+      // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+      const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
+      
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
       const subTypeId = item.lottery_sub_type_id;
       const subType = item.lottery_sub_types;
@@ -316,12 +353,14 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
           };
         }
         
-        const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
+        // แบ่งสัดส่วน payout ตามจำนวน amount ของแต่ละ item ใน bill
+        const ticketTotalAmount = (ticket.lottery_ticket_items || []).reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
+        const itemPayout = ticketTotalAmount > 0 ? (ticketPayout * Number(item.amount || 0)) / ticketTotalAmount : 0;
       
         acc[subTypeId].total_bills.add(ticket.id);
         acc[subTypeId].total_numbers += (item.numbers || []).length;
         acc[subTypeId].total_purchase_amount += Number(item.amount || 0);
-        acc[subTypeId].total_payout += prize;
+        acc[subTypeId].total_payout += itemPayout;
       });
       return acc;
     }, {});
@@ -358,6 +397,23 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
     if (ticketError) throw ticketError;
     if (!tickets || tickets.length === 0) return [];
     
+    // ✅ ดึงข้อมูลจาก lottery_winning_bills
+    let winningQuery = supabase
+      .from('lottery_winning_bills')
+      .select('bill_number, total_prize, draw_date');
+
+    if (drawDate) {
+      winningQuery = winningQuery.eq('draw_date', drawDate);
+    }
+
+    const { data: winningBills } = await winningQuery;
+
+    // สร้าง Map สำหรับ winningBills เพื่อค้นหาได้เร็ว
+    const winningBillsMap = new Map<string, number>();
+    (winningBills || []).forEach((bill: any) => {
+      winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
+    });
+    
     const userIds = [...new Set(tickets.map((t: any) => t.user_id))];
     const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
     if (profileError) throw profileError;
@@ -371,11 +427,11 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
         const countries = [...new Set(ticket.lottery_ticket_items.map((item: any) => item.lottery_sub_types?.country_origin).filter(Boolean))];
         const userProfile = profilesMap.get(ticket.user_id);
         
-        let totalPayout = 0;
+        // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+        const totalPayout = winningBillsMap.get(ticket.bill_number) || 0;
+        
         let totalNumbers = 0;
         (ticket.lottery_ticket_items || []).forEach((item: any) => {
-          const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap);
-          totalPayout += prize;
           totalNumbers += (item.numbers || []).length;
         });
           

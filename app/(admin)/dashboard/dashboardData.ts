@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/supabaseClient'
-import { calculateWinningsForItem } from '@/lib/utils/lottery-utils'
+// Remove the conflicting import since calculateWinningsForItem is defined in this file
+// import { calculateWinningsForItem } from '@/lib/utils/lottery-utils'
 
 export interface DashboardData {
   users: {
@@ -838,12 +839,28 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
     }
   }
 
+  // ✅ ดึงข้อมูลจาก lottery_winning_bills
+  const { data: winningBills, error: winningBillsError } = await supabase
+    .from('lottery_winning_bills')
+    .select('bill_number, total_prize, draw_date')
+    .gte('draw_date', previousStartDate.toISOString())
+
+  if (winningBillsError) {
+    console.error('❌ Error fetching lottery winning bills:', winningBillsError)
+  }
+
+  // สร้าง Map สำหรับ winningBills เพื่อค้นหาได้เร็ว
+  const winningBillsMap = new Map<string, number>()
+  ;(winningBills || []).forEach((bill: any) => {
+    winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0))
+  })
+
   // ดึงข้อมูล lottery_sub_types สำหรับ mapping
   const subTypeIds = [...new Set(
     tickets.flatMap(ticket => 
-      ticket.lottery_ticket_items?.map(item => item.lottery_sub_type_id) || []
+      ticket.lottery_ticket_items?.map((item: any) => item.lottery_sub_type_id) || []
     ).filter(Boolean)
-  )] || []
+  )]
   
   let subTypesMap = new Map()
   
@@ -896,24 +913,20 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
     const dayRevenue = dayTickets.reduce((sum, ticket) => sum + globalThis.Number(ticket.total_amount), 0)
     const dayTicketCount = dayTickets.length
     
-    // คำนวณยอดจ่ายจริง (payout) ด้วย calculateWinningsForItem เฉพาะบิลที่ status 'confirmed' เหมือน summary
+    // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
     let dayActualPayout = 0
     let dayOriginalPayout = 0
     let dayNumberCapCount = 0
     
     dayTickets.forEach(ticket => {
+      // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+      const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0
+      dayActualPayout += ticketPayout
+      
       let ticketHasNumberCap = false; // เพิ่มตัวแปรเพื่อตรวจสอบว่าบิลนี้ใช้เลขอั้นหรือไม่
       
       ticket.lottery_ticket_items?.forEach((item: any) => {
-        // ใช้ฟังก์ชันเดียวกับ summary: calculateWinningsForItem อิงผลรางวัลจริง
-        const { prize } = calculateWinningsForItem(
-          item, 
-          ticket.draw_date, 
-          resultsMap
-        )
-        dayActualPayout += prize
-
-        // Calculate original payout (without number cap)
+        // Calculate original payout (without number cap) - ยังคงใช้ calculateWinningsForItem
         const originalRate = item.lottery_sub_number?.price_paid || 0
         const { prize: originalPrize } = calculateWinningsForItem(
           { ...item, effective_prize_rate: originalRate }, 
@@ -971,7 +984,7 @@ async function fetchTicketsData(startDate: Date, previousStartDate: Date, result
   // Calculate type distribution
   const typeDistribution = calculateTypeDistribution(currentPeriodTickets)
   const statusDistribution = calculateStatusDistribution(currentPeriodTickets)
-  const revenueByType = calculateRevenueByType(currentPeriodTickets, resultsMap)
+  const revenueByType = calculateRevenueByType(currentPeriodTickets, winningBillsMap) // ✅ ส่ง winningBillsMap แทน resultsMap
   const monthlyComparison = calculateMonthlyComparison(tickets)
 
   return {
@@ -1109,10 +1122,13 @@ function calculateStatusDistribution(tickets: any[]) {
   }))
 }
 
-function calculateRevenueByType(tickets: any[], resultsMap: Record<string, any>) {
+function calculateRevenueByType(tickets: any[], winningBillsMap: Map<string, number>) {
   const typeMap: Record<string, any> = {}
   
   tickets.forEach(ticket => {
+    // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+    const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0
+    
     ticket.lottery_ticket_items?.forEach((item: any) => {
       const typeName = item.lottery_sub_types?.sub_type_name || 'Unknown'
       if (!typeMap[typeName]) {
@@ -1127,13 +1143,10 @@ function calculateRevenueByType(tickets: any[], resultsMap: Record<string, any>)
       typeMap[typeName].revenue += globalThis.Number(item.amount)
       typeMap[typeName].tickets += 1
       
-      // Calculate payout
-      const { prize } = calculateWinningsForItem(
-        item, 
-        ticket.draw_date, 
-        resultsMap
-      )
-      typeMap[typeName].payout += prize
+      // ✅ แบ่งสัดส่วน payout ตามจำนวน amount ของแต่ละ item ใน bill
+      const ticketTotalAmount = (ticket.lottery_ticket_items || []).reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0)
+      const itemPayout = ticketTotalAmount > 0 ? (ticketPayout * Number(item.amount || 0)) / ticketTotalAmount : 0
+      typeMap[typeName].payout += itemPayout
     })
   })
 
@@ -1222,10 +1235,10 @@ const calculateWinningsForItem = (
   let matchedNumbers: string[] = [];
   
   if (type_number === 'โต๊ด') {
-    const winningSet = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    const winningSet = new Set(matchingResult.winning_number.split(",").map((s: string) => s.trim()));
     matchedNumbers = item.numbers.filter((num: string) => winningSet.has(num));
   } else if (type_number === 'วิ่งบน' || type_number === 'วิ่งล่าง') {
-    const winningDigits = new Set(matchingResult.winning_number.split(",").map(s => s.trim()));
+    const winningDigits = new Set(matchingResult.winning_number.split(",").map((s: string) => s.trim()));
     item.numbers.forEach((num: string) => {
       for (const digit of num) {
         if (winningDigits.has(digit)) {
@@ -1302,12 +1315,28 @@ async function fetchLotteryTypesData(startDate: Date, previousStartDate: Date) {
 
     console.log('✅ Tickets data fetched:', tickets?.length || 0, 'records')
 
+    // ✅ ดึงข้อมูลจาก lottery_winning_bills
+    const { data: winningBills, error: winningBillsError } = await supabase
+      .from('lottery_winning_bills')
+      .select('bill_number, total_prize, draw_date')
+      .gte('draw_date', previousStartDate.toISOString())
+
+    if (winningBillsError) {
+      console.error('❌ Error fetching lottery winning bills:', winningBillsError)
+    }
+
+    // สร้าง Map สำหรับ winningBills เพื่อค้นหาได้เร็ว
+    const winningBillsMap = new Map<string, number>()
+    ;(winningBills || []).forEach((bill: any) => {
+      winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0))
+    })
+
     // ดึงข้อมูล lottery_sub_types สำหรับ mapping
     const subTypeIds = [...new Set(
       tickets.flatMap(ticket => 
-        ticket.lottery_ticket_items?.map(item => item.lottery_sub_type_id) || []
+        ticket.lottery_ticket_items?.map((item: any) => item.lottery_sub_type_id) || []
       ).filter(Boolean)
-    )] || []
+    )]
     
     let subTypesMap = new Map()
     
@@ -1327,35 +1356,15 @@ async function fetchLotteryTypesData(startDate: Date, previousStartDate: Date) {
         subTypesMap = new Map(subTypesData.map(sub => [sub.lottery_sub_type_id, sub]))
       }
     }
-
-    // ดึงข้อมูล lottery_results สำหรับคำนวณ payout
-    const { data: resultsData, error: resultsError } = await supabase
-      .from('lottery_results')
-      .select(`
-        lottery_sub_type_id,
-        draw_date,
-        prize_code,
-        winning_number
-      `)
-      .gte('draw_date', startDate.toISOString())
-      .lte('draw_date', new Date().toISOString())
     
-    if (resultsError) {
-      console.error('❌ Error fetching lottery results:', resultsError)
-    }
-    
-    // สร้าง resultsMap สำหรับคำนวณ payout - ตรงกับ summary page
-    const resultsMap: Record<string, any> = {}
-    resultsData?.forEach(result => {
-      const key = `${result.draw_date}|${result.lottery_sub_type_id}|${result.prize_code}`
-      resultsMap[key] = result
-    })
-    
-    console.log('✅ Results data fetched:', resultsData?.length || 0, 'records')
+    console.log('✅ Results data fetched:', winningBills?.length || 0, 'records')
     
     // ประมวลผลข้อมูล
     const typeStats = new Map()
     tickets?.forEach(ticket => {
+      // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+      const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0
+      
       ticket.lottery_ticket_items?.forEach((item: any) => {
         const subType = subTypesMap.get(item.lottery_sub_type_id)
         if (subType) {
@@ -1372,9 +1381,10 @@ async function fetchLotteryTypesData(startDate: Date, previousStartDate: Date) {
           current.items += 1
           current.revenue += item.amount || 0
           
-          // คำนวณ payout
-          const { prize } = calculateWinningsForItem(item, ticket.draw_date, resultsMap)
-          current.payout += prize
+          // ✅ แบ่งสัดส่วน payout ตามจำนวน amount ของแต่ละ item ใน bill
+          const ticketTotalAmount = (ticket.lottery_ticket_items || []).reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0)
+          const itemPayout = ticketTotalAmount > 0 ? (ticketPayout * Number(item.amount || 0)) / ticketTotalAmount : 0
+          current.payout += itemPayout
           
           typeStats.set(typeName, current)
         }
@@ -1432,13 +1442,22 @@ async function fetchLotteryTypesData(startDate: Date, previousStartDate: Date) {
     }))
     
     // สร้าง dailyPerformance (ข้อมูลจำลอง)
-    const dailyPerformance = []
+    const dailyPerformance: Array<{
+      date: string;
+      typeBreakdown: Record<string, {
+        revenue: number;
+        tickets: number;
+        payout: number;
+        netProfit: number;
+      }>;
+    }> = []
     
     console.log('✅ Processed lottery types data:', {
       types: popular.length,
       total: popular.length,
       popular,
-      performance
+      performance,
+      dailyPerformance
     })
     
     return {
