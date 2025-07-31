@@ -5,9 +5,7 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import * as cheerio from 'cheerio';
 import { createClient } from '@supabase/supabase-js';
-import { LOTTERY_METADATA } from '@/lib/utils/lotteryMetadata'; // Ensure this path is correct for your project
-import { formatInTimeZone } from 'date-fns-tz';
-import { subMinutes } from 'date-fns';
+import { LOTTERY_METADATA } from './lib/utils/lotteryMetadata'; // Fixed relative path
 
 // Load environment variables for local execution
 import * as dotenv from 'dotenv';
@@ -16,13 +14,44 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), override: false });
 
 // =================================================================================
-// 1. SETUP
+// 1. SETUP & VALIDATION
 // =================================================================================
+
+// Validate required environment variables
+const requiredEnvVars = {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
+};
+
+for (const [key, value] of Object.entries(requiredEnvVars)) {
+    if (!value) {
+        console.error(`❌ Missing required environment variable: ${key}`);
+        console.error('Please ensure your .env.local or .env file contains:');
+        console.error(`NEXT_PUBLIC_SUPABASE_URL=your_supabase_url`);
+        console.error(`SUPABASE_SERVICE_ROLE_KEY=your_service_role_key`);
+        process.exit(1);
+    }
+}
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// Test Supabase connection
+async function testSupabaseConnection() {
+    try {
+        const { data, error } = await supabase.from('lottery_name_aliases').select('count').limit(1);
+        if (error) {
+            console.error('❌ Failed to connect to Supabase:', error.message);
+            process.exit(1);
+        }
+        console.log('✅ Successfully connected to Supabase');
+    } catch (error) {
+        console.error('❌ Failed to connect to Supabase:', error);
+        process.exit(1);
+    }
+}
 
 type LotteryResult = {
     draw_date: string;
@@ -386,6 +415,10 @@ async function main() {
         console.log('🚀 Starting the FULL scrape and import process (no time restriction)...');
         console.log(`⏰ Started at: ${now.toLocaleString('th-TH', { timeZone })}`);
         
+        // Test Supabase connection first
+        console.log('\n[Step 0/4] Testing Supabase connection...');
+        await testSupabaseConnection();
+        
         // --- Skip Schedule Check and Target All Lotteries ---
         console.log('\n[Step 1/4] Targeting ALL available lotteries (no schedule restriction)...');
         
@@ -408,8 +441,8 @@ async function main() {
         console.log('\n[Step 2/4] Scraping Phase (with up to 20 retries)...');
         browser = await chromium.launch({ 
             headless: true, 
-            args: ['--disable-gpu', '--no-sandbox'],
-            timeout: 360000 
+            args: ['--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--disable-setuid-sandbox'],
+            timeout: 600000 // Increased to 10 minutes
         });
         const context = await browser.newContext({ 
             userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36' 

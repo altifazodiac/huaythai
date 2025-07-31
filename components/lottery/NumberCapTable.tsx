@@ -18,6 +18,8 @@ export function NumberCapTable({ title, numbers, selectedNumbers, onSelect, mana
               <th className="text-right p-2">เงินรางวัล</th>
               <th className="text-right p-2">ความเสี่ยง</th>
               <th className="text-center p-2">จำนวนบิล</th>
+              <th className="text-center p-2">ผลลัพธ์</th>
+              <th className="text-center p-2">ประสิทธิภาพ</th>
             </tr>
           </thead>
           <tbody>
@@ -36,6 +38,32 @@ export function NumberCapTable({ title, numbers, selectedNumbers, onSelect, mana
                   <td className="p-2 text-right font-bold">{formatCurrency(number.potential_payout)}</td>
                   <td className="p-2 text-right"><Badge variant={getRiskBadgeColor(number.risk_percentage)}>{formatPercentage(number.risk_percentage)}</Badge></td>
                   <td className="p-2 text-center">{number.total_bets}</td>
+                  <td className="p-2 text-center">
+                    {number.isWinning !== undefined && (
+                      <Badge variant={number.isWinning ? "destructive" : "secondary"}>
+                        {number.isWinning ? "❌ ถูก" : "✅ ไม่ถูก"}
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="p-2 text-center">
+                    {number.accuracyScore !== undefined && (
+                      <div className="text-xs">
+                        <div className={`font-bold ${
+                          number.accuracyScore >= 80 ? 'text-green-600 dark:text-green-400' : 
+                          number.accuracyScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 
+                          number.accuracyScore >= 40 ? 'text-orange-600 dark:text-orange-400' : 
+                          'text-red-600 dark:text-red-400'
+                        }`}>
+                          {number.accuracyScore.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {number.accuracyScore >= 80 ? 'จัดการดี' : 
+                           number.accuracyScore >= 60 ? 'พอใช้' : 
+                           number.accuracyScore >= 40 ? 'ต้องปรับ' : 'ต้องแก้ไข'}
+                        </div>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               );
             })}

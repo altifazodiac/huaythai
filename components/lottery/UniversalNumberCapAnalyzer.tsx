@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Plus, Settings, Ban, Scissors, BarChart3, Users, Calendar, Clock, X } from "lucide-react";
+import { Loader2, AlertTriangle, TrendingUp, TrendingDown, Plus, Settings, Ban, Scissors, BarChart3, Users, Calendar, Clock, X, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/supabaseClient";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -101,6 +101,8 @@ interface NumberSalesData {
   risk_percentage: number;
   is_capped: boolean;
   total_bets: number;
+  isWinning?: boolean; // Added for winning status
+  accuracyScore?: number; // Added for accuracy score
 }
 
 interface SalesAnalysis {
@@ -125,7 +127,7 @@ interface ManagedNumber {
 }
 
 interface ManualAddFormState {
-  number: string;
+  numbers: string; // Changed from 'number' to 'numbers' to support bulk input
   is2Digits: boolean;
   is3Digits: boolean;
   isTop: boolean;
@@ -152,7 +154,7 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
   const [showManualAdd, setShowManualAdd] = useState(true);
   const [manualForm, setManualForm] = useState<ManualAddFormState>({
-    number: '',
+    numbers: '',
     is2Digits: true,
     is3Digits: false,
     isTop: true,
@@ -163,20 +165,20 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
     reason: 'เลขดัง',
   });
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('analysis');
+  const [activeTab, setActiveTab] = useState('managed');
 
   const handleManualFormChange = (field: keyof ManualAddFormState, value: string | boolean) => {
     setManualForm(prev => {
       let newState = { ...prev, [field]: value };
 
-      // Handle digit selection logic
+      // Handle digit selection logic - clear numbers when switching types
       if (field === 'is2Digits' && value === true) {
         newState.is3Digits = false;
-        if (newState.number.length > 2) newState.number = newState.number.substring(0, 2);
+        // Don't auto-truncate, let user re-enter numbers
       }
       if (field === 'is3Digits' && value === true) {
         newState.is2Digits = false;
-        if (newState.number.length > 3) newState.number = newState.number.substring(0, 3);
+        // Don't auto-truncate, let user re-enter numbers
       }
       
       // Ensure at least one digit type is selected
@@ -207,27 +209,90 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
   };
 
   const handleManualNumberInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9]/g, '');
-    const limit = manualForm.is3Digits ? 3 : 2;
-    if (value.length > limit) value = value.slice(0, limit);
-    setManualForm(prev => ({...prev, number: value}));
+    let value = e.target.value;
+    const digitLimit = manualForm.is3Digits ? 3 : 2;
+    
+    // Remove all non-digits and spaces
+    let cleanValue = value.replace(/[^0-9\s]/g, '');
+    
+    // Auto-format with spaces between numbers
+    let formatted = '';
+    let currentNumber = '';
+    
+    for (let char of cleanValue) {
+      if (char === ' ') {
+        if (currentNumber.length > 0) {
+          formatted += currentNumber + ' ';
+          currentNumber = '';
+        }
+      } else if (char.match(/[0-9]/)) {
+        currentNumber += char;
+        if (currentNumber.length === digitLimit) {
+          formatted += currentNumber + ' ';
+          currentNumber = '';
+        }
+      }
+    }
+    
+    // Add the remaining number if any
+    if (currentNumber.length > 0) {
+      formatted += currentNumber;
+    }
+    
+    // Clean up extra spaces
+    formatted = formatted.replace(/\s+/g, ' ').trim();
+    
+    setManualForm(prev => ({...prev, numbers: formatted}));
   }
 
   const handleAddManualNumbers = async () => {
-    const { number, is2Digits, is3Digits, isTop, isBottom, isTod, isSwap, action, reason } = manualForm;
-    if (!number.trim()) { toast.error('กรุณาใส่หมายเลข'); return; }
+    const { numbers, is2Digits, is3Digits, isTop, isBottom, isTod, isSwap, action, reason } = manualForm;
+    if (!numbers.trim()) { toast.error('กรุณาใส่หมายเลข'); return; }
+    
     const digitCount = is3Digits ? 3 : 2;
-    if (number.length !== digitCount) { toast.error(`กรุณาใส่เลข ${digitCount} หลัก`); return; }
+    
+    // Parse and validate input numbers
+    const inputNumbers = numbers.trim().split(/\s+/).filter(n => n.length > 0);
+    
+    // Validate each number
+    const validNumbers: string[] = [];
+    const invalidNumbers: string[] = [];
+    
+    inputNumbers.forEach(num => {
+      if (!/^\d+$/.test(num)) {
+        invalidNumbers.push(`${num} (ต้องเป็นตัวเลขเท่านั้น)`);
+      } else if (num.length !== digitCount) {
+        invalidNumbers.push(`${num} (ต้องเป็น ${digitCount} หลัก)`);
+      } else {
+        validNumbers.push(num);
+      }
+    });
+    
+    if (invalidNumbers.length > 0) {
+      toast.error(`เลขไม่ถูกต้อง: ${invalidNumbers.join(', ')}`);
+      return;
+    }
+    
+    if (validNumbers.length === 0) {
+      toast.error('ไม่พบเลขที่ถูกต้อง');
+      return;
+    }
     
     let numbersToAdd: { num: string, type: string, digit: number }[] = [];
-    const baseNumbers = isSwap ? getPermutations(number) : [number];
-
-    baseNumbers.forEach(num => {
-      if (isTop) numbersToAdd.push({ num, type: 'บน', digit: digitCount });
-      if (isBottom) numbersToAdd.push({ num, type: 'ล่าง', digit: digitCount });
-      if (is3Digits && isTod) {
-         getPermutations(number).forEach(p => { numbersToAdd.push({ num: p, type: 'โต๊ด', digit: 3 }); })
-      }
+    
+    // Process each valid number
+    validNumbers.forEach(number => {
+      const baseNumbers = isSwap ? getPermutations(number) : [number];
+      
+      baseNumbers.forEach(num => {
+        if (isTop) numbersToAdd.push({ num, type: 'บน', digit: digitCount });
+        if (isBottom) numbersToAdd.push({ num, type: 'ล่าง', digit: digitCount });
+        if (is3Digits && isTod) {
+          getPermutations(number).forEach(p => { 
+            numbersToAdd.push({ num: p, type: 'โต๊ด', digit: 3 }); 
+          });
+        }
+      });
     });
     
     const uniqueNumbersToAdd = Array.from(new Set(numbersToAdd.map(n => JSON.stringify(n)))).map(s => JSON.parse(s));
@@ -249,15 +314,15 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
     }
     
     if (addedCount > 0) {
-      toast.success(`เพิ่ม ${addedCount} เลขสำเร็จ`, {
+      toast.success(`เพิ่ม ${addedCount} เลขสำเร็จ จาก ${validNumbers.length} เลขที่ใส่`, {
          description: skippedCount > 0 ? `ข้าม ${skippedCount} เลขที่มีอยู่แล้ว` : undefined,
       });
-      setActiveTab('managed'); // Switch to managed tab
+      // Already on managed tab, no need to switch
     } else if (skippedCount > 0) {
       toast.info(`เลขทั้งหมดมีอยู่แล้ว ไม่ได้เพิ่มเลขใหม่`);
-      setActiveTab('managed'); // Switch to managed tab to show existing numbers
+      // Already on managed tab, no need to switch
     }
-    setManualForm(prev => ({ ...prev, number: '' }));
+    setManualForm(prev => ({ ...prev, numbers: '' }));
   };
   
   useEffect(() => {
@@ -370,6 +435,8 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                   <th className="text-left p-2 w-8">เลือก</th><th className="text-left p-2">เลข</th><th className="text-left p-2">ประเภท</th>
                   <th className="text-right p-2">ยอดขาย</th><th className="text-right p-2">เงินรางวัล</th><th className="text-right p-2">ความเสี่ยง</th>
                   <th className="text-center p-2">จำนวนบิล</th>
+                  <th className="text-center p-2">ผลลัพธ์</th>
+                  <th className="text-center p-2">ความแม่นยำ</th>
                 </tr>
               </thead>
               <tbody>
@@ -384,6 +451,32 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                       <td className="p-2 text-right">{formatCurrency(number.total_sales)}</td><td className="p-2 text-right font-bold">{formatCurrency(number.potential_payout)}</td>
                       <td className="p-2 text-right"><Badge variant={getRiskBadgeColor(number.risk_percentage)}>{formatPercentage(number.risk_percentage)}</Badge></td>
                       <td className="p-2 text-center">{number.total_bets}</td>
+                      <td className="p-2 text-center">
+                        {number.isWinning !== undefined && (
+                          <Badge variant={number.isWinning ? 'default' : 'secondary'} className="text-xs">
+                            {number.isWinning ? '🎯 ชนะ' : '❌ ไม่ชนะ'}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {number.accuracyScore !== undefined && (
+                          <div className="text-xs">
+                            <div className={`font-bold ${
+                              number.accuracyScore >= 80 ? 'text-green-600 dark:text-green-400' : 
+                              number.accuracyScore >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 
+                              number.accuracyScore >= 40 ? 'text-orange-600 dark:text-orange-400' : 
+                              'text-red-600 dark:text-red-400'
+                            }`}>
+                              {number.accuracyScore.toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {number.accuracyScore >= 80 ? 'ดีมาก' : 
+                               number.accuracyScore >= 60 ? 'ดี' : 
+                               number.accuracyScore >= 40 ? 'ปานกลาง' : 'ต้องปรับปรุง'}
+                            </div>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -454,8 +547,16 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                         <CardContent className="pt-2 pb-4">
                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                           <div className="space-y-2">
-                              <label className="font-semibold dark:text-gray-200">หมายเลข</label>
-                              <Input placeholder={manualForm.is3Digits ? "เช่น 123" : "เช่น 45"} value={manualForm.number} onChange={handleManualNumberInputChange} maxLength={manualForm.is3Digits ? 3 : 2} className="text-lg h-12 bg-white dark:bg-gray-800" />
+                              <label className="font-semibold dark:text-gray-200">หมายเลข (หลายเลขคั่นด้วยเว้นวรรค)</label>
+                              <Input 
+                                placeholder={manualForm.is3Digits ? "เช่น 123 456 789" : "เช่น 45 67 89"} 
+                                value={manualForm.numbers} 
+                                onChange={handleManualNumberInputChange} 
+                                className="text-lg h-12 bg-white dark:bg-gray-800" 
+                              />
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {manualForm.is3Digits ? "ใส่เลข 3 หลัก คั่นด้วยเว้นวรรค เช่น 258 688 447" : "ใส่เลข 2 หลัก คั่นด้วยเว้นวรรค เช่น 35 26 27"}
+                              </div>
                               <div className="flex items-center space-x-4 pt-2">
                                 <label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="is2Digits" checked={manualForm.is2Digits} onCheckedChange={(checked) => handleManualFormChange('is2Digits', !!checked)} /> 2 ตัว</label>
                                 <label className="flex items-center gap-2 cursor-pointer dark:text-gray-200"><Checkbox id="is3Digits" checked={manualForm.is3Digits} onCheckedChange={(checked) => handleManualFormChange('is3Digits', !!checked)} /> 3 ตัว</label>
@@ -502,23 +603,9 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
                 >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="analysis"><BarChart3 className="mr-2" />ผลวิเคราะห์</TabsTrigger>
                         <TabsTrigger value="managed"><Settings className="mr-2" />รายการจัดการ ({filteredManagedNumbers.length})</TabsTrigger>
+                        <TabsTrigger value="analysis"><BarChart3 className="mr-2" />ผลวิเคราะห์</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="analysis">
-                        <motion.div 
-                            className="grid grid-cols-1 md:grid-cols-4 gap-4 my-4"
-                            variants={containerVariants}
-                        >
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">ยอดขายรวม</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(analysis.total_sales_all)}</div></CardContent></Card></motion.div>
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">อาจต้องจ่าย</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(analysis.total_potential_payout)}</div></CardContent></Card></motion.div>
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">ความเสี่ยงรวม</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${analysis.overall_risk_percentage > riskThreshold ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatPercentage(analysis.overall_risk_percentage)}</div></CardContent></Card></motion.div>
-                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">เลขอั้น</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.high_risk_numbers.length}</div><div className="text-xs text-gray-500 dark:text-gray-400">เลข</div></CardContent></Card></motion.div>
-                        </motion.div>
-                        <motion.div variants={itemVariants}>{renderNumberTable('เลขอั้น - ควรจัดการด่วน', analysis.high_risk_numbers, <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />, 'border-red-200 dark:border-red-800')}</motion.div>
-                        <motion.div variants={itemVariants}>{renderNumberTable('เลขเสี่ยงปานกลาง - ควรติดตาม', analysis.medium_risk_numbers, <TrendingUp className="h-5 w-5 text-orange-600 dark:text-orange-400" />, 'border-orange-200 dark:border-orange-800')}</motion.div>
-                        {!analysis.total_sales_all && <div className="text-center p-8 text-gray-500 dark:text-gray-400">ไม่พบข้อมูลการขายในวันที่เลือก</div>}
-                    </TabsContent>
                     <TabsContent value="managed">
                          {filteredManagedNumbers.length > 0 ? (
                             <Card className="mt-4">
@@ -545,6 +632,120 @@ export default function UniversalNumberCapAnalyzer({ lottery_sub_type_id, onClos
               </CardContent>
             </Card>
                         ) : (<div className="text-center p-8 text-gray-500 dark:text-gray-400">ไม่มีรายการจัดการสำหรับวันที่เลือก</div>)}
+                    </TabsContent>
+                    <TabsContent value="analysis">
+                        <motion.div 
+                            className="grid grid-cols-1 md:grid-cols-4 gap-4 my-4"
+                            variants={containerVariants}
+                        >
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">ยอดขายรวม</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(analysis.total_sales_all)}</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">อาจต้องจ่าย</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(analysis.total_potential_payout)}</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">ความเสี่ยงรวม</CardTitle></CardHeader><CardContent><div className={`text-2xl font-bold ${analysis.overall_risk_percentage > riskThreshold ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{formatPercentage(analysis.overall_risk_percentage)}</div></CardContent></Card></motion.div>
+                            <motion.div variants={itemVariants}><Card><CardHeader className="pb-2"><CardTitle className="text-sm dark:text-gray-200">เลขอั้น</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.high_risk_numbers.length}</div><div className="text-xs text-gray-500 dark:text-gray-400">เลข</div></CardContent></Card></motion.div>
+                        </motion.div>
+                        
+                        {/* Accuracy Analysis Section */}
+                        {analysis.winningNumbers && analysis.winningNumbers.length > 0 && (
+                            <motion.div variants={itemVariants}>
+                                <Card className="mb-4 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-green-700 dark:text-green-300 flex items-center gap-2">
+                                            🎯 ผลการวิเคราะห์ประสิทธิภาพการจัดการ
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                                    {analysis.accuracyPercentage?.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">ประสิทธิภาพรวม</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                                    {analysis.highRiskAccuracy?.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">เลขอั้น</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                                                    {analysis.mediumRiskAccuracy?.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">เลขเสี่ยงปานกลาง</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                                    {analysis.safeAccuracy?.toFixed(1)}%
+                                                </div>
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">เลขปลอดภัย</div>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                                                    {analysis.winningNumbers.length}
+                                                </div>
+                                                <div className="text-xs text-gray-600 dark:text-gray-400">เลขที่ออก</div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+                                            <strong>เลขที่ออก:</strong> {analysis.winningNumbers.join(', ')}
+                                        </div>
+                                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                            💡 ประสิทธิภาพสูง = จัดการได้ดี (คนไม่ถูก), ต่ำ = ต้องปรับปรุง (คนถูก)
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
+                        )}
+                        
+                        {/* Number Distribution Summary */}
+                        <motion.div variants={itemVariants}>
+                            <Card className="mb-4 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                                        📊 สรุปการกระจายเลข
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                        <div className="text-center">
+                                            <div className="text-xl font-bold text-red-600 dark:text-red-400">
+                                                {analysis.high_risk_numbers.length}
+                                            </div>
+                                            <div className="text-xs text-gray-600 dark:text-gray-400">เลขอั้น</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                2 ตัว: {analysis.high_risk_numbers.filter(n => n.digit_count === 2).length} | 
+                                                3 ตัว: {analysis.high_risk_numbers.filter(n => n.digit_count === 3).length}
+                                            </div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                                                {analysis.medium_risk_numbers.length}
+                                            </div>
+                                            <div className="text-xs text-gray-600 dark:text-gray-400">เลขเสี่ยงปานกลาง</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                2 ตัว: {analysis.medium_risk_numbers.filter(n => n.digit_count === 2).length} | 
+                                                3 ตัว: {analysis.medium_risk_numbers.filter(n => n.digit_count === 3).length}
+                                            </div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                                                {analysis.safe_numbers.length}
+                                            </div>
+                                            <div className="text-xs text-gray-600 dark:text-gray-400">เลขปลอดภัย</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                2 ตัว: {analysis.safe_numbers.filter(n => n.digit_count === 2).length} | 
+                                                3 ตัว: {analysis.safe_numbers.filter(n => n.digit_count === 3).length}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                        
+                        <motion.div variants={itemVariants}>{renderNumberTable('เลขอั้น - ควรจัดการด่วน', analysis.high_risk_numbers, <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />, 'border-red-200 dark:border-red-800')}</motion.div>
+                        <motion.div variants={itemVariants}>{renderNumberTable('เลขเสี่ยงปานกลาง - ควรเฝ้าติดตาม', analysis.medium_risk_numbers, <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />, 'border-orange-200 dark:border-orange-800')}</motion.div>
+                        <motion.div variants={itemVariants}>{renderNumberTable('เลขปลอดภัย - ยังไม่ต้องกังวล', analysis.safe_numbers, <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />, 'border-green-200 dark:border-green-800')}</motion.div>
+                        {!analysis.total_sales_all && <div className="text-center p-8 text-gray-500 dark:text-gray-400">ไม่พบข้อมูลการขายในวันที่เลือก</div>}
                     </TabsContent>
                 </Tabs>
                 </motion.div>

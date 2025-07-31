@@ -107,7 +107,7 @@ interface UserSummary {
   total_profit_loss: number;
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
   total_system_fee: number; // ค่าบริหารระบบ 5%
-  total_final_balance: number; // ยอดคงเหลือสุดท้าย = ยอดสุทธิ - ค่าบริหารระบบ
+  total_final_balance: number; // ยอดคงเหลือสุดท้าย = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
   bill_count: number;
   transaction_count: number;
 }
@@ -122,7 +122,7 @@ interface DateGroupedReport {
   total_profit_loss: number;
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
   total_system_fee: number; // ค่าบริหารระบบ 5%
-  total_final_balance: number; // ยอดคงเหลือสุดท้าย = ยอดสุทธิ - ค่าบริหารระบบ
+  total_final_balance: number; // ยอดคงเหลือสุดท้าย = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
   total_bills: number;
   total_transactions: number;
   users: UserSummary[];
@@ -436,10 +436,10 @@ const LotteryReportSummaryPage: React.FC = () => {
       group.total_bills += transaction.bill_count;
       group.total_transactions += 1;
 
-      // Calculate system fee (5% of net amount)
-      const systemFee = transaction.net_amount * 0.05;
+      // Calculate system fee (5% of profit_loss)
+      const systemFee = transaction.profit_loss * 0.05;
       group.total_system_fee += systemFee;
-      group.total_final_balance += (transaction.net_amount - systemFee);
+      group.total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee); // ยอดคงเหลือ = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
 
       // Find or create user summary
       let userSummary = group.users.find((u: UserSummary) => u.user_id === transaction.user_id);
@@ -469,7 +469,7 @@ const LotteryReportSummaryPage: React.FC = () => {
       userSummary.total_profit_loss += transaction.profit_loss;
       userSummary.total_net_amount += transaction.net_amount;
       userSummary.total_system_fee += systemFee;
-      userSummary.total_final_balance += (transaction.net_amount - systemFee);
+      userSummary.total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee); // ยอดคงเหลือ = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
       userSummary.bill_count += transaction.bill_count;
       userSummary.transaction_count += 1;
     });
@@ -1421,7 +1421,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">สรุปการคำนวณ</h3>
                           <Badge variant="outline" className="text-xs">
-                            ยอดสุทธิ - ค่าบริหารระบบ = ยอดคงเหลือสุดท้าย
+                            กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ = ยอดคงเหลือสุดท้าย
                           </Badge>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
