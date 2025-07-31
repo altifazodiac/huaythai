@@ -25,9 +25,63 @@ function isOpenNow(schedule: any): boolean {
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
 
-  // กรณีหวยไทย (ออกวันที่ 1 หรือ 16 ของเดือน หรือหลายวันในเดือน)
-  if (schedule.day_of_week.includes('ของเดือน')) {
-    // รองรับหลายวัน เช่น "1,16 ของเดือน" หรือ "1 ของเดือน, 16 ของเดือน"
+  // ตรวจสอบว่าเป็นรูปแบบวันที่ 1-31 หรือไม่
+  const isDateRange = /^\d+(?:,\s*\d+)*$/.test(schedule.day_of_week.trim());
+  
+  if (isDateRange) {
+    // กรณีวันที่ 1-31
+    const dateNumbers = schedule.day_of_week.split(',').map((d: string) => parseInt(d.trim(), 10)).filter((d: number) => d >= 1 && d <= 31);
+    
+    if (dateNumbers.length === 0) {
+      return false;
+    }
+
+    const closeTime = schedule.close_time.split(':');
+    const closeHour = parseInt(closeTime[0]);
+    const closeMinute = parseInt(closeTime[1]);
+    let prevTarget: Date | null = null;
+    let nextTarget: Date | null = null;
+
+    for (const day of dateNumbers) {
+      // รอบถัดไป (ของเดือนนี้หรือเดือนหน้า)
+      let nextMonth = currentMonth;
+      let nextYear = currentYear;
+      if (currentDate >= day) {
+        nextMonth = currentMonth + 1;
+        if (nextMonth > 11) {
+          nextMonth = 0;
+          nextYear += 1;
+        }
+      }
+      const thisTarget = new Date(currentYear, currentMonth, day, closeHour, closeMinute, 0, 0);
+      const next = new Date(nextYear, nextMonth, day, closeHour, closeMinute, 0, 0);
+      
+      // รอบก่อนหน้า (ของเดือนนี้หรือเดือนที่แล้ว)
+      let prevMonth = currentMonth;
+      let prevYear = currentYear;
+      if (currentDate < day) {
+        prevMonth = currentMonth - 1;
+        if (prevMonth < 0) {
+          prevMonth = 11;
+          prevYear -= 1;
+        }
+      }
+      const prev = new Date(prevYear, prevMonth, day, closeHour, closeMinute, 0, 0);
+      
+      // หา prevTarget ที่ใกล้ที่สุดก่อน now และ nextTarget ที่ใกล้ที่สุดหลัง now
+      if (!prevTarget || (prev < now && prev > prevTarget)) prevTarget = prev;
+      if (!nextTarget || (next > now && next < nextTarget)) nextTarget = next;
+      if (!nextTarget || (thisTarget > now && thisTarget < nextTarget)) nextTarget = next;
+      if (!prevTarget || (thisTarget < now && thisTarget > prevTarget)) prevTarget = thisTarget;
+    }
+    
+    // เปิดรับระหว่าง prevTarget < now < nextTarget
+    if (prevTarget && nextTarget && now > prevTarget && now < nextTarget) {
+      return true;
+    }
+    return false;
+  } else if (schedule.day_of_week.includes('ของเดือน')) {
+    // กรณีหวยไทย (ออกวันที่ 1 หรือ 16 ของเดือน หรือหลายวันในเดือน)
     const dayMatches = schedule.day_of_week.match(/\d+/g);
     if (dayMatches && dayMatches.length > 0) {
       const closeTime = schedule.close_time.split(':');
@@ -353,7 +407,14 @@ export default function LotteryTypeGrid({
   }, [grouped, schedules, filterOpen, filterCountry]);
 
   function isMonthlyDraw(schedule: any) {
-    return schedule?.day_of_week?.includes("ของเดือน");
+    if (!schedule?.day_of_week) return false;
+    
+    // ตรวจสอบกรณีวันที่ 1-31
+    const isDateRange = /^\d+(?:,\s*\d+)*$/.test(schedule.day_of_week.trim());
+    if (isDateRange) return true;
+    
+    // ตรวจสอบกรณี "ของเดือน"
+    return schedule.day_of_week.includes("ของเดือน");
   }
 
   if (!mounted) return null;
@@ -528,14 +589,16 @@ export default function LotteryTypeGrid({
                                     : (
                                       (() => {
                                         const today = new Date();
-                                        const isSpecialLottery = schedule.day_of_week.includes('1') || schedule.day_of_week.includes('16');
+                                        const isDateRange = /^\d+(?:,\s*\d+)*$/.test(schedule.day_of_week?.trim() || '');
+                                        const isMonthlyType = schedule.day_of_week?.includes("ของเดือน");
 
-                                        if (isSpecialLottery) {
-                                          return <div className="text-xs text-red-500">เหลืออีก {getSpecialCountdown(schedule, today)}</div>;
-                                        } else if (today.getDate() === 1 || today.getDate() === 16) {
+                                        if (isDateRange || isMonthlyType) {
+                                          // กรณีวันที่ 1-31 หรือ "ของเดือน" ใช้ CountdownRow ใหม่
                                           return <CountdownRow schedule={scheduleWithDays} isCurrentlyOpen={isCurrentlyOpen} />;
+                                        } else {
+                                          // กรณีอื่นๆ ใช้ getSpecialCountdown
+                                          return <div className="text-xs text-red-500">เหลืออีก {getSpecialCountdown(schedule, today)}</div>;
                                         }
-                                        return null;
                                       })()
                                     )
                                   }
