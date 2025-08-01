@@ -36,94 +36,63 @@ function isOpenNow(schedule: any): boolean {
       return false;
     }
 
-    const closeTime = schedule.close_time.split(':');
-    const closeHour = parseInt(closeTime[0]);
-    const closeMinute = parseInt(closeTime[1]);
-    let prevTarget: Date | null = null;
-    let nextTarget: Date | null = null;
-
-    for (const day of dateNumbers) {
-      // รอบถัดไป (ของเดือนนี้หรือเดือนหน้า)
-      let nextMonth = currentMonth;
-      let nextYear = currentYear;
-      if (currentDate >= day) {
-        nextMonth = currentMonth + 1;
-        if (nextMonth > 11) {
-          nextMonth = 0;
-          nextYear += 1;
-        }
-      }
-      const thisTarget = new Date(currentYear, currentMonth, day, closeHour, closeMinute, 0, 0);
-      const next = new Date(nextYear, nextMonth, day, closeHour, closeMinute, 0, 0);
+    // ตรวจสอบว่าวันนี้เป็นวันที่เปิดรับหรือไม่
+    const isTodayOpenDay = dateNumbers.includes(currentDate);
+    
+    if (isTodayOpenDay) {
+      // วันนี้เป็นวันที่เปิดรับ ตรวจสอบเวลา
+      const [openH, openM] = schedule.open_time.split(":").map(Number);
+      const [closeH, closeM] = schedule.close_time.split(":").map(Number);
       
-      // รอบก่อนหน้า (ของเดือนนี้หรือเดือนที่แล้ว)
-      let prevMonth = currentMonth;
-      let prevYear = currentYear;
-      if (currentDate < day) {
-        prevMonth = currentMonth - 1;
-        if (prevMonth < 0) {
-          prevMonth = 11;
-          prevYear -= 1;
-        }
-      }
-      const prev = new Date(prevYear, prevMonth, day, closeHour, closeMinute, 0, 0);
+      const todayOpenTime = new Date(currentYear, currentMonth, currentDate, openH, openM, 0);
+      const todayCloseTime = new Date(currentYear, currentMonth, currentDate, closeH, closeM, 0);
       
-      // หา prevTarget ที่ใกล้ที่สุดก่อน now และ nextTarget ที่ใกล้ที่สุดหลัง now
-      if (!prevTarget || (prev < now && prev > prevTarget)) prevTarget = prev;
-      if (!nextTarget || (next > now && next < nextTarget)) nextTarget = next;
-      if (!nextTarget || (thisTarget > now && thisTarget < nextTarget)) nextTarget = next;
-      if (!prevTarget || (thisTarget < now && thisTarget > prevTarget)) prevTarget = thisTarget;
+      // ตรวจสอบว่าเวลาปัจจุบันอยู่ระหว่างเวลาเปิดและปิดรับหรือไม่
+      if (openH < closeH) {
+        // กรณีเปิดและปิดในวันเดียวกัน
+        return now >= todayOpenTime && now < todayCloseTime;
+      } else {
+        // กรณีข้ามวัน (เช่น เปิด 22:00 ปิด 06:00)
+        const yesterdayCloseTime = new Date(currentYear, currentMonth, currentDate - 1, closeH, closeM, 0);
+        const tomorrowCloseTime = new Date(currentYear, currentMonth, currentDate + 1, closeH, closeM, 0);
+        
+        return (now >= todayOpenTime && now < tomorrowCloseTime) || 
+               (now >= yesterdayCloseTime && now < todayCloseTime);
+      }
     }
     
-    // เปิดรับระหว่าง prevTarget < now < nextTarget
-    if (prevTarget && nextTarget && now > prevTarget && now < nextTarget) {
-      return true;
-    }
     return false;
   } else if (schedule.day_of_week.includes('ของเดือน')) {
     // กรณีหวยไทย (ออกวันที่ 1 หรือ 16 ของเดือน หรือหลายวันในเดือน)
     const dayMatches = schedule.day_of_week.match(/\d+/g);
     if (dayMatches && dayMatches.length > 0) {
-      const closeTime = schedule.close_time.split(':');
-      const closeHour = parseInt(closeTime[0]);
-      const closeMinute = parseInt(closeTime[1]);
-      let prevTarget: Date | null = null;
-      let nextTarget: Date | null = null;
-      for (const dayStr of dayMatches) {
-        const targetDate = parseInt(dayStr);
-        // รอบถัดไป (ของเดือนนี้หรือเดือนหน้า)
-        let nextMonth = currentMonth;
-        let nextYear = currentYear;
-        if (currentDate >= targetDate) {
-          nextMonth = currentMonth + 1;
-          if (nextMonth > 11) {
-            nextMonth = 0;
-            nextYear += 1;
-          }
+      const daysOfMonth = dayMatches.map((d: string) => parseInt(d, 10));
+      
+      // ตรวจสอบว่าวันนี้เป็นวันที่เปิดรับหรือไม่
+      const isTodayOpenDay = daysOfMonth.includes(currentDate);
+      
+      if (isTodayOpenDay) {
+        // วันนี้เป็นวันที่เปิดรับ ตรวจสอบเวลา
+        const [openH, openM] = schedule.open_time.split(":").map(Number);
+        const [closeH, closeM] = schedule.close_time.split(":").map(Number);
+        
+        const todayOpenTime = new Date(currentYear, currentMonth, currentDate, openH, openM, 0);
+        const todayCloseTime = new Date(currentYear, currentMonth, currentDate, closeH, closeM, 0);
+        
+        // ตรวจสอบว่าเวลาปัจจุบันอยู่ระหว่างเวลาเปิดและปิดรับหรือไม่
+        if (openH < closeH) {
+          // กรณีเปิดและปิดในวันเดียวกัน
+          return now >= todayOpenTime && now < todayCloseTime;
+        } else {
+          // กรณีข้ามวัน (เช่น เปิด 22:00 ปิด 06:00)
+          const yesterdayCloseTime = new Date(currentYear, currentMonth, currentDate - 1, closeH, closeM, 0);
+          const tomorrowCloseTime = new Date(currentYear, currentMonth, currentDate + 1, closeH, closeM, 0);
+          
+          return (now >= todayOpenTime && now < tomorrowCloseTime) || 
+                 (now >= yesterdayCloseTime && now < todayCloseTime);
         }
-        const thisTarget = new Date(currentYear, currentMonth, targetDate, closeHour, closeMinute, 0, 0);
-        const next = new Date(nextYear, nextMonth, targetDate, closeHour, closeMinute, 0, 0);
-        // รอบก่อนหน้า (ของเดือนนี้หรือเดือนที่แล้ว)
-        let prevMonth = currentMonth;
-        let prevYear = currentYear;
-        if (currentDate < targetDate) {
-          prevMonth = currentMonth - 1;
-          if (prevMonth < 0) {
-            prevMonth = 11;
-            prevYear -= 1;
-          }
-        }
-        const prev = new Date(prevYear, prevMonth, targetDate, closeHour, closeMinute, 0, 0);
-        // หา prevTarget ที่ใกล้ที่สุดก่อน now และ nextTarget ที่ใกล้ที่สุดหลัง now
-        if (!prevTarget || (prev < now && prev > prevTarget)) prevTarget = prev;
-        if (!nextTarget || (next > now && next < nextTarget)) nextTarget = next;
-        if (!nextTarget || (thisTarget > now && thisTarget < nextTarget)) nextTarget = thisTarget;
-        if (!prevTarget || (thisTarget < now && thisTarget > prevTarget)) prevTarget = thisTarget;
       }
-      // เปิดรับระหว่าง prevTarget < now < nextTarget
-      if (prevTarget && nextTarget && now > prevTarget && now < nextTarget) {
-        return true;
-      }
+      
       return false;
     }
     return false;
