@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Filter, X, TrendingUp, TrendingDown, DollarSign, Receipt, BarChart3, Hash, AlertCircle } from 'lucide-react';
 import { Separator } from "@/components/ui/separator";
@@ -307,7 +307,7 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
   try {
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
+      .select('id, draw_date, bill_number, user_id, total_amount, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
       .eq('status', 'confirmed');
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
@@ -331,43 +331,73 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
     (winningBills || []).forEach((bill: any) => {
       winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
     });
+
+    // 🔧 ดึงข้อมูล user profiles สำหรับคำนวณคอมมิชชั่น
+    const userIds = [...new Set(tickets?.map((t: any) => t.user_id).filter(Boolean) || [])];
+    let profilesMap = new Map<string, { name: string, percent: number }>();
+    
+    console.log('fetchLotteryTypeSummary - userIds:', userIds);
+    
+    if (userIds.length > 0) {
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, name, percent')
+        .in('id', userIds);
+      
+      if (profileError) throw profileError;
+      
+      console.log('fetchLotteryTypeSummary - profiles:', profiles);
+      
+      profiles?.forEach((p: {id: string, name: string, percent: number}) => {
+        profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+      });
+    }
     
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
       // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
       const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
       
+      // 🔧 ดึง user percent สำหรับคำนวณคอมมิชชั่น
+      const userProfile = profilesMap.get(ticket.user_id);
+      const userPercent = userProfile?.percent || 0;
+      
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
-      const subTypeId = item.lottery_sub_type_id;
-      const subType = item.lottery_sub_types;
+        const subTypeId = item.lottery_sub_type_id;
+        const subType = item.lottery_sub_types;
         if (!subType) return;
       
-      if (!acc[subTypeId]) {
-        acc[subTypeId] = {
-          lottery_sub_type_id: subTypeId,
-          sub_type_name: subType.sub_type_name,
-          country_origin: subType.country_origin,
-          total_bills: new Set(),
-          total_numbers: 0,
-          total_purchase_amount: 0,
-          total_payout: 0,
+        if (!acc[subTypeId]) {
+          acc[subTypeId] = {
+            lottery_sub_type_id: subTypeId,
+            sub_type_name: subType.sub_type_name,
+            country_origin: subType.country_origin,
+            total_bills: new Set(),
+            total_numbers: 0,
+            total_purchase_amount: 0,
+            total_payout: 0,
+            total_commission: 0, // 🔧 เพิ่มฟิลด์สำหรับเก็บผลรวมคอมมิชชั่น
           };
         }
         
         // แบ่งสัดส่วน payout ตามจำนวน amount ของแต่ละ item ใน bill
         const ticketTotalAmount = (ticket.lottery_ticket_items || []).reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
         const itemPayout = ticketTotalAmount > 0 ? (ticketPayout * Number(item.amount || 0)) / ticketTotalAmount : 0;
+        
+        // 🔧 คำนวณคอมมิชชั่นสำหรับ item นี้
+        const itemCommission = (Number(item.amount || 0) * userPercent) / 100;
       
         acc[subTypeId].total_bills.add(ticket.id);
         acc[subTypeId].total_numbers += (item.numbers || []).length;
         acc[subTypeId].total_purchase_amount += Number(item.amount || 0);
         acc[subTypeId].total_payout += itemPayout;
+        acc[subTypeId].total_commission += itemCommission; // 🔧 รวมคอมมิชชั่น
       });
       return acc;
     }, {});
     
-    return Object.values(groupedData).map((item: any) => {
+    const result = Object.values(groupedData).map((item: any) => {
       const netProfitLoss = item.total_purchase_amount - item.total_payout;
-      const commissionAmount = (item.total_purchase_amount * 0) / 100; // สำหรับประเภทหวยยังไม่มีการคำนวณ percent
+      const commissionAmount = item.total_commission; // 🔧 ใช้ค่าคอมมิชชั่นที่คำนวณแล้ว
       return {
         ...item,
         total_bills: item.total_bills.size,
@@ -376,6 +406,14 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
         net_amount: netProfitLoss - commissionAmount // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
       };
     }).sort((a: any, b: any) => b.total_purchase_amount - a.total_purchase_amount);
+
+    // 🔧 Debug log
+    console.log('fetchLotteryTypeSummary - commission calculation:');
+    result.forEach((item: any) => {
+      console.log(`${item.sub_type_name}: purchase=${item.total_purchase_amount}, commission=${item.commission_amount}`);
+    });
+
+    return result;
   } catch (err) {
     console.error('Error in fetchLotteryTypeSummary:', err);
     throw err;
@@ -937,11 +975,16 @@ const LotterySummaryPage: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  // 🔧 เพิ่ม state สำหรับการวิเคราะห์แบบละเอียด
+  // 🔧 เพิ่ม state สำหรับเก็บรายการประเภทหวย
+  const [lotteryTypes, setLotteryTypes] = useState<{ lottery_sub_type_id: number; sub_type_name: string; country_origin: string }[]>([]);
+    // 🔧 เพิ่ม state สำหรับการวิเคราะห์แบบละเอียด
   const [selectedNumberType, setSelectedNumberType] = useState<string>('all');
   const [sortField, setSortField] = useState<keyof DetailedNumberAnalysis>('potential_payout');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
- 
+  
+  // 🔧 เพิ่ม ref เพื่อ track การ reset
+  const isResettingLotteryType = useRef(false);
+
   useRequireAuth();
 
   // 🔧 **ปรับปรุง**: แยกฟังก์ชัน loadData ออกมา
@@ -998,6 +1041,54 @@ const LotterySummaryPage: React.FC = () => {
       }, {});
       setResultsMap(newResultsMap);
 
+      // 🔧 ดึงข้อมูลประเภทหวยที่มีข้อมูลในวันที่ที่เลือก
+      let lotteryTypesData: { lottery_sub_type_id: number; sub_type_name: string; country_origin: string }[] = [];
+      
+      if (selectedDate) {
+        // ดึงเฉพาะประเภทหวยที่มีข้อมูลในวันที่ที่เลือก
+        const { data: filteredTypesData, error: lotteryTypesError } = await supabase
+          .from('lottery_tickets')
+          .select(`
+            lottery_ticket_items!inner(
+              lottery_sub_types!inner(
+                lottery_sub_type_id,
+                sub_type_name,
+                country_origin
+              )
+            )
+          `)
+          .eq('draw_date', selectedDate)
+          .eq('status', 'confirmed');
+        
+        if (lotteryTypesError) throw lotteryTypesError;
+        
+        // Extract unique lottery types
+        const uniqueTypes = new Map();
+        filteredTypesData?.forEach((ticket: any) => {
+          ticket.lottery_ticket_items?.forEach((item: any) => {
+            const lotteryType = item.lottery_sub_types;
+            if (lotteryType && !uniqueTypes.has(lotteryType.lottery_sub_type_id)) {
+              uniqueTypes.set(lotteryType.lottery_sub_type_id, lotteryType);
+            }
+          });
+        });
+        
+        lotteryTypesData = Array.from(uniqueTypes.values()).sort((a, b) => 
+          a.sub_type_name.localeCompare(b.sub_type_name, 'th')
+        );
+      } else {
+        // ถ้าไม่มีวันที่เลือก ให้ดึงประเภทหวยทั้งหมด
+        const { data: allTypesData, error: lotteryTypesError } = await supabase
+          .from('lottery_sub_types')
+          .select('lottery_sub_type_id, sub_type_name, country_origin')
+          .order('sub_type_name', { ascending: true });
+        
+        if (lotteryTypesError) throw lotteryTypesError;
+        lotteryTypesData = allTypesData || [];
+      }
+      
+      setLotteryTypes(lotteryTypesData);
+
       const [dailyData, typeData, billData, numberData, analysisData, detailedAnalysisData] = await Promise.all([
         fetchDailySummary(supabase, newResultsMap, selectedDate || undefined),
         fetchLotteryTypeSummary(supabase, newResultsMap, selectedDate || undefined),
@@ -1032,9 +1123,24 @@ const LotterySummaryPage: React.FC = () => {
     loadData();
   }, [supabase]);
 
+  // Reset selectedLotteryType if it's not in the current lottery types list
+  useEffect(() => {
+    if (selectedLotteryType && lotteryTypes.length > 0 && !lotteryTypes.some(type => type.lottery_sub_type_id === selectedLotteryType)) {
+      isResettingLotteryType.current = true;
+      setSelectedLotteryType(null);
+    }
+  }, [lotteryTypes, selectedLotteryType]);
+
   // Refresh data when filters change
   useEffect(() => {
     if (!supabase || !selectedDate) return;
+    
+    // ถ้าเป็นการ reset จาก useEffect ด้านบน ให้ skip การ loadData
+    if (isResettingLotteryType.current) {
+      isResettingLotteryType.current = false;
+      return;
+    }
+    
     const timeoutId = setTimeout(() => {
       loadData();
     }, 500);
@@ -1415,7 +1521,7 @@ const LotterySummaryPage: React.FC = () => {
             {(selectedDate || selectedLotteryType || (selectedUserId && selectedUserId !== 'all')) && (
               <span className="text-sm font-normal text-muted-foreground">
                 - {selectedDate && formatDate(selectedDate)}
-                {selectedLotteryType && ` (ประเภทหวย ID: ${selectedLotteryType})`}
+                {selectedLotteryType && ` (ประเภทหวย: ${lotteryTypes.find(t => t.lottery_sub_type_id === selectedLotteryType)?.sub_type_name || selectedLotteryType})`}
                 {selectedUserId && selectedUserId !== 'all' && ` (ผู้ใช้: ${users.find(u => u.id === selectedUserId)?.name || selectedUserId})`}
               </span>
             )}
@@ -1453,7 +1559,7 @@ const LotterySummaryPage: React.FC = () => {
                     <TableCell colSpan={role === 'admin' ? 10 : 8} className="text-center py-8 text-muted-foreground">
                       ไม่พบข้อมูลบิล
                       {selectedDate && <div className="text-xs mt-1">สำหรับวันที่: {formatDate(selectedDate)}</div>}
-                      {selectedLotteryType && <div className="text-xs mt-1">ประเภทหวย ID: {selectedLotteryType}</div>}
+                      {selectedLotteryType && <div className="text-xs mt-1">ประเภทหวย: {lotteryTypes.find(t => t.lottery_sub_type_id === selectedLotteryType)?.sub_type_name || selectedLotteryType}</div>}
                       {selectedUserId && selectedUserId !== 'all' && <div className="text-xs mt-1">ผู้ใช้: {users.find(u => u.id === selectedUserId)?.name || selectedUserId}</div>}
                     </TableCell>
                   </TableRow>
@@ -2268,14 +2374,30 @@ const LotterySummaryPage: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-2">ประเภทหวย ID</label>
-                        <Input
-                          type="number"
-                          value={selectedLotteryType || ''}
-                          onChange={(e) => setSelectedLotteryType(e.target.value ? Number(e.target.value) : null)}
-                          placeholder="เลือกประเภทหวย"
-                          className="w-full"
-                        />
+                        <label className="block text-sm font-medium mb-2">ประเภทหวย</label>
+                        <Select value={selectedLotteryType?.toString() || 'all'} onValueChange={(value) => setSelectedLotteryType(value === 'all' ? null : Number(value))}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="เลือกประเภทหวย" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">ทั้งหมด</SelectItem>
+                            {lotteryTypes.map((type) => (
+                              <SelectItem key={type.lottery_sub_type_id} value={type.lottery_sub_type_id.toString()}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{type.sub_type_name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {type.country_origin}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedLotteryType && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            เลือก: {lotteryTypes.find(t => t.lottery_sub_type_id === selectedLotteryType)?.sub_type_name}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-2">เลขที่บิล</label>

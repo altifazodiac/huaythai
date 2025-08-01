@@ -20,7 +20,6 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  Search,
   Download,
   RefreshCw,
   Award,
@@ -94,6 +93,7 @@ interface LotteryTransactionData {
   ticket_count: number;
   status: string;
   deleted_at?: string;
+  lottery_types?: any[]; // 🔧 เพิ่มข้อมูลประเภทหวย
 }
 
 interface UserSummary {
@@ -108,6 +108,21 @@ interface UserSummary {
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
   total_system_fee: number; // ค่าบริหารระบบ 5%
   total_final_balance: number; // ยอดคงเหลือสุดท้าย = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
+  bill_count: number;
+  transaction_count: number;
+  lottery_type_breakdown?: LotteryTypeBreakdown[]; // 🔧 เพิ่มข้อมูลประเภทหวย
+}
+
+interface LotteryTypeBreakdown {
+  lottery_sub_type_id: number;
+  sub_type_name: string;
+  country_origin: string;
+  total_purchase: number;
+  total_reward: number;
+  total_commission: number;
+  total_profit_loss: number;
+  total_system_fee: number;
+  total_final_balance: number;
   bill_count: number;
   transaction_count: number;
 }
@@ -185,7 +200,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   try {
     let query = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
+      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(lottery_sub_type_id, sub_type_name, country_origin))')
       .eq('status', 'confirmed');
 
     if (startDate) query = query.gte('draw_date', startDate);
@@ -238,6 +253,13 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       const remaining_balance = profit_loss - commission_amount;
       const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 
+      // 🔧 ดึงข้อมูลประเภทหวยจาก lottery_ticket_items
+      const lottery_types = [...new Set((ticket.lottery_ticket_items || []).map((item: any) => ({
+        lottery_sub_type_id: item.lottery_sub_types?.lottery_sub_type_id,
+        sub_type_name: item.lottery_sub_types?.sub_type_name,
+        country_origin: item.lottery_sub_types?.country_origin
+      })).filter((type: any) => type.lottery_sub_type_id))];
+
       return {
         id: ticket.id,
         draw_date: ticket.draw_date,
@@ -254,7 +276,8 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
         bill_count: 1,
         ticket_count: (ticket.lottery_ticket_items || []).length,
         status: ticket.status,
-        deleted_at: ticket.deleted_at
+        deleted_at: ticket.deleted_at,
+        lottery_types // 🔧 เพิ่มข้อมูลประเภทหวย
       };
     });
   } catch (err) {
@@ -374,16 +397,34 @@ const LotteryReportSummaryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('all'); // 🔧 เปลี่ยนจาก searchTerm เป็น selectedUserId
+  const [availableUsers, setAvailableUsers] = useState<{id: string; name: string}[]>([]); // 🔧 เพิ่มรายชื่อผู้ใช้
+  const [selectedLotteryType, setSelectedLotteryType] = useState<string>('all'); // 🔧 เพิ่ม filter ประเภทหวย
+  const [availableLotteryTypes, setAvailableLotteryTypes] = useState<{id: number; name: string; country: string}[]>([]); // 🔧 เพิ่มรายการประเภทหวย
   const [sortBy, setSortBy] = useState<'date' | 'purchase' | 'profit' | 'commission'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<string>('confirmed');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set()); // 🔧 เพิ่ม state สำหรับ expanded users
   const isMobile = useIsMobile();
 
+  // 🔧 ฟังก์ชันสำหรับ toggle การขยาย user details
+  const toggleUserExpansion = (dateKey: string, userId: string) => {
+    const key = `${dateKey}_${userId}`;
+    const newExpanded = new Set(expandedUsers);
+    if (newExpanded.has(key)) {
+      newExpanded.delete(key);
+    } else {
+      newExpanded.add(key);
+    }
+    setExpandedUsers(newExpanded);
+  };
+
   // Function to group data by period
-  const groupDataByPeriod = (data: LotteryTransactionData[], period: 'daily' | 'weekly' | 'monthly'): DateGroupedReport[] => {
+  const groupDataByPeriod = (data: LotteryTransactionData[], period: 'daily' | 'weekly' | 'monthly', reportData?: LotteryTransactionData[]): DateGroupedReport[] => {
+    // 🔧 ใช้ reportData สำหรับการสร้าง lottery_type_breakdown
+    const allReportData = reportData || data;
     const groups: { [key: string]: DateGroupedReport } = {};
 
     data.forEach(transaction => {
@@ -457,7 +498,8 @@ const LotteryReportSummaryPage: React.FC = () => {
           total_system_fee: 0,
           total_final_balance: 0,
           bill_count: 0,
-          transaction_count: 0
+          transaction_count: 0,
+          lottery_type_breakdown: [] // 🔧 เพิ่ม breakdown ประเภทหวย
         };
         group.users.push(userSummary);
       }
@@ -472,6 +514,74 @@ const LotteryReportSummaryPage: React.FC = () => {
       userSummary.total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee); // ยอดคงเหลือ = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
       userSummary.bill_count += transaction.bill_count;
       userSummary.transaction_count += 1;
+    });
+
+    // 🔧 สร้าง lottery_type_breakdown สำหรับแต่ละ user
+    Object.values(groups).forEach(group => {
+      group.users.forEach(user => {
+        // กรองข้อมูลของ user นี้ในช่วงเวลานี้
+        const userTransactions = allReportData.filter(t => 
+          t.user_id === user.user_id && 
+          (() => {
+            const date = new Date(t.draw_date);
+            switch (period) {
+              case 'daily':
+                return t.draw_date === group.date;
+              case 'weekly':
+                const weekStart = new Date(date);
+                weekStart.setDate(date.getDate() - date.getDay());
+                return weekStart.toISOString().split('T')[0] === group.date;
+              case 'monthly':
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` === group.date;
+              default:
+                return true;
+            }
+          })()
+        );
+
+        // จัดกลุ่มตามประเภทหวย
+        const lotteryTypeGroups: { [key: number]: LotteryTypeBreakdown } = {};
+        
+        userTransactions.forEach(transaction => {
+          // ดึงข้อมูลประเภทหวยจาก lottery_ticket_items (ถ้ามี)
+          const lotteryTypes = transaction.lottery_types || [];
+          
+          lotteryTypes.forEach((lotteryType: any) => {
+            const typeId = lotteryType.lottery_sub_type_id;
+            
+            if (!lotteryTypeGroups[typeId]) {
+              lotteryTypeGroups[typeId] = {
+                lottery_sub_type_id: typeId,
+                sub_type_name: lotteryType.sub_type_name,
+                country_origin: lotteryType.country_origin,
+                total_purchase: 0,
+                total_reward: 0,
+                total_commission: 0,
+                total_profit_loss: 0,
+                total_system_fee: 0,
+                total_final_balance: 0,
+                bill_count: 0,
+                transaction_count: 0
+              };
+            }
+
+            // คำนวณสัดส่วนของประเภทหวยนี้ในการซื้อ
+            const systemFee = transaction.profit_loss * 0.05;
+            
+            lotteryTypeGroups[typeId].total_purchase += transaction.total_purchase_amount / lotteryTypes.length;
+            lotteryTypeGroups[typeId].total_reward += transaction.total_payout / lotteryTypes.length;
+            lotteryTypeGroups[typeId].total_commission += transaction.commission_amount / lotteryTypes.length;
+            lotteryTypeGroups[typeId].total_profit_loss += transaction.profit_loss / lotteryTypes.length;
+            lotteryTypeGroups[typeId].total_system_fee += systemFee / lotteryTypes.length;
+            lotteryTypeGroups[typeId].total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee) / lotteryTypes.length;
+            lotteryTypeGroups[typeId].bill_count += transaction.bill_count / lotteryTypes.length;
+            lotteryTypeGroups[typeId].transaction_count += 1 / lotteryTypes.length;
+          });
+        });
+
+        user.lottery_type_breakdown = Object.values(lotteryTypeGroups)
+          .sort((a, b) => b.total_purchase - a.total_purchase);
+      });
     });
 
     // Calculate percentages and set user count
@@ -540,6 +650,44 @@ const LotteryReportSummaryPage: React.FC = () => {
     };
   }, [dateGroupedData]);
 
+  // 🔧 ฟังก์ชันดึงรายชื่อผู้ใช้
+  const fetchAvailableUsers = async () => {
+    try {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      
+      setAvailableUsers(profiles || []);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    }
+  };
+
+  // 🔧 ฟังก์ชันดึงรายการประเภทหวย
+  const fetchAvailableLotteryTypes = async () => {
+    try {
+      const { data: lotteryTypes, error } = await supabase
+        .from('lottery_sub_types')
+        .select('lottery_sub_type_id, sub_type_name, country_origin')
+        .order('sub_type_name', { ascending: true });
+
+      if (error) throw error;
+      
+      const formattedTypes = (lotteryTypes || []).map(type => ({
+        id: type.lottery_sub_type_id,
+        name: type.sub_type_name,
+        country: type.country_origin
+      }));
+      
+      setAvailableLotteryTypes(formattedTypes);
+    } catch (err) {
+      console.error('Error fetching lottery types:', err);
+    }
+  };
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -584,7 +732,7 @@ const LotteryReportSummaryPage: React.FC = () => {
       setReportData(reportData);
 
             // Group data by period
-      const groupedData = groupDataByPeriod(reportData, period);
+      const groupedData = groupDataByPeriod(reportData, period, reportData);
 
             // Sort grouped data
       const sortedGroupedData = groupedData.sort((a, b) => {
@@ -622,9 +770,11 @@ const LotteryReportSummaryPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      fetchAvailableUsers(); // 🔧 ดึงรายชื่อผู้ใช้
+      fetchAvailableLotteryTypes(); // 🔧 ดึงรายการประเภทหวย
       loadData();
     }
-  }, [user, selectedDate, sortBy, sortOrder, period]);
+  }, [user, selectedDate, sortBy, sortOrder, period, selectedUserId, selectedLotteryType]); // 🔧 เพิ่ม selectedLotteryType
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('th-TH', {
@@ -674,22 +824,88 @@ const LotteryReportSummaryPage: React.FC = () => {
   const filteredDateData = useMemo(() => {
     let filtered = dateGroupedData;
     
-    if (searchTerm) {
+    // 🔧 กรองตาม selectedUserId
+    if (selectedUserId && selectedUserId !== 'all') {
       filtered = filtered.filter(dateGroup =>
-        dateGroup.users.some(user => 
-          user.user_name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
+        dateGroup.users.some(user => user.user_id === selectedUserId)
+      ).map(dateGroup => ({
+        ...dateGroup,
+        // กรองให้แสดงเฉพาะผู้ใช้ที่เลือก
+        users: dateGroup.users.filter(user => user.user_id === selectedUserId),
+        // คำนวณยอดใหม่สำหรับผู้ใช้ที่เลือก
+        total_users: dateGroup.users.filter(user => user.user_id === selectedUserId).length,
+        total_purchase: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_purchase, 0),
+        total_reward: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_reward, 0),
+        total_commission: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_commission, 0),
+        total_profit_loss: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_profit_loss, 0),
+        total_system_fee: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_system_fee, 0),
+        total_final_balance: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_final_balance, 0),
+        total_bills: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.bill_count, 0),
+        total_transactions: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.transaction_count, 0),
+      }));
+    }
+
+    // 🔧 กรองตาม selectedLotteryType
+    if (selectedLotteryType && selectedLotteryType !== 'all') {
+      const lotteryTypeId = parseInt(selectedLotteryType);
+      
+      filtered = filtered.filter(dateGroup => {
+        // ตรวจสอบว่ามีผู้ใช้ที่มีประเภทหวยนี้หรือไม่
+        return dateGroup.users.some(user => 
+          user.lottery_type_breakdown && 
+          user.lottery_type_breakdown.some(breakdown => breakdown.lottery_sub_type_id === lotteryTypeId)
+        );
+      }).map(dateGroup => ({
+        ...dateGroup,
+        // กรองและปรับปรุงข้อมูลผู้ใช้ให้แสดงเฉพาะประเภทหวยที่เลือก
+        users: dateGroup.users.map(user => {
+          const filteredBreakdown = user.lottery_type_breakdown?.filter(
+            breakdown => breakdown.lottery_sub_type_id === lotteryTypeId
+          ) || [];
+          
+          if (filteredBreakdown.length === 0) return null;
+          
+          const filteredUser = {
+            ...user,
+            lottery_type_breakdown: filteredBreakdown,
+            // คำนวณยอดใหม่จากประเภทหวยที่เลือก
+            total_purchase: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_purchase, 0),
+            total_reward: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_reward, 0),
+            total_commission: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_commission, 0),
+            total_profit_loss: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_profit_loss, 0),
+            total_system_fee: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_system_fee, 0),
+            total_final_balance: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_final_balance, 0),
+            bill_count: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.bill_count, 0),
+            transaction_count: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.transaction_count, 0),
+          };
+          
+          return filteredUser;
+        }).filter(Boolean) as UserSummary[],
+      })).map(dateGroup => ({
+        ...dateGroup,
+        // คำนวณยอดรวมใหม่จากผู้ใช้ที่กรองแล้ว
+        total_users: dateGroup.users.length,
+        total_purchase: dateGroup.users.reduce((sum, user) => sum + user.total_purchase, 0),
+        total_reward: dateGroup.users.reduce((sum, user) => sum + user.total_reward, 0),
+        total_commission: dateGroup.users.reduce((sum, user) => sum + user.total_commission, 0),
+        total_profit_loss: dateGroup.users.reduce((sum, user) => sum + user.total_profit_loss, 0),
+        total_system_fee: dateGroup.users.reduce((sum, user) => sum + user.total_system_fee, 0),
+        total_final_balance: dateGroup.users.reduce((sum, user) => sum + user.total_final_balance, 0),
+        total_bills: dateGroup.users.reduce((sum, user) => sum + user.bill_count, 0),
+        total_transactions: dateGroup.users.reduce((sum, user) => sum + user.transaction_count, 0),
+      })).filter(dateGroup => dateGroup.users.length > 0);
     }
 
     return filtered;
-  }, [dateGroupedData, searchTerm]);
+  }, [dateGroupedData, selectedUserId, selectedLotteryType]);
 
   const clearFilters = async () => {
     setSelectedDate('');
-    setSearchTerm('');
+    setSelectedUserId('all'); // 🔧 เปลี่ยนจาก searchTerm เป็ selectedUserId
+    setSelectedLotteryType('all'); // 🔧 เพิ่มรีเซ็ตประเภทหวย
     setStatusFilter('confirmed');
     setPeriod('daily');
+    setExpandedUsers(new Set()); // 🔧 ล้าง expanded users
   };
 
   if (!user) {
@@ -781,18 +997,53 @@ const LotteryReportSummaryPage: React.FC = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">ค้นหาผู้ใช้</label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="ชื่อผู้ใช้..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9"
-                          />
-                        </div>
+                        <label className="text-sm font-medium">เลือกผู้ใช้</label>
+                        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="เลือกผู้ใช้" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">ทั้งหมด</SelectItem>
+                            {availableUsers.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>
+                                {user.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedUserId && selectedUserId !== 'all' && (
+                          <p className="text-xs text-muted-foreground">
+                            เลือก: {availableUsers.find(u => u.id === selectedUserId)?.name}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">ประเภทหวย</label>
+                        <Select value={selectedLotteryType} onValueChange={setSelectedLotteryType}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="เลือกประเภทหวย" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">ทั้งหมด</SelectItem>
+                            {availableLotteryTypes.map((type) => (
+                              <SelectItem key={type.id} value={type.id.toString()}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{type.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {type.country}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedLotteryType && selectedLotteryType !== 'all' && (
+                          <p className="text-xs text-muted-foreground">
+                            เลือก: {availableLotteryTypes.find(t => t.id.toString() === selectedLotteryType)?.name}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">ช่วงเวลา</label>
@@ -827,6 +1078,16 @@ const LotteryReportSummaryPage: React.FC = () => {
                         {selectedDate && (
                           <p className="text-xs text-muted-foreground">
                             กำลังดูข้อมูลวันที่: {formatDate(selectedDate)}
+                          </p>
+                        )}
+                        {selectedUserId && selectedUserId !== 'all' && (
+                          <p className="text-xs text-muted-foreground">
+                            ผู้ใช้: {availableUsers.find(u => u.id === selectedUserId)?.name}
+                          </p>
+                        )}
+                        {selectedLotteryType && selectedLotteryType !== 'all' && (
+                          <p className="text-xs text-muted-foreground">
+                            ประเภทหวย: {availableLotteryTypes.find(t => t.id.toString() === selectedLotteryType)?.name}
                           </p>
                         )}
                       </div>
@@ -1002,7 +1263,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         {period === 'monthly' ? (
                                           `${dateReport.total_users} ผู้ใช้ • ${dateReport.total_transactions} รายการ`
                                         ) : (
-                                          `${dateReport.total_users} ผู้ใช้ • ${dateReport.total_transactions} รายการ • ${dateReport.total_bills} บิล`
+                                          `${dateReport.total_users} ผู้ใช้ • ${Math.round(dateReport.total_transactions)} รายการ • ${Math.round(dateReport.total_bills)} บิล`
                                         )}
                                       </CardDescription>
                                     </div>
@@ -1114,21 +1375,55 @@ const LotteryReportSummaryPage: React.FC = () => {
                                       ) : (
                                         // สำหรับรายวันและรายสัปดาห์ แสดงรายละเอียด user
                                         <>
-                                          {dateReport.users.map((user, userIndex) => (
-                                            <TableRow key={user.user_id} className="hover:bg-muted/30">
-                                              <TableCell className="font-medium">
-                                                <div className="flex items-center space-x-2">
-                                                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                                                    <User className="h-4 w-4 text-primary" />
-                                                  </div>
-                                                  <div>
-                                                    <div className="font-medium">{user.user_name}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                      {user.bill_count} บิล • {user.transaction_count} รายการ
+                                          {dateReport.users.map((user, userIndex) => {
+                                            const userKey = `${dateReport.date}_${user.user_id}`;
+                                            const isExpanded = expandedUsers.has(userKey);
+                                            
+                                            return (
+                                              <React.Fragment key={user.user_id}>
+                                                <TableRow className="hover:bg-muted/30">
+                                                  <TableCell className="font-medium">
+                                                    <div className="flex items-center space-x-2">
+                                                      {/* 🔧 ปุ่มขยาย/ย่อ (แสดงเฉพาะเมื่อมีรายละเอียดประเภทหวยให้แสดง) */}
+                                                      {selectedLotteryType === 'all' && user.lottery_type_breakdown && user.lottery_type_breakdown.length > 0 ? (
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
+                                                          className="p-1 h-6 w-6"
+                                                          onClick={() => toggleUserExpansion(dateReport.date, user.user_id)}
+                                                        >
+                                                          {isExpanded ? (
+                                                            <ChevronUp className="h-3 w-3" />
+                                                          ) : (
+                                                            <ChevronDown className="h-3 w-3" />
+                                                          )}
+                                                        </Button>
+                                                      ) : (
+                                                        <div className="w-6 h-6" /> // placeholder เพื่อรักษาการจัดตำแหน่ง
+                                                      )}
+                                                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                                                        <User className="h-4 w-4 text-primary" />
+                                                      </div>
+                                                      <div>
+                                                        <div className="font-medium flex items-center">
+                                                          {user.user_name}
+                                                          {user.lottery_type_breakdown && user.lottery_type_breakdown.length > 0 && selectedLotteryType === 'all' && (
+                                                            <Badge variant="outline" className="ml-2 text-xs">
+                                                              {user.lottery_type_breakdown.length} ประเภท
+                                                            </Badge>
+                                                          )}
+                                                          {selectedLotteryType !== 'all' && (
+                                                            <Badge variant="secondary" className="ml-2 text-xs">
+                                                              {availableLotteryTypes.find(t => t.id.toString() === selectedLotteryType)?.name}
+                                                            </Badge>
+                                                          )}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                          {Math.round(user.bill_count)} บิล • {Math.round(user.transaction_count)} รายการ
+                                                        </div>
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                </div>
-                                              </TableCell>
+                                                  </TableCell>
                                               <TableCell className="text-right">
                                                 <Badge variant="outline" className="text-xs">
                                                   {user.commission_percentage}%
@@ -1162,13 +1457,77 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(user.total_system_fee)}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
-                                            <span className={`font-medium ${user.total_final_balance >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
-                                              {formatCurrency(user.total_final_balance)}
-                                            </span>
-                                          </TableCell>
-                                            </TableRow>
-                                          ))}
+                                                  <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
+                                                    <span className={`font-medium ${user.total_final_balance >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
+                                                      {formatCurrency(user.total_final_balance)}
+                                                    </span>
+                                                  </TableCell>
+                                                </TableRow>
+
+                                                {/* 🔧 แสดงรายละเอียดประเภทหวยเมื่อขยาย (เฉพาะเมื่อไม่ได้เลือกประเภทหวยเฉพาะ) */}
+                                                {isExpanded && user.lottery_type_breakdown && user.lottery_type_breakdown.length > 0 && selectedLotteryType === 'all' && (
+                                                  <TableRow>
+                                                    <TableCell colSpan={8} className="p-0 bg-slate-50 dark:bg-slate-900/50">
+                                                      <div className="p-4">
+                                                        <h4 className="text-sm font-medium mb-3 text-slate-700 dark:text-slate-300">
+                                                          รายละเอียดตามประเภทหวย
+                                                        </h4>
+                                                        <div className="overflow-x-auto">
+                                                          <Table>
+                                                            <TableHeader>
+                                                              <TableRow className="bg-white dark:bg-slate-800">
+                                                                <TableHead className="text-xs">ประเภทหวย</TableHead>
+                                                                <TableHead className="text-xs text-right">ยอดซื้อ</TableHead>
+                                                                <TableHead className="text-xs text-right">ค่าคอม</TableHead>
+                                                                <TableHead className="text-xs text-right">ยอดจ่าย</TableHead>
+                                                                <TableHead className="text-xs text-right">กำไร/ขาดทุน</TableHead>
+                                                                <TableHead className="text-xs text-right">ค่าบริหาร(5%)</TableHead>
+                                                                <TableHead className="text-xs text-right">ยอดคงเหลือ</TableHead>
+                                                              </TableRow>
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                              {user.lottery_type_breakdown.map((lotteryType) => (
+                                                                <TableRow key={lotteryType.lottery_sub_type_id} className="text-xs">
+                                                                  <TableCell>
+                                                                    <div>
+                                                                      <div className="font-medium">{lotteryType.sub_type_name}</div>
+                                                                      <div className="text-xs text-muted-foreground">{lotteryType.country_origin}</div>
+                                                                    </div>
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right">
+                                                                    {formatCurrency(lotteryType.total_purchase)}
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right text-blue-600">
+                                                                    {formatCurrency(lotteryType.total_commission)}
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right text-red-600">
+                                                                    {formatCurrency(lotteryType.total_reward)}
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right">
+                                                                    <span className={lotteryType.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                      {formatCurrency(lotteryType.total_profit_loss)}
+                                                                    </span>
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right text-blue-600">
+                                                                    {formatCurrency(lotteryType.total_system_fee)}
+                                                                  </TableCell>
+                                                                  <TableCell className="text-right">
+                                                                    <span className={`font-medium ${lotteryType.total_final_balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
+                                                                      {formatCurrency(lotteryType.total_final_balance)}
+                                                                    </span>
+                                                                  </TableCell>
+                                                                </TableRow>
+                                                              ))}
+                                                            </TableBody>
+                                                          </Table>
+                                                        </div>
+                                                      </div>
+                                                    </TableCell>
+                                                  </TableRow>
+                                                )}
+                                              </React.Fragment>
+                                            );
+                                          })}
                                           {/* Summary Row for Users */}
                                           {dateReport.users.length > 0 && (
                                             <TableRow className="bg-gray-100 dark:bg-gray-800 font-bold">
