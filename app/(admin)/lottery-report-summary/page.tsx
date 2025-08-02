@@ -201,7 +201,8 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
     let query = supabase
       .from('lottery_tickets')
       .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(lottery_sub_type_id, sub_type_name, country_origin))')
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .is('deleted_at', null); // ✅ เพิ่มเงื่อนไขเพื่อไม่แสดงรายการที่ถูกลบ
 
     if (startDate) query = query.gte('draw_date', startDate);
     if (endDate) query = query.lte('draw_date', endDate);
@@ -378,6 +379,7 @@ const getLatestDrawDate = async (supabase: any): Promise<string> => {
       .from('lottery_tickets')
       .select('draw_date')
       .eq('status', 'confirmed')
+      .is('deleted_at', null)
       .order('draw_date', { ascending: false })
       .limit(1);
 
@@ -702,6 +704,7 @@ const LotteryReportSummaryPage: React.FC = () => {
         .from('lottery_tickets')
         .select('draw_date')
         .eq('status', 'confirmed')
+        .is('deleted_at', null) // ✅ ไม่นำรายการที่ถูกลบมาคำนวณ
         .order('draw_date', { ascending: false });
       
       if (ticketsError) throw ticketsError;

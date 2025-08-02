@@ -218,7 +218,8 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
     let ticketQuery = supabase
       .from('lottery_tickets')
       .select('id, draw_date, total_amount, user_id, bill_number, lottery_ticket_items(*, lottery_sub_number(*))')
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .is('deleted_at', null);
     
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
@@ -308,7 +309,8 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
     let ticketQuery = supabase
       .from('lottery_tickets')
       .select('id, draw_date, bill_number, user_id, total_amount, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .is('deleted_at', null);
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
     }
@@ -425,7 +427,8 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
     let ticketQuery = supabase
       .from('lottery_tickets')
       .select('id, bill_number, draw_date, total_amount, status, user_id, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(*))')
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .is('deleted_at', null);
     
     if (drawDate) ticketQuery = ticketQuery.eq('draw_date', drawDate);
     if (userId && userId !== 'all') ticketQuery = ticketQuery.eq('user_id', userId);
@@ -507,6 +510,7 @@ const fetchNumberDetails = async (supabase: any, resultsMap: Record<string, Lott
       .from('lottery_tickets')
       .select('id, bill_number, draw_date, lottery_ticket_items!inner(*, lottery_sub_number(*))')
       .eq('status', 'confirmed')
+      .is('deleted_at', null)
       .eq('bill_number', billNumber);
     
     const { data: tickets, error: ticketError } = await ticketQuery;
@@ -584,7 +588,8 @@ const analyzeLotteryNumbers = async (supabase: any, drawDate?: string): Promise<
           )
         )
       `)
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .is('deleted_at', null);
     
     if (drawDate) {
       ticketQuery = ticketQuery.eq('draw_date', drawDate);
@@ -683,7 +688,8 @@ const analyzeLotteryNumbersDetailed = async (supabase: any, drawDate?: string, u
           )
         )
       `)
-      .eq('status', 'confirmed');
+      .eq('status', 'confirmed')
+      .is('deleted_at', null);
     
     // 🔧 เพิ่มการกรองตาม user_id ถ้ามี
     if (userId) {
@@ -998,6 +1004,7 @@ const LotterySummaryPage: React.FC = () => {
         .from('lottery_tickets')
         .select('draw_date')
         .eq('status', 'confirmed')
+        .is('deleted_at', null)
         .order('draw_date', { ascending: false });
       
       if (ticketsError) throw ticketsError;
@@ -1058,7 +1065,8 @@ const LotterySummaryPage: React.FC = () => {
             )
           `)
           .eq('draw_date', selectedDate)
-          .eq('status', 'confirmed');
+          .eq('status', 'confirmed')
+          .is('deleted_at', null);
         
         if (lotteryTypesError) throw lotteryTypesError;
         

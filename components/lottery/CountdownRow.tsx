@@ -110,7 +110,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
             }
             targetTime = nextDate;
             prefix = "รอบถัดไป";
-            color = "text-white";
+            color = "text-red-600";
           }
         } else {
           // วันนี้ไม่ใช่วันที่เปิดรับ หาวันถัดไป
@@ -141,7 +141,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
           }
           targetTime = nextDate;
           prefix = "รอบถัดไป";
-          color = "text-white";
+          color = "text-red-600";
         }
       } else if (schedule.day_of_week.includes("ของเดือน")) {
         // --- ตรรกะสำหรับรายการ "ของเดือน" ---
@@ -213,7 +213,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
               }
               targetTime = nextDate;
               prefix = "รอบถัดไป";
-              color = "text-white";
+              color = "text-red-600";
             }
           } else {
             // วันนี้ไม่ใช่วันที่เปิดรับ หาวันถัดไป
@@ -244,7 +244,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
             }
             targetTime = nextDate;
             prefix = "รอบถัดไป";
-            color = "text-white";
+            color = "text-red-600";
           }
         } else {
           setDisplayText("รูปแบบวันที่(เดือน)ไม่ถูกต้อง");
@@ -426,7 +426,7 @@ export default function CountdownRow({ schedule, isCurrentlyOpen }: CountdownRow
           } else {
             // วันนี้ไม่ใช่วันที่เปิดรับ
             setDisplayText("รอบถัดไป");
-            setTextColor("text-white");
+            setTextColor("text-red-600");
           }
         } else {
           setDisplayText("ไม่พบวันเปิดรับถัดไป");
