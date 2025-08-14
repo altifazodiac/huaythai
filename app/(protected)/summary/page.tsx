@@ -48,6 +48,8 @@ interface DailySummary {
   user_id: string;
   user_name: string;
   user_percent: number;
+  lottery_sub_type_id: number;
+  lottery_sub_type_name: string;
   total_bills: number;
   total_numbers: number;
   total_purchase_amount: number;
@@ -217,7 +219,7 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
   try {
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount, user_id, bill_number, lottery_ticket_items(*, lottery_sub_number(*))')
+      .select('id, draw_date, total_amount, user_id, bill_number, lottery_ticket_items(*, lottery_sub_number(*), lottery_sub_types(lottery_sub_type_id, sub_type_name, percent))')
       .eq('status', 'confirmed')
       .is('deleted_at', null);
     
@@ -251,40 +253,69 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
     console.log('fetchDailySummary - tickets dates:', tickets.map((t: any) => t.draw_date));
 
     const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
-    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
     if (profileError) throw profileError;
-    const profilesMap = new Map<string, { name: string, percent: number }>();
-    profiles.forEach((p: {id: string, name: string, percent: number}) => {
-      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+    const profilesMap = new Map<string, { name: string }>();
+    profiles.forEach((p: {id: string, name: string}) => {
+      profilesMap.set(p.id, { name: p.name });
     });
 
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
-      if (!ticket.user_id) return acc;
-      const key = `${ticket.draw_date}__${ticket.user_id}`;
-      if (!acc[key]) {
-        const userProfile = profilesMap.get(ticket.user_id);
-        acc[key] = {
-          draw_date: ticket.draw_date,
-          user_id: ticket.user_id,
-          user_name: userProfile?.name || 'ไม่ระบุ',
-          user_percent: userProfile?.percent || 0,
-          total_bills: 0,
-          total_numbers: 0,
-          total_purchase_amount: 0,
-          total_payout: 0,
-        };
-      }
-
-      // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
-      const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
+      if (!ticket.user_id || !ticket.lottery_ticket_items) return acc;
       
+      // Group ตาม user และ lottery_sub_type แยกกัน เพื่อให้ผู้ใช้สามารถมีหลายรายการตามประเภทหวย
+      const lotterySubTypes = new Set<number>();
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
-        acc[key].total_numbers += (item.numbers || []).length;
+        if (item.lottery_sub_types?.lottery_sub_type_id) {
+          lotterySubTypes.add(item.lottery_sub_types.lottery_sub_type_id);
+        }
+      });
+
+      lotterySubTypes.forEach((subTypeId: number) => {
+        const key = `${ticket.draw_date}__${ticket.user_id}__${subTypeId}`;
+        
+        if (!acc[key]) {
+          const userProfile = profilesMap.get(ticket.user_id);
+          // หา lottery_sub_type ข้อมูลสำหรับ subTypeId นี้
+          const subTypeInfo = (ticket.lottery_ticket_items || [])
+            .find((item: any) => item.lottery_sub_types?.lottery_sub_type_id === subTypeId)
+            ?.lottery_sub_types;
+          
+          acc[key] = {
+            draw_date: ticket.draw_date,
+            user_id: ticket.user_id,
+            user_name: userProfile?.name || 'ไม่ระบุ',
+            user_percent: subTypeInfo?.percent || 0,
+            lottery_sub_type_id: subTypeId,
+            lottery_sub_type_name: subTypeInfo?.sub_type_name || 'ไม่ระบุ',
+            total_bills: 0,
+            total_numbers: 0,
+            total_purchase_amount: 0,
+            total_payout: 0,
+          };
+        }
+
+        // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
+        const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
+        
+        // คำนวณเฉพาะ items ที่ตรงกับ lottery_sub_type_id นี้
+        const itemsForThisType = (ticket.lottery_ticket_items || [])
+          .filter((item: any) => item.lottery_sub_types?.lottery_sub_type_id === subTypeId);
+        
+        const numbersCount = itemsForThisType.reduce((sum: number, item: any) => 
+          sum + (item.numbers || []).length, 0);
+        
+        // คำนวณสัดส่วนของ amount และ payout สำหรับประเภทหวยนี้
+        const totalItemsInTicket = (ticket.lottery_ticket_items || []).length;
+        const itemsForThisTypeCount = itemsForThisType.length;
+        const proportionForThisType = totalItemsInTicket > 0 ? itemsForThisTypeCount / totalItemsInTicket : 0;
+        
+        acc[key].total_bills += 1;
+        acc[key].total_numbers += numbersCount;
+        acc[key].total_purchase_amount += Number(ticket.total_amount || 0) * proportionForThisType;
+        acc[key].total_payout += ticketPayout * proportionForThisType;
       });
       
-      acc[key].total_bills += 1;
-      acc[key].total_purchase_amount += Number(ticket.total_amount || 0);
-      acc[key].total_payout += ticketPayout;
       return acc;
     }, {});
 
@@ -334,24 +365,24 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
       winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
     });
 
-    // 🔧 ดึงข้อมูล user profiles สำหรับคำนวณคอมมิชชั่น
+    // 🔧 ดึงข้อมูล user profiles (ไม่ต้องใช้ percent จาก profiles อีกต่อไป)
     const userIds = [...new Set(tickets?.map((t: any) => t.user_id).filter(Boolean) || [])];
-    let profilesMap = new Map<string, { name: string, percent: number }>();
+    let profilesMap = new Map<string, { name: string }>();
     
     console.log('fetchLotteryTypeSummary - userIds:', userIds);
     
     if (userIds.length > 0) {
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select('id, name, percent')
+        .select('id, name')
         .in('id', userIds);
       
       if (profileError) throw profileError;
       
       console.log('fetchLotteryTypeSummary - profiles:', profiles);
       
-      profiles?.forEach((p: {id: string, name: string, percent: number}) => {
-        profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+      profiles?.forEach((p: {id: string, name: string}) => {
+        profilesMap.set(p.id, { name: p.name });
       });
     }
     
@@ -359,9 +390,8 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
       // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
       const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
       
-      // 🔧 ดึง user percent สำหรับคำนวณคอมมิชชั่น
+      // 🔧 ใช้ percent จาก lottery_sub_types แทน profiles
       const userProfile = profilesMap.get(ticket.user_id);
-      const userPercent = userProfile?.percent || 0;
       
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
         const subTypeId = item.lottery_sub_type_id;
@@ -385,8 +415,9 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
         const ticketTotalAmount = (ticket.lottery_ticket_items || []).reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
         const itemPayout = ticketTotalAmount > 0 ? (ticketPayout * Number(item.amount || 0)) / ticketTotalAmount : 0;
         
-        // 🔧 คำนวณคอมมิชชั่นสำหรับ item นี้
-        const itemCommission = (Number(item.amount || 0) * userPercent) / 100;
+        // 🔧 คำนวณคอมมิชชั่นสำหรับ item นี้ จาก lottery_sub_types.percent
+        const subTypePercent = subType.percent || 0;
+        const itemCommission = (Number(item.amount || 0) * subTypePercent) / 100;
       
         acc[subTypeId].total_bills.add(ticket.id);
         acc[subTypeId].total_numbers += (item.numbers || []).length;
@@ -456,11 +487,11 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
     });
     
     const userIds = [...new Set(tickets.map((t: any) => t.user_id))];
-    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
     if (profileError) throw profileError;
-    const profilesMap = new Map<string, { name: string, percent: number }>();
-    profiles.forEach((p: {id: string, name: string, percent: number}) => {
-      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+    const profilesMap = new Map<string, { name: string }>();
+    profiles.forEach((p: {id: string, name: string}) => {
+      profilesMap.set(p.id, { name: p.name });
     });
     
           const transformedData = tickets.map((ticket: any) => {
@@ -476,13 +507,21 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
           totalNumbers += (item.numbers || []).length;
         });
           
+          // คำนวณเปอร์เซนต์เฉลี่ยจาก lottery_sub_types.percent ของ ticket items
+          const ticketPercents = ticket.lottery_ticket_items
+            .map((item: any) => item.lottery_sub_types?.percent || 0)
+            .filter((p: number) => p > 0);
+          const avgPercent = ticketPercents.length > 0 
+            ? ticketPercents.reduce((sum: number, p: number) => sum + p, 0) / ticketPercents.length 
+            : 0;
+          
           const netProfitLoss = Number(ticket.total_amount || 0) - totalPayout;
-          const commissionAmount = (Number(ticket.total_amount || 0) * (userProfile?.percent || 0)) / 100;
+          const commissionAmount = (Number(ticket.total_amount || 0) * avgPercent) / 100;
           return {
             bill_number: ticket.bill_number,
             draw_date: ticket.draw_date,
             user_name: userProfile?.name || 'ไม่ระบุ',
-            user_percent: userProfile?.percent || 0,
+            user_percent: avgPercent,
             sub_type_name: subTypeNames.join(', '),
             country_origin: countries.join(', '),
             total_amount: Number(ticket.total_amount || 0),
@@ -1175,6 +1214,14 @@ const LotterySummaryPage: React.FC = () => {
     });
   };
 
+  // 🔧 เพิ่ม: Filtered data สำหรับ dailySummary ตาม selectedUserId
+  const filteredDailySummary = useMemo(() => {
+    if (selectedUserId === 'all' || !selectedUserId) {
+      return dailySummary;
+    }
+    return dailySummary.filter(item => item.user_id === selectedUserId);
+  }, [dailySummary, selectedUserId]);
+
   const clearFilters = () => {
     // 🔧 ใหม่: ตั้งค่าวันที่ล่าสุดแทนที่จะล้าง
     if (availableDates.length > 0) {
@@ -1219,6 +1266,7 @@ const LotterySummaryPage: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   {role === 'admin' && <TableHead>ผู้ใช้</TableHead>}
+                  <TableHead>ประเภทหวย</TableHead>
                   <TableHead>วันที่</TableHead>
                   <TableHead className="text-right">จำนวนบิล</TableHead>
                   <TableHead className="text-right">จำนวนเลข</TableHead>
@@ -1231,9 +1279,9 @@ const LotterySummaryPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {dailySummary.length === 0 ? (
+                {filteredDailySummary.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={role === 'admin' ? 9 : 6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={role === 'admin' ? 10 : 7} className="text-center py-8 text-muted-foreground">
                       <div className="flex flex-col items-center gap-2">
                         <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
                         <p>ไม่พบข้อมูลสรุปรายวัน</p>
@@ -1248,9 +1296,9 @@ const LotterySummaryPage: React.FC = () => {
                   </TableRow>
                 ) : (
                   <AnimatePresence>
-                    {dailySummary.map((item, index) => (
+                    {filteredDailySummary.map((item, index) => (
                     <motion.tr 
-                      key={item.draw_date + '__' + (item.user_id || '')}
+                      key={`${item.draw_date}__${item.user_id || ''}__${item.lottery_sub_type_id}`}
                       layout
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1269,6 +1317,13 @@ const LotterySummaryPage: React.FC = () => {
                           </div>
                         </TableCell>
                       )}
+                      <TableCell className="max-w-[180px]">
+                        <div className="truncate" title={item.lottery_sub_type_name}>
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                            {item.lottery_sub_type_name || 'ไม่ระบุ'}
+                          </Badge>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-medium">
                         {formatDate(item.draw_date)}
                       </TableCell>
@@ -1302,30 +1357,30 @@ const LotterySummaryPage: React.FC = () => {
                   ))}
                 </AnimatePresence>
                 )}
-                {role === 'admin' && dailySummary.length > 0 && (
+                {role === 'admin' && filteredDailySummary.length > 0 && (
                   <tr className="font-bold bg-gray-100 dark:bg-gray-800 dark:text-white text-black">
-                    <TableCell colSpan={1}>ยอดสุทธิรวม</TableCell>
+                    <TableCell colSpan={2}>ยอดสุทธิรวม</TableCell>
                     <TableCell></TableCell>
-                    <TableCell className="text-right">{dailySummary.reduce((sum, item) => sum + Number(item.total_bills), 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{dailySummary.reduce((sum, item) => sum + Number(item.total_numbers), 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0))}</TableCell>
+                    <TableCell className="text-right">{filteredDailySummary.reduce((sum, item) => sum + Number(item.total_bills), 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{filteredDailySummary.reduce((sum, item) => sum + Number(item.total_numbers), 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0))}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0))}</TableCell>
                     <TableCell className="text-right font-semibold">
-                      {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.net_profit_loss), 0))}
+                      {formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.net_profit_loss), 0))}
                     </TableCell>
                     <TableCell></TableCell>
                     <TableCell className="text-right text-purple-600 font-semibold">
-                      {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                      {formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-emerald-600">
-                      {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.net_amount), 0))}
+                      {formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.net_amount), 0))}
                     </TableCell>
                   </tr>
                 )}
               </TableBody>
             </Table>
           </div>
-          {role === 'admin' && dailySummary.length > 0 && (
+          {role === 'admin' && filteredDailySummary.length > 0 && (
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* ยอดซื้อรวม */}
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
@@ -1342,7 +1397,7 @@ const LotterySummaryPage: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                        {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0))}
+                        {formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.total_purchase_amount), 0))}
                       </p>
                     </div>
                   </div>
@@ -1364,7 +1419,7 @@ const LotterySummaryPage: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-green-700 dark:text-green-300">
-                        {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0))}
+                        {formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.total_payout), 0))}
                       </p>
                     </div>
                   </div>
@@ -1386,7 +1441,7 @@ const LotterySummaryPage: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
-                        {formatCurrency(dailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
+                        {formatCurrency(filteredDailySummary.reduce((sum, item) => sum + Number(item.commission_amount), 0))}
                       </p>
                     </div>
                   </div>
@@ -1966,9 +2021,15 @@ const LotterySummaryPage: React.FC = () => {
 
   // 🔧 **ใหม่**: แสดงผลการวิเคราะห์หมายเลขหวยแบบละเอียด
   const renderDetailedNumberAnalysisTab = () => {
-    // 🔧 กรองข้อมูลตามประเภทเลข
+    // 🔧 กรองข้อมูลตามประเภทเลขและคำค้นหา
     const filteredData = detailedNumberAnalysis.filter(item => {
-      return selectedNumberType === 'all' || item.type_number === selectedNumberType;
+      const matchesNumberType = selectedNumberType === 'all' || item.type_number === selectedNumberType;
+      const matchesSearch = !searchTerm || 
+        item.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.sub_type_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.country_origin.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return matchesNumberType && matchesSearch;
     });
 
     // 🔧 เรียงลำดับข้อมูล
@@ -2345,7 +2406,7 @@ const LotterySummaryPage: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-6' : 'md:grid-cols-4'} gap-4`}>
+                    <div className={`grid grid-cols-1 ${role === 'admin' ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4`}>
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           วันที่ ({availableDates.length} วัน)
@@ -2414,6 +2475,16 @@ const LotterySummaryPage: React.FC = () => {
                           value={selectedBillNumber}
                           onChange={(e) => setSelectedBillNumber(e.target.value)}
                           placeholder="ใส่เลขที่บิล"
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">ค้นหา</label>
+                        <Input
+                          type="text"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          placeholder="ค้นหาหมายเลข, ประเภทหวย, ประเทศ..."
                           className="w-full"
                         />
                       </div>

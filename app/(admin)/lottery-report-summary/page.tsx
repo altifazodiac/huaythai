@@ -106,8 +106,7 @@ interface UserSummary {
   total_remaining: number;
   total_profit_loss: number;
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
-  total_system_fee: number; // ค่าบริหารระบบ 5%
-  total_final_balance: number; // ยอดคงเหลือสุดท้าย = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
+
   bill_count: number;
   transaction_count: number;
   lottery_type_breakdown?: LotteryTypeBreakdown[]; // 🔧 เพิ่มข้อมูลประเภทหวย
@@ -121,8 +120,7 @@ interface LotteryTypeBreakdown {
   total_reward: number;
   total_commission: number;
   total_profit_loss: number;
-  total_system_fee: number;
-  total_final_balance: number;
+
   bill_count: number;
   transaction_count: number;
 }
@@ -136,8 +134,7 @@ interface DateGroupedReport {
   total_remaining: number;
   total_profit_loss: number;
   total_net_amount: number; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
-  total_system_fee: number; // ค่าบริหารระบบ 5%
-  total_final_balance: number; // ยอดคงเหลือสุดท้าย = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
+
   total_bills: number;
   total_transactions: number;
   users: UserSummary[];
@@ -200,7 +197,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   try {
     let query = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(lottery_sub_type_id, sub_type_name, country_origin))')
+      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(lottery_sub_type_id, sub_type_name, country_origin, percent))')
       .eq('status', 'confirmed')
       .is('deleted_at', null); // ✅ เพิ่มเงื่อนไขเพื่อไม่แสดงรายการที่ถูกลบ
 
@@ -226,18 +223,18 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
     });
 
-          // ดึงข้อมูล profiles แยก
+          // ดึงข้อมูล profiles แยก (ไม่ต้องใช้ percent จาก profiles แล้ว)
     const userIds = [...new Set(tickets?.map((t: any) => t.user_id) || [])];
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
-      .select('id, name, percent')
+      .select('id, name')
       .in('id', userIds);
     
     if (profileError) throw profileError;
     
-    const profilesMap = new Map<string, { name: string, percent: number }>();
-    (profiles || []).forEach((p: {id: string, name: string, percent: number}) => {
-      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
+    const profilesMap = new Map<string, { name: string }>();
+    (profiles || []).forEach((p: {id: string, name: string}) => {
+      profilesMap.set(p.id, { name: p.name });
     });
 
     return (tickets || []).map((ticket: any) => {
@@ -247,18 +244,25 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       const total_purchase_amount = Number(ticket.total_amount || 0);
       const profit_loss = total_purchase_amount - total_payout;
       
-      // คำนวณ commission และอื่นๆ
+      // คำนวณ commission จาก lottery_sub_types.percent
       const userProfile = profilesMap.get(ticket.user_id);
-      const commission_percentage = userProfile?.percent || 0;
+      // คำนวณเปอร์เซนต์เฉลี่ยจาก lottery_sub_types.percent ของ ticket items
+      const ticketPercents = (ticket.lottery_ticket_items || [])
+        .map((item: any) => item.lottery_sub_types?.percent || 0)
+        .filter((p: number) => p > 0);
+      const commission_percentage = ticketPercents.length > 0 
+        ? ticketPercents.reduce((sum: number, p: number) => sum + p, 0) / ticketPercents.length 
+        : 0;
       const commission_amount = total_purchase_amount * (commission_percentage / 100);
       const remaining_balance = profit_loss - commission_amount;
       const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 
-      // 🔧 ดึงข้อมูลประเภทหวยจาก lottery_ticket_items
+      // 🔧 ดึงข้อมูลประเภทหวยจาก lottery_ticket_items (รวม percent)
       const lottery_types = [...new Set((ticket.lottery_ticket_items || []).map((item: any) => ({
         lottery_sub_type_id: item.lottery_sub_types?.lottery_sub_type_id,
         sub_type_name: item.lottery_sub_types?.sub_type_name,
-        country_origin: item.lottery_sub_types?.country_origin
+        country_origin: item.lottery_sub_types?.country_origin,
+        percent: item.lottery_sub_types?.percent || 0
       })).filter((type: any) => type.lottery_sub_type_id))];
 
       return {
@@ -459,8 +463,7 @@ const LotteryReportSummaryPage: React.FC = () => {
           total_remaining: 0,
           total_profit_loss: 0,
           total_net_amount: 0,
-          total_system_fee: 0,
-          total_final_balance: 0,
+
           total_bills: 0,
           total_transactions: 0,
           users: [],
@@ -479,10 +482,7 @@ const LotteryReportSummaryPage: React.FC = () => {
       group.total_bills += transaction.bill_count;
       group.total_transactions += 1;
 
-      // Calculate system fee (5% of profit_loss)
-      const systemFee = transaction.profit_loss * 0.05;
-      group.total_system_fee += systemFee;
-      group.total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee); // ยอดคงเหลือ = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
+
 
       // Find or create user summary
       let userSummary = group.users.find((u: UserSummary) => u.user_id === transaction.user_id);
@@ -497,8 +497,7 @@ const LotteryReportSummaryPage: React.FC = () => {
           total_remaining: 0,
           total_profit_loss: 0,
           total_net_amount: 0,
-          total_system_fee: 0,
-          total_final_balance: 0,
+
           bill_count: 0,
           transaction_count: 0,
           lottery_type_breakdown: [] // 🔧 เพิ่ม breakdown ประเภทหวย
@@ -512,8 +511,7 @@ const LotteryReportSummaryPage: React.FC = () => {
       userSummary.total_remaining += transaction.remaining_balance;
       userSummary.total_profit_loss += transaction.profit_loss;
       userSummary.total_net_amount += transaction.net_amount;
-      userSummary.total_system_fee += systemFee;
-      userSummary.total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee); // ยอดคงเหลือ = กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ
+
       userSummary.bill_count += transaction.bill_count;
       userSummary.transaction_count += 1;
     });
@@ -560,22 +558,17 @@ const LotteryReportSummaryPage: React.FC = () => {
                 total_reward: 0,
                 total_commission: 0,
                 total_profit_loss: 0,
-                total_system_fee: 0,
-                total_final_balance: 0,
+
                 bill_count: 0,
                 transaction_count: 0
               };
             }
 
             // คำนวณสัดส่วนของประเภทหวยนี้ในการซื้อ
-            const systemFee = transaction.profit_loss * 0.05;
-            
             lotteryTypeGroups[typeId].total_purchase += transaction.total_purchase_amount / lotteryTypes.length;
             lotteryTypeGroups[typeId].total_reward += transaction.total_payout / lotteryTypes.length;
             lotteryTypeGroups[typeId].total_commission += transaction.commission_amount / lotteryTypes.length;
             lotteryTypeGroups[typeId].total_profit_loss += transaction.profit_loss / lotteryTypes.length;
-            lotteryTypeGroups[typeId].total_system_fee += systemFee / lotteryTypes.length;
-            lotteryTypeGroups[typeId].total_final_balance += (transaction.profit_loss - transaction.commission_amount - systemFee) / lotteryTypes.length;
             lotteryTypeGroups[typeId].bill_count += transaction.bill_count / lotteryTypes.length;
             lotteryTypeGroups[typeId].transaction_count += 1 / lotteryTypes.length;
           });
@@ -841,8 +834,7 @@ const LotteryReportSummaryPage: React.FC = () => {
         total_reward: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_reward, 0),
         total_commission: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_commission, 0),
         total_profit_loss: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_profit_loss, 0),
-        total_system_fee: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_system_fee, 0),
-        total_final_balance: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.total_final_balance, 0),
+
         total_bills: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.bill_count, 0),
         total_transactions: dateGroup.users.filter(user => user.user_id === selectedUserId).reduce((sum, user) => sum + user.transaction_count, 0),
       }));
@@ -876,8 +868,7 @@ const LotteryReportSummaryPage: React.FC = () => {
             total_reward: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_reward, 0),
             total_commission: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_commission, 0),
             total_profit_loss: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_profit_loss, 0),
-            total_system_fee: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_system_fee, 0),
-            total_final_balance: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.total_final_balance, 0),
+
             bill_count: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.bill_count, 0),
             transaction_count: filteredBreakdown.reduce((sum, breakdown) => sum + breakdown.transaction_count, 0),
           };
@@ -892,8 +883,7 @@ const LotteryReportSummaryPage: React.FC = () => {
         total_reward: dateGroup.users.reduce((sum, user) => sum + user.total_reward, 0),
         total_commission: dateGroup.users.reduce((sum, user) => sum + user.total_commission, 0),
         total_profit_loss: dateGroup.users.reduce((sum, user) => sum + user.total_profit_loss, 0),
-        total_system_fee: dateGroup.users.reduce((sum, user) => sum + user.total_system_fee, 0),
-        total_final_balance: dateGroup.users.reduce((sum, user) => sum + user.total_final_balance, 0),
+
         total_bills: dateGroup.users.reduce((sum, user) => sum + user.bill_count, 0),
         total_transactions: dateGroup.users.reduce((sum, user) => sum + user.transaction_count, 0),
       })).filter(dateGroup => dateGroup.users.length > 0);
@@ -1315,8 +1305,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         <TableHead className="text-right w-32">ค่าคอม</TableHead>
                                         <TableHead className="text-right w-32">ยอดจ่าย</TableHead>
                                         <TableHead className="text-right w-32">กำไร/ขาดทุน</TableHead>
-                                        <TableHead className="text-right w-32">ค่าบริหารระบบ(5%)</TableHead>
-                                        <TableHead className="text-right w-32">ยอดคงเหลือ</TableHead>
+
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1364,14 +1353,9 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(dateReport.total_profit_loss)}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right">
-                                            <span className="text-blue-600 font-medium">
-                                              {formatCurrency(dateReport.total_system_fee)}
-                                            </span>
-                                          </TableCell>
                                           <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
-                                            <span className={`font-medium ${dateReport.total_final_balance >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
-                                              {formatCurrency(dateReport.total_final_balance)}
+                                            <span className={`font-medium ${dateReport.total_profit_loss >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
+                                              {formatCurrency(dateReport.total_profit_loss)}
                                             </span>
                                           </TableCell>
                                         </TableRow>
@@ -1455,14 +1439,9 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(user.total_profit_loss)}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right">
-                                            <span className="text-blue-600 font-medium">
-                                              {formatCurrency(user.total_system_fee)}
-                                            </span>
-                                          </TableCell>
                                                   <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
-                                                    <span className={`font-medium ${user.total_final_balance >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
-                                                      {formatCurrency(user.total_final_balance)}
+                                                    <span className={`font-medium ${user.total_profit_loss >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
+                                                      {formatCurrency(user.total_profit_loss)}
                                                     </span>
                                                   </TableCell>
                                                 </TableRow>
@@ -1484,8 +1463,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                                                 <TableHead className="text-xs text-right">ค่าคอม</TableHead>
                                                                 <TableHead className="text-xs text-right">ยอดจ่าย</TableHead>
                                                                 <TableHead className="text-xs text-right">กำไร/ขาดทุน</TableHead>
-                                                                <TableHead className="text-xs text-right">ค่าบริหาร(5%)</TableHead>
-                                                                <TableHead className="text-xs text-right">ยอดคงเหลือ</TableHead>
+
                                                               </TableRow>
                                                             </TableHeader>
                                                             <TableBody>
@@ -1511,14 +1489,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                                                       {formatCurrency(lotteryType.total_profit_loss)}
                                                                     </span>
                                                                   </TableCell>
-                                                                  <TableCell className="text-right text-blue-600">
-                                                                    {formatCurrency(lotteryType.total_system_fee)}
-                                                                  </TableCell>
-                                                                  <TableCell className="text-right">
-                                                                    <span className={`font-medium ${lotteryType.total_final_balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                                                      {formatCurrency(lotteryType.total_final_balance)}
-                                                                    </span>
-                                                                  </TableCell>
+
                                                                 </TableRow>
                                                               ))}
                                                             </TableBody>
@@ -1550,11 +1521,8 @@ const LotteryReportSummaryPage: React.FC = () => {
                                               {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
                                             </span>
                                           </TableCell>
-                                          <TableCell className="text-right text-blue-600">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_system_fee, 0))}
-                                          </TableCell>
                                           <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_final_balance, 0))}
+                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
                                           </TableCell>
                                             </TableRow>
                                           )}
@@ -1593,8 +1561,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                     <TableHead className="text-right w-32">ค่าคอม</TableHead>
                                     <TableHead className="text-right w-32">ยอดจ่าย</TableHead>
                                     <TableHead className="text-right w-32">กำไร/ขาดทุน</TableHead>
-                                    <TableHead className="text-right w-32">ค่าบริหารระบบ</TableHead>
-                                    <TableHead className="text-right w-32">ยอดคงเหลือสุดท้าย</TableHead>
+
                                     <TableHead className="text-right w-20">อัตราส่วนกำไร</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -1646,16 +1613,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                           {formatCurrency(dateReport.total_profit_loss)}
                                         </span>
                                       </TableCell>
-                                      <TableCell className="text-right">
-                                        <span className="text-blue-600 font-medium">
-                                          {formatCurrency(dateReport.total_system_fee)}
-                                        </span>
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        <span className={`font-medium ${dateReport.total_final_balance >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
-                                          {formatCurrency(dateReport.total_final_balance)}
-                                        </span>
-                                      </TableCell>
+
                                       <TableCell></TableCell>
                                     </TableRow>
                                   ))}
@@ -1682,12 +1640,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                                           {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0))}
                                         </span>
                                       </TableCell>
-                                      <TableCell className="text-right text-blue-600">
-                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_system_fee, 0))}
-                                      </TableCell>
-                                      <TableCell className="text-right text-emerald-600">
-                                        {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
-                                      </TableCell>
+
                                       <TableCell></TableCell>
                                     </TableRow>
                                   </TableBody>
@@ -1705,12 +1658,12 @@ const LotteryReportSummaryPage: React.FC = () => {
                 <Card className="mt-8">
                   <CardHeader>
                     <CardTitle className="text-xl flex items-center">
-                      <Computer className="h-5 w-5 mr-2" />
-                      ค่าบริหารระบบ
+                      <Calculator className="h-5 w-5 mr-2" />
+                      สรุปยอดรวม
                     </CardTitle>
                   </CardHeader>
                                       <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* กำไร/ขาดทุนรวม */}
                         <Card className="bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 border-emerald-200 dark:border-emerald-800">
                           <CardContent className="p-4">
@@ -1733,28 +1686,6 @@ const LotteryReportSummaryPage: React.FC = () => {
                           </CardContent>
                         </Card>
 
-                        {/* ค่าบริหารระบบ (5%) */}
-                        <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                  <Computer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300">ค่าบริหารระบบ</p>
-                                  <p className="text-xs text-blue-600/70 dark:text-blue-400/70">System Management (5%)</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                  {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05)}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-
                         {/* ยอดคงเหลือสุดท้าย */}
                         <Card className="bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800">
                           <CardContent className="p-4">
@@ -1770,7 +1701,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                               </div>
                               <div className="text-right">
                                 <p className="text-lg font-bold text-purple-700 dark:text-purple-300">
-                                  {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
+                                  {formatCurrency(filteredDateData.reduce((sum, item) => sum + (item.total_profit_loss - item.total_commission), 0))}
                                 </p>
                               </div>
                             </div>
@@ -1783,7 +1714,7 @@ const LotteryReportSummaryPage: React.FC = () => {
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">สรุปการคำนวณ</h3>
                           <Badge variant="outline" className="text-xs">
-                            กำไร/ขาดทุน - ค่าคอมมิชชั่น - ค่าบริหารระบบ = ยอดคงเหลือสุดท้าย
+                            กำไร/ขาดทุน - ค่าคอมมิชชั่น = ยอดสุทธิ
                           </Badge>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -1794,15 +1725,15 @@ const LotteryReportSummaryPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">
-                            <span className="text-gray-600 dark:text-gray-400">ค่าบริหารระบบ (5%):</span>
+                            <span className="text-gray-600 dark:text-gray-400">ค่าคอมมิชชั่นรวม:</span>
                             <span className="font-semibold text-blue-600">
-                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_profit_loss, 0) * 0.05)}
+                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_commission, 0))}
                             </span>
                           </div>
                           <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded border dark:border-gray-700">
                             <span className="text-gray-600 dark:text-gray-400">ยอดคงเหลือสุดท้าย:</span>
                             <span className="font-semibold text-purple-600">
-                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + item.total_final_balance, 0))}
+                              {formatCurrency(filteredDateData.reduce((sum, item) => sum + (item.total_profit_loss - item.total_commission), 0))}
                             </span>
                           </div>
                         </div>

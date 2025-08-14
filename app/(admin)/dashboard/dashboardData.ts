@@ -2,6 +2,26 @@ import { supabase } from '@/lib/supabase/supabaseClient'
 // Remove the conflicting import since calculateWinningsForItem is defined in this file
 // import { calculateWinningsForItem } from '@/lib/utils/lottery-utils'
 
+// Performance optimization: ใช้ cache สำหรับข้อมูลที่ไม่เปลี่ยนแปลงบ่อย
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const cache = new Map<string, { data: any; timestamp: number }>()
+
+function getCacheKey(functionName: string, params: any[]): string {
+  return `${functionName}-${JSON.stringify(params)}`
+}
+
+function getFromCache<T>(key: string): T | null {
+  const cached = cache.get(key)
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data
+  }
+  return null
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() })
+}
+
 export interface DashboardData {
   users: {
     total: number
@@ -541,11 +561,21 @@ export function filterDashboardDataByDateRange(
 
 export async function fetchDashboardData(dateRange: string = 'week'): Promise<DashboardData> {
   try {
+    // Performance: ใช้ cache สำหรับ dashboard data
+    const cacheKey = getCacheKey('fetchDashboardData', [dateRange])
+    const cached = getFromCache<DashboardData>(cacheKey)
+    if (cached) {
+      return cached
+    }
     // ดึงข้อมูลทั้งหมดก่อน
     const allData = await fetchAllDashboardData()
     
     // Filter ข้อมูลตามช่วงเวลาที่เลือก
-    return filterDashboardDataByDateRange(allData, dateRange)
+    const result = filterDashboardDataByDateRange(allData, dateRange)
+    
+    // Performance: บันทึกผลลัพธ์ลง cache
+    setCache(cacheKey, result)
+    return result
   } catch (error) {
     console.error('Error fetching dashboard data:', error)
     return getEmptyDashboardData()
@@ -1530,7 +1560,13 @@ async function fetchRecentActivitiesData(startDate: Date) {
 
 async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
   try {
-    // ดึงข้อมูลบิลและค่าคอมมิชชั่น
+    // Performance: ใช้ cache สำหรับ commission data
+    const cacheKey = getCacheKey('fetchCommissionData', [startDate.toISOString(), previousStartDate.toISOString()])
+    const cached = getFromCache(cacheKey)
+    if (cached) {
+      return cached
+    }
+    // ดึงข้อมูลบิลและค่าคอมมิชชั่น (ใช้ lottery_sub_types.percent แทน profiles.percent)
     const { data: tickets } = await supabase
       .from('lottery_tickets')
       .select(`
@@ -1543,13 +1579,19 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
         profiles!inner(
           id,
           name,
-          branch,
-          percent
+          branch
+        ),
+        lottery_ticket_items!inner(
+          lottery_sub_types!inner(
+            percent
+          )
         )
       `)
       .gte('draw_date', previousStartDate.toISOString())
       .eq('status', 'confirmed')
+      .is('deleted_at', null)
       .order('draw_date', { ascending: false })
+      .limit(1000) // Performance: จำกัดจำนวนข้อมูลที่ดึงมา
 
     if (!tickets || tickets.length === 0) {
       return {
@@ -1565,9 +1607,17 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
       }
     }
 
-    // คำนวณค่าคอมมิชชั่นสำหรับแต่ละบิล
+    // คำนวณค่าคอมมิชชั่นสำหรับแต่ละบิล (ใช้ lottery_sub_types.percent)
     const commissionData = tickets.map((ticket: any) => {
-      const commissionRate = ticket.profiles?.percent || 0
+      // คำนวณเปอร์เซนต์เฉลี่ยจาก lottery_sub_types.percent ของ ticket items
+      const ticketPercents = (ticket.lottery_ticket_items || [])
+        .map((item: any) => item.lottery_sub_types?.percent || 0)
+        .filter((p: number) => p > 0)
+      
+      const commissionRate = ticketPercents.length > 0 
+        ? ticketPercents.reduce((sum: number, p: number) => sum + p, 0) / ticketPercents.length 
+        : 0
+      
       const commission = (ticket.total_amount * commissionRate) / 100
       return {
         ...ticket,
@@ -1707,7 +1757,7 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
       }
     })
 
-    return {
+    const result = {
       total: totalCommission,
       totalPaid,
       totalPending,
@@ -1718,6 +1768,10 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
       commissionByBranch,
       commissionTrends
     }
+
+    // Performance: บันทึกผลลัพธ์ลง cache
+    setCache(cacheKey, result)
+    return result
   } catch (error) {
     console.error('Error fetching commission data:', error)
     return {
