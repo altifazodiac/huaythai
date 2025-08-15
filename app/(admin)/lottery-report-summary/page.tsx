@@ -1275,19 +1275,11 @@ const LotteryReportSummaryPage: React.FC = () => {
                                         <div className="font-semibold text-lg text-blue-600">{formatCurrency(dateReport.total_commission)}</div>
                                         <div className="text-sm text-muted-foreground">ค่าคอม</div>
                                       </div>
-                                      <div className="text-right">
-                                        <div className={`font-semibold text-lg ${dateReport.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                          {formatCurrency(dateReport.total_profit_loss)}
-                                        </div>
-                                        <div className="text-sm text-muted-foreground">
-                                          {dateReport.total_profit_loss >= 0 ? 'กำไร' : 'ขาดทุน'}
-                                        </div>
-                                      </div>
                                       <div className="text-right rounded-md border border-green-200 bg-green-100 dark:border-green-800 dark:bg-green-900/20 p-4">
                                         <div className={`font-semibold text-lg ${dateReport.total_net_amount >= 0 ? 'text-emerald-600' : 'text-orange-600'}`}>
                                           {formatCurrency(dateReport.total_net_amount)}
                                         </div>
-                                        <div className="text-sm text-muted-foreground">หลังหักค่าคอม</div>
+                                        <div className="text-sm text-muted-foreground">กำไร/ขาดทุน (สุทธิ)</div>
                                       </div>
                                     </div>
                                   )}
@@ -1344,18 +1336,13 @@ const LotteryReportSummaryPage: React.FC = () => {
                                             </span>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <span className={`font-medium ${dateReport.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                              {dateReport.total_profit_loss >= 0 ? (
+                                            <span className={`font-medium ${dateReport.total_net_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                              {dateReport.total_net_amount >= 0 ? (
                                                 <PlusCircle className="h-4 w-4 inline mr-1" />
                                               ) : (
                                                 <MinusCircle className="h-4 w-4 inline mr-1" />
                                               )}
-                                              {formatCurrency(dateReport.total_profit_loss)}
-                                            </span>
-                                          </TableCell>
-                                          <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
-                                            <span className={`font-medium ${dateReport.total_profit_loss >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
-                                              {formatCurrency(dateReport.total_profit_loss)}
+                                              {formatCurrency(dateReport.total_net_amount)}
                                             </span>
                                           </TableCell>
                                         </TableRow>
@@ -1430,20 +1417,15 @@ const LotteryReportSummaryPage: React.FC = () => {
                                             </span>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <span className={`font-medium ${user.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                              {user.total_profit_loss >= 0 ? (
+                                            <span className={`font-medium ${user.total_net_amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                              {user.total_net_amount >= 0 ? (
                                                 <PlusCircle className="h-4 w-4 inline mr-1" />
                                               ) : (
                                                 <MinusCircle className="h-4 w-4 inline mr-1" />
                                               )}
-                                              {formatCurrency(user.total_profit_loss)}
+                                              {formatCurrency(user.total_net_amount)}
                                             </span>
                                           </TableCell>
-                                                  <TableCell className="text-right bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 p-2">
-                                                    <span className={`font-medium ${user.total_profit_loss >= 0 ? 'text-emerald-900 dark:text-emerald-100' : 'text-orange-600'}`}>
-                                                      {formatCurrency(user.total_profit_loss)}
-                                                    </span>
-                                                  </TableCell>
                                                 </TableRow>
 
                                                 {/* 🔧 แสดงรายละเอียดประเภทหวยเมื่อขยาย (เฉพาะเมื่อไม่ได้เลือกประเภทหวยเฉพาะ) */}
@@ -1485,8 +1467,8 @@ const LotteryReportSummaryPage: React.FC = () => {
                                                                     {formatCurrency(lotteryType.total_reward)}
                                                                   </TableCell>
                                                                   <TableCell className="text-right">
-                                                                    <span className={lotteryType.total_profit_loss >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                                      {formatCurrency(lotteryType.total_profit_loss)}
+                                                                    <span className={(lotteryType.total_profit_loss - lotteryType.total_commission) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                      {formatCurrency(lotteryType.total_profit_loss - lotteryType.total_commission)}
                                                                     </span>
                                                                   </TableCell>
 
@@ -1517,12 +1499,9 @@ const LotteryReportSummaryPage: React.FC = () => {
                                             {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_reward, 0))}
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <span className={dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                              {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
+                                            <span className={dateReport.users.reduce((sum, user) => sum + user.total_net_amount, 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                              {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_net_amount, 0))}
                                             </span>
-                                          </TableCell>
-                                          <TableCell className="text-right text-emerald-900 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100">
-                                            {formatCurrency(dateReport.users.reduce((sum, user) => sum + user.total_profit_loss, 0))}
                                           </TableCell>
                                             </TableRow>
                                           )}
