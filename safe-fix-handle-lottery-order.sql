@@ -210,6 +210,7 @@ END $$;
 -- 6. Create unique constraint for bill_number safely
 DO $$
 BEGIN
+    -- Check if constraint already exists
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint 
         WHERE conname = 'unique_bill_number' 
@@ -229,6 +230,8 @@ BEGIN
             ADD CONSTRAINT unique_bill_number UNIQUE (bill_number);
             RAISE NOTICE 'Added unique_bill_number constraint';
         END IF;
+    ELSE
+        RAISE NOTICE 'Constraint unique_bill_number already exists - skipping';
     END IF;
 END $$;
 

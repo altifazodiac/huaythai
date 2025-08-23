@@ -576,7 +576,6 @@ export default function LotteryPurchasePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTicket, setDeletingTicket] = useState<LotteryTicket | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
-  const [deleteDate, setDeleteDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showDeleted, setShowDeleted] = useState(false);
   const [statusEditDialogOpen, setStatusEditDialogOpen] = useState(false);
@@ -672,31 +671,18 @@ export default function LotteryPurchasePage() {
   const handleDeleteTicket = async () => {
     if (!deletingTicket || !user) return;
     try {
-      // Convert deleteDate to ISO string with time
-      const deleteDateTime = new Date(deleteDate);
-      deleteDateTime.setHours(23, 59, 59, 999); // Set to end of day
-      
-      const { error } = await supabase
-        .from("lottery_tickets")
-        .update({ deleted_at: deleteDateTime.toISOString() })
-        .eq("id", deletingTicket.id);
+      // ใช้ RPC function แทนการ UPDATE โดยตรง เพื่อข้ามการตรวจสอบ draw_date validation
+      const { error } = await supabase.rpc('soft_delete_lottery_ticket', {
+        ticket_id: deletingTicket.id,
+        delete_reason: deleteReason || 'ลบโดยผู้ใช้'
+      });
       
       if (error) throw error;
       
-      await supabase
-        .from("delete_history")
-        .insert({
-          ticket_id: deletingTicket.id,
-          user_id: user.id,
-          reason: deleteReason,
-          deleted_at: deleteDateTime.toISOString(),
-        });
-        
       toast.success("ลบรายการสำเร็จ (จะถูกลบถาวรใน 30 วัน)");
       setDeleteDialogOpen(false);
       setDeletingTicket(null);
       setDeleteReason("");
-      setDeleteDate(format(new Date(), 'yyyy-MM-dd')); // Reset to today
       refetch(); // Refresh the data
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการลบ: " + error.message);
@@ -706,22 +692,9 @@ export default function LotteryPurchasePage() {
   // Restore function
   const handleRestoreTicket = async (ticket: LotteryTicket) => {
     try {
-      // Check if draw_date is in the past and update it to today if needed
-      const currentDrawDate = new Date(ticket.draw_date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to start of day
-      
-      let updateData: any = { deleted_at: null };
-      
-      // If draw_date is in the past, update it to today
-      if (currentDrawDate < today) {
-        updateData.draw_date = format(today, 'yyyy-MM-dd');
-        updateData.updated_at = new Date().toISOString();
-      }
-      
       const { error } = await supabase
         .from("lottery_tickets")
-        .update(updateData)
+        .update({ deleted_at: null })
         .eq("id", ticket.id);
       
       if (error) throw error;
@@ -732,11 +705,7 @@ export default function LotteryPurchasePage() {
         .delete()
         .eq("ticket_id", ticket.id);
         
-      if (updateData.draw_date) {
-        toast.success("กู้คืนรายการสำเร็จ และอัปเดตวันที่ออกรางวัลเป็นวันนี้");
-      } else {
-        toast.success("กู้คืนรายการสำเร็จ");
-      }
+      toast.success("กู้คืนรายการสำเร็จ");
       refetch(); // Refresh the data
     } catch (error: any) {
       toast.error("เกิดข้อผิดพลาดในการกู้คืน: " + error.message);
@@ -1333,29 +1302,12 @@ export default function LotteryPurchasePage() {
                       <br />
                       (ข้อมูลจะถูกเก็บไว้อีก 30 วันก่อนลบถาวร)
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">วันที่ลบ:</label>
-                        <Input
-                          type="date"
-                          value={deleteDate}
-                          onChange={(e) => setDeleteDate(e.target.value)}
-                          className="w-full"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          เลือกวันที่ลบย้อนหลัง (สามารถเลือกวันที่ใดก็ได้)
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">เหตุผลในการลบ:</label>
-                        <Input
-                          placeholder="เหตุผลในการลบ (ไม่บังคับ)"
-                          value={deleteReason}
-                          onChange={(e) => setDeleteReason(e.target.value)}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
+                    <Input
+                      placeholder="เหตุผลในการลบ (ไม่บังคับ)"
+                      value={deleteReason}
+                      onChange={(e) => setDeleteReason(e.target.value)}
+                      className="mb-2"
+                    />
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
                         ยกเลิก
