@@ -14,8 +14,7 @@
     "import:lottery": "bun run import-lottery-results.ts",
     "send:lottery": "bun run send-lottery-results.ts",
     "playwright:install": "npx playwright install chromium",
-    "playwright:install-deps": "npx playwright install-deps chromium",
-    "postinstall": "npm rebuild lightningcss"
+    "playwright:install-deps": "npx playwright install-deps chromium"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
