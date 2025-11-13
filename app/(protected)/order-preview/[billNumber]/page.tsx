@@ -433,7 +433,7 @@ export default function OrderPreviewPage() {
               <div className="flex items-center gap-4">
                 <div className=" rounded-full">
                 <Image
-              src="https://bqgiwmawqnixpgvuqhuc.supabase.co/storage/v1/object/public/images//Logo2.png"
+              src="https://uhdvxoqvtdimtufaxsya.supabase.co/storage/v1/object/public/images//Logo2.png"
               alt="logo"
               width={80}
               height={80}
