@@ -76,7 +76,7 @@ chmod +x run-safe-fix.sh
 ## 🔧 Environment Variables ที่ต้องการ:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://uhdvxoqvtdimtufaxsya.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://wbvgdqiozztgqodtajui.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 

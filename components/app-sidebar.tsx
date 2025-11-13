@@ -86,7 +86,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <div className="flex items-center gap-3 group">
             {/* --- โลโก้ --- */}
             <Image
-              src="https://uhdvxoqvtdimtufaxsya.supabase.co/storage/v1/object/public/images//Logo2.png"
+              src="https://wbvgdqiozztgqodtajui.supabase.co/storage/v1/object/public/images//Logo2.png"
               alt="logo"
               width={60}
               height={60}

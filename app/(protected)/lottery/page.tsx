@@ -103,7 +103,7 @@ export default async function Page() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  const imageUrl = 'https://uhdvxoqvtdimtufaxsya.supabase.co/storage/v1/object/public/images//BG2.png';
+  const imageUrl = 'https://wbvgdqiozztgqodtajui.supabase.co/storage/v1/object/public/images//BG2.png';
   const [{ data: typesData }, { data: subTypesData }, { data: schedulesData }] = await Promise.all([
     supabase.from("lottery_types").select(),
     supabase.from("lottery_sub_types").select(),

@@ -5,7 +5,7 @@
 เมื่อเข้าถึงหน้า results จะเกิดข้อผิดพลาด 403 Forbidden เมื่อพยายามเข้าถึงตาราง `lottery_winning_bills`:
 
 ```
-POST https://uhdvxoqvtdimtufaxsya.supabase.co/rest/v1/lottery_winning_bills?on_conflict=bill_number 403 (Forbidden)
+POST https://wbvgdqiozztgqodtajui.supabase.co/rest/v1/lottery_winning_bills?on_conflict=bill_number 403 (Forbidden)
 ```
 
 ## 🔍 สาเหตุของปัญหา

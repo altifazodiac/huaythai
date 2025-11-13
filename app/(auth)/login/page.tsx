@@ -273,7 +273,7 @@ const LoginPage = () => {
         {/* Image section */}
         <div className="w-full md:w-1/2 h-48 md:h-auto relative flex items-center justify-center bg-gradient-to-br from-red-800 via-red-600 to-red-300">
           <img
-            src="https://uhdvxoqvtdimtufaxsya.supabase.co/storage/v1/object/public/images/BgLogin.png"
+            src="https://wbvgdqiozztgqodtajui.supabase.co/storage/v1/object/public/images/BgLogin.png"
             alt="Login Background"
             className="w-full h-full object-cover object-center opacity-80"
             style={{ mixBlendMode: "screen", filter: "drop-shadow(0 0 40px #ff1439)" }}
@@ -293,7 +293,7 @@ const LoginPage = () => {
             className="w-full"
           >
           <Image
-              src="https://uhdvxoqvtdimtufaxsya.supabase.co/storage/v1/object/public/images/Logo2.png"
+              src="https://wbvgdqiozztgqodtajui.supabase.co/storage/v1/object/public/images/Logo2.png"
               alt="logo"
               width={180}
               height={180}
