@@ -442,6 +442,15 @@ const LoginPage = () => {
             alt="Login Background"
             className="w-full h-full object-cover object-center opacity-80"
             style={{ mixBlendMode: "screen", filter: "drop-shadow(0 0 40px #ff1439)" }}
+            onError={(e) => {
+              // ถ้ารูปพื้นหลังโหลดไม่ได้ ให้ซ่อนรูปและใช้ gradient แทน
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              console.log('🖼️ ซ่อนรูปพื้นหลัง ใช้ gradient แทน');
+            }}
+            onLoad={() => {
+              console.log('🖼️ โหลดรูปพื้นหลังจาก Supabase สำเร็จ');
+            }}
           />
           {/* Overlay for better contrast */}
           <div className="absolute inset-0 bg-gradient-to-t from-red-900/70 to-transparent" />
@@ -457,19 +466,30 @@ const LoginPage = () => {
             variants={{ visible: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } } }}
             className="w-full"
           >
-          <Image
-              src="https://wbvgdqiozztgqodtajui.supabase.co/storage/v1/object/public/images/Logo2.png"
+          <div className="flex justify-center mb-6">
+            <img
+              src="/Logo.png"
               alt="logo"
               width={180}
               height={180}
               className={`
                 rounded-full  
-               animate-fade-in-up 
-                ml-24
+                animate-fade-in-up 
                 shadow-md
+                object-cover
               `}
               style={{ animationDelay: '0.2s' }}
+              onError={(e) => {
+                // ถ้ารูปจาก public folder โหลดไม่ได้ ให้ลองจาก Supabase
+                const target = e.target as HTMLImageElement;
+                target.src = 'https://wbvgdqiozztgqodtajui.supabase.co/storage/v1/object/public/images/Logo2.png';
+                console.log('🖼️ ลองโหลดโลโก้จาก Supabase');
+              }}
+              onLoad={() => {
+                console.log('🖼️ โหลดโลโก้จาก public folder สำเร็จ');
+              }}
             />
+          </div>
             <motion.h1 variants={itemVariants} className="text-4xl font-extrabold text-red-900 ">
               <span className="text-red-600  ">เข้าสู่ระบบ</span>
             </motion.h1>
