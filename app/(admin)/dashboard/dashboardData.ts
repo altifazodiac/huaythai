@@ -313,6 +313,9 @@ export interface DashboardData {
   }
 }
 
+// Derive specific types from DashboardData to ensure strong typing
+type CommissionData = DashboardData['commission']
+
 // ฟังก์ชันใหม่: ดึงข้อมูลทั้งหมดแล้ว filter ตามช่วงเวลา
 export async function fetchAllDashboardData(): Promise<DashboardData> {
   try {
@@ -1558,11 +1561,11 @@ async function fetchRecentActivitiesData(startDate: Date) {
   }
 }
 
-async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
+async function fetchCommissionData(startDate: Date, previousStartDate: Date): Promise<CommissionData> {
   try {
     // Performance: ใช้ cache สำหรับ commission data
     const cacheKey = getCacheKey('fetchCommissionData', [startDate.toISOString(), previousStartDate.toISOString()])
-    const cached = getFromCache(cacheKey)
+    const cached = getFromCache<CommissionData>(cacheKey)
     if (cached) {
       return cached
     }
@@ -1757,7 +1760,7 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
       }
     })
 
-    const result = {
+    const result: CommissionData = {
       total: totalCommission,
       totalPaid,
       totalPending,
@@ -1770,7 +1773,7 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date) {
     }
 
     // Performance: บันทึกผลลัพธ์ลง cache
-    setCache(cacheKey, result)
+    setCache<CommissionData>(cacheKey, result)
     return result
   } catch (error) {
     console.error('Error fetching commission data:', error)

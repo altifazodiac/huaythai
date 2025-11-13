@@ -87,6 +87,7 @@
     "react-virtuoso": "^4.13.0",
     "react-window": "^1.8.11",
     "sonner": "^2.0.3",
+    "supabase": "^2.58.5",
     "swagger-ui-react": "^5.22.0",
     "tailwind-merge": "^3.3.0",
     "tesseract.js": "^6.0.1",
