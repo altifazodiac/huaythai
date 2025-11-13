@@ -20,6 +20,14 @@ const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [dbTables, setDbTables] = useState<any[]>([]);
+  const [loadingTables, setLoadingTables] = useState(false);
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -240,6 +248,111 @@ const LoginPage = () => {
     }
   };
 
+  const handleResetPassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    console.log('🔄 เริ่มการรีเซ็ตรหัสผ่านสำหรับอีเมล:', resetEmail);
+    
+    if (!resetEmail) {
+      setError('กรุณากรอกอีเมลสำหรับรีเซ็ตรหัสผ่าน');
+      return;
+    }
+
+    // ตรวจสอบรูปแบบอีเมล
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(resetEmail)) {
+      setError('รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+    
+    setResetLoading(true);
+    setError(null);
+    setResetMessage(null);
+
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        console.error('🚨 Reset password error:', error.message);
+        throw error;
+      }
+
+      console.log('✅ Reset password email sent successfully');
+      setResetMessage('ส่งอีเมลสำหรับรีเซ็ตรหัสผ่านแล้ว กรุณาตรวจสอบอีเมลของคุณ');
+      
+      // ล้างฟอร์มหลังจากส่งสำเร็จ
+      setResetEmail('');
+      
+    } catch (err: any) {
+      console.error('🚨 Reset password error:', err.message);
+      setError(err.message || 'เกิดข้อผิดพลาดในการส่งอีเมลรีเซ็ตรหัสผ่าน');
+    } finally {
+      setResetLoading(false);
+      console.log('🏁 Reset password process completed');
+    }
+  };
+
+  const handleAdminAccess = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    
+    if (adminPassword !== 'admin123') {
+      setError('รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง');
+      return;
+    }
+    
+    setLoadingTables(true);
+    setError(null);
+    
+    try {
+      // Fetch tables from information_schema
+      const { data, error } = await supabase
+        .from('information_schema.tables')
+        .select('table_name, table_type')
+        .eq('table_schema', 'public')
+        .eq('table_type', 'BASE TABLE')
+        .order('table_name');
+
+      if (error) {
+        throw error;
+      }
+
+      setDbTables(data || []);
+      console.log('📊 Database tables:', data);
+      
+    } catch (err: any) {
+      console.error('🚨 Error fetching tables:', err.message);
+      setError('ไม่สามารถดึงข้อมูลตารางได้: ' + err.message);
+    } finally {
+      setLoadingTables(false);
+    }
+  };
+
+  const handleViewTable = async (tableName: string) => {
+    try {
+      console.log(`🔍 Viewing table: ${tableName}`);
+      
+      // Try to fetch first 10 rows from the selected table
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(10);
+
+      if (error) {
+        console.error(`Error fetching ${tableName}:`, error);
+        alert(`ไม่สามารถดูข้อมูลตาราง ${tableName} ได้: ${error.message}`);
+        return;
+      }
+
+      console.log(`Data from ${tableName}:`, data);
+      alert(`ตาราง ${tableName} มีข้อมูล ${data?.length || 0} แถว\nดูข้อมูลใน Console สำหรับรายละเอียด`);
+      
+    } catch (err: any) {
+      console.error('🚨 Error viewing table:', err);
+      alert(`เกิดข้อผิดพลาด: ${err.message}`);
+    }
+  };
+
   // Animation variants
   const cardVariants = {
     hidden: { opacity: 0, scale: 0.95, y: 40 },
@@ -380,6 +493,184 @@ const LoginPage = () => {
                     'เข้าสู่ระบบ'
                   )}
                 </Button>
+              </motion.div>
+              
+              {/* Reset Password Section */}
+              <motion.div variants={itemVariants} className="mt-6">
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetForm(!showResetForm)}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium underline transition-colors"
+                  >
+                    ลืมรหัสผ่าน?
+                  </button>
+                </div>
+                
+                <AnimatePresence>
+                  {showResetForm && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200"
+                    >
+                      <form onSubmit={handleResetPassword} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-red-700 mb-2">
+                            อีเมลสำหรับรีเซ็ตรหัสผ่าน
+                          </label>
+                          <Input
+                            type="email"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                            className="w-full p-3 border border-red-300 placeholder-red-400 text-red-900 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-500 transition-all bg-white"
+                            placeholder="กรอกอีเมลของคุณ"
+                            required
+                          />
+                        </div>
+                        
+                        <AnimatePresence>
+                          {resetMessage && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="text-green-600 text-sm bg-green-100 p-3 rounded-md text-center border border-green-300"
+                            >
+                              {resetMessage}
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
+                        
+                        <Button
+                          type="submit"
+                          disabled={resetLoading}
+                          className="w-full py-2 font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-red-400 transition-all"
+                        >
+                          {resetLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              กำลังส่งอีเมล...
+                            </>
+                          ) : (
+                            'ส่งอีเมลรีเซ็ตรหัสผ่าน'
+                          )}
+                        </Button>
+                        
+                        <div className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowResetForm(false);
+                              setResetEmail('');
+                              setResetMessage(null);
+                              setError(null);
+                            }}
+                            className="text-red-600 hover:text-red-800 text-sm transition-colors"
+                          >
+                            ยกเลิก
+                          </button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+              
+              {/* Admin Panel Section */}
+              <motion.div variants={itemVariants} className="mt-4">
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminPanel(!showAdminPanel)}
+                    className="text-red-600 hover:text-red-800 text-xs font-medium transition-colors"
+                  >
+                    ผู้ดูแลระบบ?
+                  </button>
+                </div>
+                
+                <AnimatePresence>
+                  {showAdminPanel && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <form onSubmit={handleAdminAccess} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            รหัสผ่านผู้ดูแลระบบ
+                          </label>
+                          <Input
+                            type="password"
+                            value={adminPassword}
+                            onChange={(e) => setAdminPassword(e.target.value)}
+                            className="w-full p-3 border border-gray-300 placeholder-gray-400 text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-gray-500 transition-all bg-white"
+                            placeholder="กรอกรหัสผ่านผู้ดูแลระบบ"
+                            required
+                          />
+                        </div>
+                        
+                        <Button
+                          type="submit"
+                          disabled={loadingTables}
+                          className="w-full py-2 font-medium text-white bg-gray-600 hover:bg-gray-700 rounded-lg shadow focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all"
+                        >
+                          {loadingTables ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              กำลังดึงข้อมูล...
+                            </>
+                          ) : (
+                            'ดูตาราง Supabase'
+                          )}
+                        </Button>
+                        
+                        {dbTables.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">ตารางในฐานข้อมูล:</h4>
+                            <div className="max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2">
+                              {dbTables.map((table, index) => (
+                                <div
+                                  key={index}
+                                  className="flex justify-between items-center py-1 px-2 hover:bg-gray-100 rounded cursor-pointer"
+                                  onClick={() => handleViewTable(table.table_name)}
+                                >
+                                  <span className="text-sm text-gray-900">{table.table_name}</span>
+                                  <button
+                                    type="button"
+                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                  >
+                                    ดูข้อมูล
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAdminPanel(false);
+                              setAdminPassword('');
+                              setDbTables([]);
+                              setError(null);
+                            }}
+                            className="text-gray-600 hover:text-gray-800 text-sm transition-colors"
+                          >
+                            ปิด
+                          </button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             </form>
           </motion.div>
