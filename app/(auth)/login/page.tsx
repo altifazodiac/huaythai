@@ -120,26 +120,78 @@ const LoginPage = () => {
 
       // ลองค้นหาด้วยรูปแบบต่างๆ โดยใช้ function lookup_user_by_phone
       for (const phoneFormat of phoneFormats) {
-        const { data, error } = await supabase
-          .rpc('lookup_user_by_phone', { phone_number: phoneFormat });
+        try {
+          const { data, error } = await supabase
+            .rpc('lookup_user_by_phone', { phone_number: phoneFormat });
 
-        if (data && data.length > 0) {
-          userProfile = {
-            email: data[0].user_email,
-            phone: data[0].user_phone,
-            name: null // function ไม่ return name เพื่อความปลอดภัย
-          };
-          console.log('✅ พบผู้ใช้ด้วยเบอร์โทร:', phoneFormat);
-          break;
-        } else if (error) {
-          profileError = error;
-          console.log('⚠️ Error searching with phone format', phoneFormat, ':', error.message);
+          if (error) {
+            console.log('⚠️ Error searching with phone format', phoneFormat, ':', error.message);
+            // ถ้า function ไม่มีอยู่ ให้ลองค้นหาโดยตรง
+            if (error.message.includes('function lookup_user_by_phone') || error.code === '42883') {
+              console.log('🔄 Function not found, trying direct query...');
+              const { data: directData, error: directError } = await supabase
+                .from('profiles')
+                .select('email, phone, name')
+                .or(`phone.eq.${phoneFormat},phone.eq.${phone.replace(/^0/, '+66')},phone.eq.${phone.replace(/^\+66/, '0')}`)
+                .limit(1);
+              
+              if (!directError && directData && directData.length > 0) {
+                userProfile = {
+                  email: directData[0].email,
+                  phone: directData[0].phone,
+                  name: directData[0].name
+                };
+                console.log('✅ พบผู้ใช้ด้วยการค้นหาโดยตรง:', phoneFormat);
+                break;
+              }
+            }
+            profileError = error;
+          } else if (data && data.length > 0) {
+            userProfile = {
+              email: data[0].user_email,
+              phone: data[0].user_phone,
+              name: data[0].user_name
+            };
+            console.log('✅ พบผู้ใช้ด้วยเบอร์โทร:', phoneFormat);
+            break;
+          }
+        } catch (err) {
+          console.log('⚠️ Exception searching with phone format', phoneFormat, ':', err);
         }
       }
 
       if (!userProfile) {
         console.error('❌ ไม่พบผู้ใช้ด้วยเบอร์โทรใดๆ');
-        throw new Error('ไม่พบผู้ใช้ที่มีเบอร์โทรศัพท์นี้');
+        console.log('🔍 ลองค้นหาโดยตรงในตาราง profiles...');
+        
+        // ลองค้นหาโดยตรงอีกครั้งถ้ายังไม่เจอ
+        try {
+          const { data: directData, error: directError } = await supabase
+            .from('profiles')
+            .select('email, phone, name')
+            .or(`phone.eq.${formattedPhone},phone.eq.${phone},phone.eq.${phone.replace(/^0/, '+66')},phone.eq.${phone.replace(/^\+66/, '0')}`)
+            .limit(1);
+          
+          if (!directError && directData && directData.length > 0) {
+            userProfile = {
+              email: directData[0].email,
+              phone: directData[0].phone,
+              name: directData[0].name
+            };
+            console.log('✅ พบผู้ใช้ด้วยการค้นหาโดยตรง (สำรอง):', directData[0].phone);
+          } else {
+            console.log('❌ ไม่พบข้อมูลในตาราง profiles เลย');
+            if (directError) {
+              console.log('Direct query error:', directError.message);
+            }
+          }
+        } catch (directErr) {
+          console.error('❌ Direct query exception:', directErr);
+        }
+        
+        if (!userProfile) {
+          throw new Error('ไม่พบผู้ใช้ที่มีเบอร์โทรศัพท์นี้ในระบบ');
+        }
       }
 
       // ใช้ email ที่เก็บไว้ใน profile สำหรับ login
