@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     domains: [
-      'bqgiwmawqnixpgvuqhuc.supabase.co',
+      'uhdvxoqvtdimtufaxsya.supabase.co',
       // เพิ่ม domain อื่นๆ ที่ต้องการ
     ],
   },
