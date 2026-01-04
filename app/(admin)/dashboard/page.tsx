@@ -17,7 +17,7 @@ import {
   Award,
   DollarSign
 } from 'lucide-react';
-import { fetchDashboardDataOptimized, type DashboardDataOptimized } from './dashboardDataOptimized';
+import { fetchDashboardDataOptimized, clearDashboardCache, type DashboardDataOptimized } from './dashboardDataOptimized';
 
 // Format currency
 const formatCurrency = (value: number) => {
@@ -33,7 +33,7 @@ export default function AdminDashboardFast() {
   const [data, setData] = useState<DashboardDataOptimized | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [dateRange, setDateRange] = useState('week');
+  const [dateRange, setDateRange] = useState('all'); // เปลี่ยนเป็น 'all' เพื่อแสดงข้อมูลทั้งหมด
 
   const loadData = async () => {
     const startTime = Date.now();
@@ -56,6 +56,7 @@ export default function AdminDashboardFast() {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    clearDashboardCache(); // Clear cache ก่อน refresh
     loadData();
   };
 
@@ -95,7 +96,7 @@ export default function AdminDashboardFast() {
           </h1>
           <Badge variant="secondary" className="mt-2">
             <Calendar className="h-3 w-3 mr-1" />
-            {dateRange === 'day' ? 'วันนี้' : dateRange === 'week' ? '7 วันล่าสุด' : dateRange === 'month' ? '30 วันล่าสุด' : '90 วันล่าสุด'}
+            {dateRange === 'day' ? 'วันนี้' : dateRange === 'week' ? '7 วันล่าสุด' : dateRange === 'month' ? '30 วันล่าสุด' : dateRange === 'quarter' ? '90 วันล่าสุด' : 'ทั้งหมด'}
           </Badge>
         </div>
         
@@ -105,6 +106,7 @@ export default function AdminDashboardFast() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">ทั้งหมด</SelectItem>
               <SelectItem value="day">วันนี้</SelectItem>
               <SelectItem value="week">7 วัน</SelectItem>
               <SelectItem value="month">30 วัน</SelectItem>

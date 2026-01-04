@@ -66,12 +66,53 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
     return cached
   }
 
-  const now = new Date()
-  const daysBack = dateRange === 'day' ? 1 : dateRange === 'week' ? 7 : dateRange === 'month' ? 30 : 90
-  const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
-  const startDateStr = startDate.toISOString().split('T')[0]
+  // คำนวณ startDate - ถ้าเป็น 'all' จะไม่จำกัดวันที่
+  let startDateStr: string | null = null
+  if (dateRange !== 'all') {
+    const now = new Date()
+    const daysBack = dateRange === 'day' ? 1 : dateRange === 'week' ? 7 : dateRange === 'month' ? 30 : 90
+    const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+    startDateStr = startDate.toISOString().split('T')[0]
+  }
 
   try {
+    // 🔥 สร้าง query สำหรับ tickets
+    let ticketsQuery = supabase
+      .from('lottery_tickets')
+      .select(`
+        id,
+        bill_number,
+        total_amount,
+        draw_date,
+        status,
+        user_id,
+        lottery_ticket_items(
+          amount,
+          lottery_sub_type_id,
+          lottery_sub_types(
+            lottery_sub_type_id,
+            sub_type_name,
+            country_origin
+          )
+        )
+      `)
+      .is('deleted_at', null)
+      .order('draw_date', { ascending: false })
+    
+    // เพิ่มเงื่อนไขวันที่ถ้าไม่ใช่ 'all'
+    if (startDateStr) {
+      ticketsQuery = ticketsQuery.gte('draw_date', startDateStr)
+    }
+
+    // 🔥 สร้าง query สำหรับ winning bills
+    let winningBillsQuery = supabase
+      .from('lottery_winning_bills')
+      .select('bill_number, total_prize, draw_date')
+    
+    if (startDateStr) {
+      winningBillsQuery = winningBillsQuery.gte('draw_date', startDateStr)
+    }
+
     // 🔥 Query ทั้งหมดพร้อมกัน (Parallel)
     const [
       ticketsResult,
@@ -80,35 +121,8 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
       profilesResult,
       lotteryTypesResult
     ] = await Promise.all([
-      // 1. ดึง tickets ทั้งหมดในช่วงเวลา
-      supabase
-        .from('lottery_tickets')
-        .select(`
-          id,
-          bill_number,
-          total_amount,
-          draw_date,
-          status,
-          user_id,
-          lottery_ticket_items(
-            amount,
-            lottery_sub_type_id,
-            lottery_sub_types(
-              lottery_sub_type_id,
-              sub_type_name,
-              country_origin
-            )
-          )
-        `)
-        .gte('draw_date', startDateStr)
-        .is('deleted_at', null)
-        .order('draw_date', { ascending: false }),
-      
-      // 2. ดึง winning bills
-      supabase
-        .from('lottery_winning_bills')
-        .select('bill_number, total_prize, draw_date')
-        .gte('draw_date', startDateStr),
+      ticketsQuery,
+      winningBillsQuery,
       
       // 3. นับจำนวน users ทั้งหมด
       supabase
