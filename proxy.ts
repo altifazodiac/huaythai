@@ -24,7 +24,7 @@ function parseCookieValue(value: string): string | null {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const startTime = Date.now();
   const pathname = request.nextUrl.pathname;
   

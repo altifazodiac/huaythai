@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: [
-      'uhdvxoqvtdimtufaxsya.supabase.co',
-      // เพิ่ม domain อื่นๆ ที่ต้องการ
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'uhdvxoqvtdimtufaxsya.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'wbvgdqiozztgqodtajui.supabase.co',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
   },
   // แก้ไข cross-origin warning สำหรับ development
@@ -15,36 +23,11 @@ const nextConfig = {
   ],
   reactStrictMode: true,
   typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // !! WARN !!
     ignoreBuildErrors: true,
   },
-  eslint: {
-    // Also disable ESLint during builds
-    ignoreDuringBuilds: true,
-  },
-  // 👇 เปลี่ยนตรงนี้
   serverExternalPackages: ['playwright'],
-  // เพิ่มการตั้งค่าสำหรับ Playwright ใน serverless environment
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push({
-        'playwright': 'commonjs playwright',
-      });
-    }
-    
-    // แก้ไขปัญหา binary dependencies สำหรับ Vercel
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
-    
-    return config;
-  },
+  // เพิ่ม turbopack config เพื่อรองรับ Next.js 16
+  turbopack: {},
   async redirects() {
     return [
       {
