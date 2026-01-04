@@ -33,7 +33,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { PrinterIcon, Trash2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, Edit } from "lucide-react";
+import { PrinterIcon, Trash2, ChevronDown, ChevronUp, RotateCcw, Eye, EyeOff, Edit, Download } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import { th } from "date-fns/locale";
 import { useRouter } from "next/navigation";
@@ -244,7 +244,7 @@ interface Grouped {
   typeOrder: string[];
 }
 
-// FIXED: Fetch Tickets Function
+// FIXED: Fetch Tickets Function with total count
 const fetchTickets = async (
   supabase: any,
   user: any,
@@ -253,7 +253,13 @@ const fetchTickets = async (
   page: number,
   pageSize: number,
   showDeleted: boolean = false
-) => {
+): Promise<{ data: LotteryTicket[]; totalCount: number }> => {
+  // Build base query for count
+  let countQuery = supabase
+    .from("lottery_tickets_with_user_details")
+    .select("id", { count: "exact", head: true });
+
+  // Build data query
   let query = supabase
     .from("lottery_tickets_with_user_details")
     .select(
@@ -278,36 +284,47 @@ const fetchTickets = async (
     .range((page - 1) * pageSize, page * pageSize - 1)
     .order("created_at", { ascending: false });
 
-  // Filter based on deleted status
-  if (showDeleted) {
-    query = query.not("deleted_at", "is", null);
-  } else {
-    query = query.is("deleted_at", null);
-  }
+  // Apply filters to both queries
+  const applyFilters = (q: any) => {
+    if (showDeleted) {
+      q = q.not("deleted_at", "is", null);
+    } else {
+      q = q.is("deleted_at", null);
+    }
+    if (role !== "admin") {
+      q = q.eq("user_id", user.id);
+    }
+    if (filters.billNumber) {
+      q = q.ilike("bill_number", `%${filters.billNumber}%`);
+    }
+    if (filters.startDate) {
+      q = q.gte("draw_date", filters.startDate);
+    }
+    if (filters.endDate) {
+      q = q.lte("draw_date", filters.endDate);
+    }
+    if (filters.status && filters.status !== "all") {
+      q = q.eq("status", filters.status);
+    }
+    if (filters.username && role === "admin") {
+      q = q.ilike("username", `%${filters.username}%`);
+    }
+    return q;
+  };
 
-  if (role !== "admin") {
-    query = query.eq("user_id", user.id);
-  }
-  if (filters.billNumber) {
-    query = query.ilike("bill_number", `%${filters.billNumber}%`);
-  }
-  if (filters.startDate) {
-    query = query.gte("draw_date", filters.startDate);
-  }
-  if (filters.endDate) {
-    query = query.lte("draw_date", filters.endDate);
-  }
-  if (filters.status && filters.status !== "all") {
-    query = query.eq("status", filters.status);
-  }
-  if (filters.username && role === "admin") {
-    query = query.ilike("username", `%${filters.username}%`);
-  }
+  query = applyFilters(query);
+  countQuery = applyFilters(countQuery);
+
   if (filters.lotterySubTypeId && filters.lotterySubTypeId !== 'all') {
     query = query.eq('lottery_ticket_items.lottery_sub_type_id', filters.lotterySubTypeId)
   }
 
-  const { data, error } = await query;
+  // Execute both queries
+  const [{ data, error }, { count }] = await Promise.all([
+    query,
+    countQuery
+  ]);
+
   if (error) {
     console.error("Error fetching tickets:", error);
     throw error;
@@ -316,17 +333,13 @@ const fetchTickets = async (
   // FIXED: Ensure proper data structure and calculate totals
   const processedData = (data || []).map((ticket: any) => ({
     ...ticket,
-    // FIXED: Ensure payout_amount is properly initialized
     payout_amount: ticket.payout_amount || 0,
-    // FIXED: Ensure lottery_ticket_items is array
     lottery_ticket_items: ticket.lottery_ticket_items || [],
-    // FIXED: Recalculate total_amount if needed
     total_amount: ticket.total_amount || 
       (ticket.lottery_ticket_items || []).reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0)
   }));
 
-  console.log("Processed ticket data:", processedData); // Debug log
-  return processedData;
+  return { data: processedData, totalCount: count || 0 };
 };
 
 // FIXED: Fetch Status History Function
@@ -367,7 +380,7 @@ const createColumns = (
     accessorKey: "username",
     header: "ผู้ใช้",
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+      <span className={row.original.deleted_at ? "text-muted-foreground" : ""}>
         {row.original.username || "ไม่ระบุ"}
       </span>
     ),
@@ -384,7 +397,7 @@ const createColumns = (
       </Button>
     ),
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <div className={`font-medium ${row.original.deleted_at ? "text-gray-400 line-through" : ""}`}>
+      <div className={`font-medium ${row.original.deleted_at ? "text-muted-foreground line-through" : ""}`}>
         {row.original.bill_number || "ไม่ระบุ"}
         {row.original.deleted_at && <span className="ml-2 text-xs text-red-500">(ลบแล้ว)</span>}
       </div>
@@ -402,7 +415,7 @@ const createColumns = (
       )];
       
       return (
-        <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        <span className={row.original.deleted_at ? "text-muted-foreground" : ""}>
           {uniqueTypes.length > 0 ? uniqueTypes.join(", ") : "ไม่ระบุ"}
         </span>
       );
@@ -412,7 +425,7 @@ const createColumns = (
     accessorKey: "bill_name",
     header: "ชื่อบิล",
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+      <span className={row.original.deleted_at ? "text-muted-foreground" : ""}>
         {row.original.bill_name || "ไม่ระบุ"}
       </span>
     ),
@@ -431,7 +444,7 @@ const createColumns = (
       </Button>
     ),
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+      <span className={row.original.deleted_at ? "text-muted-foreground" : ""}>
         {`${format(new Date(row.original.draw_date), "d MMM yyyy", { locale: th })} ${row.original.draw_time || ""}`}
       </span>
     ),
@@ -448,7 +461,7 @@ const createColumns = (
       </Button>
     ),
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <div className={row.original.deleted_at ? "text-gray-400" : ""}>
+      <div className={row.original.deleted_at ? "text-muted-foreground" : ""}>
         <div>{format(new Date(row.original.created_at), "d MMM yyyy HH:mm", { locale: th })}</div>
         {row.original.deleted_at && (
           <div className="text-xs text-red-500">
@@ -470,7 +483,7 @@ const createColumns = (
       const displayAmount = row.original.total_amount || calculatedTotal;
       
       return (
-        <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+        <span className={row.original.deleted_at ? "text-muted-foreground" : ""}>
           {displayAmount.toLocaleString()}
         </span>
       );
@@ -480,7 +493,7 @@ const createColumns = (
     accessorKey: "payout_amount",
     header: "เงินรางวัล (฿)",
     cell: ({ row }: { row: Row<LotteryTicket> }) => (
-      <span className={row.original.deleted_at ? "text-gray-400" : ""}>
+      <span className={row.original.deleted_at ? "text-muted-foreground" : ""}>
         {(row.original.payout_amount ?? 0).toLocaleString()}
       </span>
     ),
@@ -491,9 +504,9 @@ const createColumns = (
     cell: ({ row }: { row: Row<LotteryTicket> }) => {
       const status = row.original.status;
       const statusStyles: Record<string, string> = {
-        confirmed: row.original.deleted_at ? "text-gray-400" : "text-green-600",
-        pending: row.original.deleted_at ? "text-gray-400" : "text-yellow-600",
-        cancelled: row.original.deleted_at ? "text-gray-400" : "text-red-600",
+        confirmed: row.original.deleted_at ? "text-muted-foreground" : "text-green-600 dark:text-green-500",
+        pending: row.original.deleted_at ? "text-muted-foreground" : "text-yellow-600 dark:text-yellow-500",
+        cancelled: row.original.deleted_at ? "text-muted-foreground" : "text-destructive",
       };
       const statusText: Record<string, string> = {
         confirmed: "จ่ายเงินแล้ว",
@@ -523,7 +536,7 @@ const createColumns = (
                 variant="outline"
                 size="sm"
                 onClick={() => onEditStatusClick(row.original)}
-                className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                className="text-primary border-primary hover:bg-primary/10"
               >
                 <Edit className="mr-1 h-4 w-4" />
                 แก้ไขสถานะ
@@ -546,7 +559,7 @@ const createColumns = (
             variant="outline"
             size="sm"
             onClick={() => onRestoreClick(row.original)}
-            className="text-green-600 border-green-600 hover:bg-green-50"
+            className="text-green-600 dark:text-green-500 border-green-600 dark:border-green-500 hover:bg-green-500/10"
           >
             <RotateCcw className="mr-1 h-4 w-4" />
             กู้คืน
@@ -644,12 +657,54 @@ export default function LotteryPurchasePage() {
     },
   });
 
-  // React Query for fetching tickets
-  const { data: tickets = [], isLoading, refetch } = useQuery<LotteryTicket[]>({
+  // React Query for fetching tickets with total count
+  const { data: ticketResult, isLoading, refetch } = useQuery<{ data: LotteryTicket[]; totalCount: number }>({
     queryKey: ["lottery_tickets", user?.id, role, filters, page, pageSize, showDeleted],
     queryFn: () => fetchTickets(supabase, user, role, filters, page, pageSize, showDeleted),
     enabled: !!user,
   });
+
+  const tickets = ticketResult?.data || [];
+  const totalCount = ticketResult?.totalCount || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  // Export to CSV function
+  const handleExportCSV = () => {
+    if (tickets.length === 0) {
+      toast.error("ไม่มีข้อมูลสำหรับ export");
+      return;
+    }
+
+    const headers = ["เลขบิล", "ชื่อบิล", "ผู้ใช้", "วันที่ออกรางวัล", "วันที่ซื้อ", "ยอดรวม", "เงินรางวัล", "สถานะ"];
+    const statusText: Record<string, string> = {
+      confirmed: "จ่ายเงินแล้ว",
+      pending: "รอจ่ายเงิน",
+      cancelled: "ยกเลิก",
+    };
+
+    const csvData = tickets.map(ticket => [
+      ticket.bill_number,
+      ticket.bill_name || "",
+      ticket.username || "",
+      format(new Date(ticket.draw_date), "yyyy-MM-dd"),
+      format(new Date(ticket.created_at), "yyyy-MM-dd HH:mm"),
+      ticket.total_amount,
+      ticket.payout_amount || 0,
+      statusText[ticket.status] || ticket.status
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `ticket-purchases-${format(new Date(), "yyyy-MM-dd-HHmm")}.csv`;
+    link.click();
+    toast.success("Export สำเร็จ");
+  };
 
   // Print function
   const onPrintClick = async (billNumber: string) => {
@@ -997,24 +1052,36 @@ export default function LotteryPurchasePage() {
                         {showDeleted ? "ซ่อนรายการที่ลบ" : "แสดงรายการที่ลบ"}
                       </Button>
                       {showDeleted && (
-                        <span className="text-sm text-red-600 font-medium">
+                        <span className="text-sm text-destructive font-medium">
                           ({tickets.length} รายการที่ลบ)
                         </span>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportCSV}
+                        disabled={tickets.length === 0}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export CSV
+                      </Button>
                     </div>
                   </div>
                   
                   {/* Status indicator */}
-                  <div className="mt-2 pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="mt-2 pt-2 border-t border-border">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <div className={`w-3 h-3 rounded-full ${showDeleted ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                        <div className={`w-3 h-3 rounded-full ${showDeleted ? 'bg-destructive' : 'bg-green-500 dark:bg-green-600'}`}></div>
                         <span>
                           {showDeleted 
                             ? "กำลังแสดงรายการที่ลบแล้ว (ข้อมูลจะถูกลบถาวรใน 30 วัน)" 
                             : "กำลังแสดงรายการปกติ"
                           }
                         </span>
+                      </div>
+                      <div className="font-medium">
+                        พบทั้งหมด {totalCount.toLocaleString()} รายการ
                       </div>
                     </div>
                   </div>
@@ -1105,13 +1172,13 @@ export default function LotteryPurchasePage() {
                                             ) : enhancedTicketData[row.original.id] ? (
                                               <div>
                                                 {/* Enhanced ticket summary */}
-                                                <div className="mb-4 p-3 border rounded-lg bg-blue-50 border-blue-200">
-                                                  <div className="text-sm font-medium text-blue-800 mb-2">
+                                                <div className="mb-4 p-3 border rounded-lg bg-primary/10 border-primary/20">
+                                                  <div className="text-sm font-medium text-foreground mb-2">
                                                     ข้อมูลที่ครบถ้วน - {enhancedTicketData[row.original.id].items.length > 0 ? 
                                                       enhancedTicketData[row.original.id].items[0].lottery_sub_types.sub_type_name : 
                                                       'ไม่ระบุประเภท'}
                                                   </div>
-                                                  <div className="text-xs text-blue-600">
+                                                  <div className="text-xs text-muted-foreground">
                                                     ยอดรวมทั้งหมด: {Array.from(enhancedTicketData[row.original.id].groups.values())
                                                       .reduce((total, group) => {
                                                         return total + group.typeOrder.reduce((sum, label) => {
@@ -1136,7 +1203,7 @@ export default function LotteryPurchasePage() {
                                                             (group.amounts[label] ?? 0).toFixed(0)
                                                           ).join(' x ')}
                                                       </div>
-                                                      <div className="text-xs text-green-600 font-medium mt-2 pt-1 border-t">
+                                                      <div className="text-xs text-green-600 dark:text-green-500 font-medium mt-2 pt-1 border-t">
                                                           รวม: {(group.typeOrder
                                                           .reduce((sum: number, label: string) => {
                                                             return sum + (group.amounts[label] || 0);
@@ -1196,9 +1263,9 @@ export default function LotteryPurchasePage() {
                                                             </span>
                                                             <span className="mx-2 text-muted-foreground">→</span>
                                                             <span className={`font-medium ${
-                                                              history.new_status === "confirmed" ? "text-green-600" :
-                                                              history.new_status === "cancelled" ? "text-red-600" : 
-                                                              "text-blue-600"
+                                                              history.new_status === "confirmed" ? "text-green-600 dark:text-green-500" :
+                                                              history.new_status === "cancelled" ? "text-destructive" : 
+                                                              "text-yellow-600 dark:text-yellow-500"
                                                             }`}>
                                                               {history.new_status === "pending" ? "รอจ่ายเงิน" :
                                                                history.new_status === "confirmed" ? "จ่ายเงินแล้ว" :
@@ -1252,10 +1319,13 @@ export default function LotteryPurchasePage() {
 
             {/* Pagination */}
             <div className="flex justify-between items-center mt-4">
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <Select
                   value={pageSize.toString()}
-                  onValueChange={(value) => setPageSize(Number(value))}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value));
+                    setPage(1); // Reset to first page when changing page size
+                  }}
                 >
                   <SelectTrigger className="w-24">
                     <SelectValue />
@@ -1264,11 +1334,20 @@ export default function LotteryPurchasePage() {
                     <SelectItem value="10">10</SelectItem>
                     <SelectItem value="20">20</SelectItem>
                     <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
                   </SelectContent>
                 </Select>
                 <span className="text-sm text-muted-foreground">รายการต่อหน้า</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                >
+                  หน้าแรก
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1277,14 +1356,24 @@ export default function LotteryPurchasePage() {
                 >
                   ย้อนกลับ
                 </Button>
-                <span className="text-sm text-muted-foreground">หน้า {page}</span>
+                <span className="text-sm text-muted-foreground px-2">
+                  หน้า {page} / {totalPages || 1}
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => p + 1)}
-                  disabled={tickets.length < pageSize}
+                  disabled={page >= totalPages}
                 >
                   ถัดไป
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                >
+                  หน้าสุดท้าย
                 </Button>
               </div>
             </div>
@@ -1334,7 +1423,7 @@ export default function LotteryPurchasePage() {
                         เลขบิล: <span className="font-bold">{editingTicket?.bill_number}</span>
                       </div>
                       <div className="mb-2">
-                        สถานะปัจจุบัน: <span className="font-bold text-yellow-600">รอจ่ายเงิน</span>
+                        สถานะปัจจุบัน: <span className="font-bold text-yellow-600 dark:text-yellow-500">รอจ่ายเงิน</span>
                       </div>
                       <div className="mb-2">
                         เปลี่ยนเป็น:

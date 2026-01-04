@@ -60,10 +60,10 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
   // แสดง loading spinner
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-warning-950">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-red-900 mb-4"></div>
-          <span className="text-lg text-red-900 dark:text-warning-100 font-semibold">กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...</span>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary mb-4"></div>
+          <span className="text-lg text-foreground font-semibold">กำลังตรวจสอบสิทธิ์ผู้ดูแลระบบ...</span>
         </div>
       </div>
     );
@@ -72,10 +72,10 @@ export default function AdminLayoutWrapper({ children }: { children: React.React
   // ถ้าไม่ใช่ admin ให้แสดงข้อความแจ้งเตือน
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-warning-950">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-900 dark:text-warning-100 mb-4">ไม่มีสิทธิ์เข้าถึง</h1>
-          <p className="text-gray-600 dark:text-warning-200">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p>
+          <h1 className="text-2xl font-bold text-foreground mb-4">ไม่มีสิทธิ์เข้าถึง</h1>
+          <p className="text-muted-foreground">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p>
         </div>
       </div>
     );

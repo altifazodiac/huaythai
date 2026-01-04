@@ -32,28 +32,19 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <LoadingProvider>
       {/* Navbar */}
-      <header
-        className="h-14 flex items-center px-4 border-b dark:border-warning-800 fixed w-full z-50 top-0 left-0"
-        style={{
-          background: "var(--sidebar)",
-          color: "var(--sidebar-foreground)"
-        }}
-      >
+      <header className="h-14 flex items-center px-4 border-b border-sidebar-border bg-sidebar text-sidebar-foreground fixed w-full z-50 top-0 left-0">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="mr-2 p-2 rounded hover:bg-muted transition md:hidden"
+          className="mr-2 p-2 rounded hover:bg-sidebar-accent transition md:hidden"
           aria-label="Show sidebar"
         >
           <Menu className="h-6 w-6" />
         </button>
-        <span className="font-bold text-lg">Admin Panel</span>
+       
       </header>
       
       {/* Layout */}
-      <div
-        className="flex min-h-screen"
-        style={{ background: "var(--background)", color: "var(--foreground)" }}
-      >
+      <div className="flex min-h-screen bg-background text-foreground">
         {/* Sidebar + Overlay */}
         <AdminSidebar 
           open={sidebarOpen} 
@@ -73,10 +64,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         {/* Main content */}
         <main 
           className={cn(
-            "flex-1 p-4 md:p-8 transition-all duration-300",
+            "flex-1 p-4 md:p-8 transition-all duration-300 pt-20",
             sidebarCollapsed ? "md:ml-1" : "md:ml-2"
-          )} 
-          style={{ color: "var(--foreground)" }}
+          )}
         >
           {children}
         </main>

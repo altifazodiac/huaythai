@@ -159,29 +159,28 @@ export function AdminSidebar({
   return (
     <aside
       className={cn(
-        "fixed z-40 top-14 left-0 h-[calc(100vh-3.5rem)] border-r dark:border-warning-800 shadow-lg transition-all duration-300 flex flex-col",
+        "fixed z-40 top-14 left-0 h-[calc(100vh-3.5rem)] border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-lg transition-all duration-300 flex flex-col",
         open ? "translate-x-0" : "-translate-x-full",
         collapsed ? "w-16" : "w-64",
         "md:translate-x-0 md:static md:block"
       )}
-      style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
       aria-label="Sidebar"
       tabIndex={open ? 0 : -1}
     >
       {/* Sidebar Header */}
-      <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b dark:border-warning-800">
+      <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b border-sidebar-border">
         {!collapsed && <span className="font-bold">เมนู</span>}
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleCollapse}
-            className="p-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800 hidden md:block"
+            className="p-2 rounded hover:bg-sidebar-accent hidden md:block"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
           <button
             onClick={onClose}
-            className="md:hidden p-2 rounded hover:bg-gray-100 dark:hover:bg-warning-800"
+            className="md:hidden p-2 rounded hover:bg-sidebar-accent"
             aria-label="Close sidebar"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -190,11 +189,11 @@ export function AdminSidebar({
       </div>
       
       {/* Back to Home Link */}
-      <div className="flex-shrink-0 px-4 py-3 border-b dark:border-warning-800">
+      <div className="flex-shrink-0 px-4 py-3 border-b border-sidebar-border">
         <Link 
           href="/" 
           className={cn(
-            "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500 font-medium",
+            "flex items-center gap-2 py-2 px-2 rounded hover:bg-sidebar-accent hover:text-primary font-medium",
             collapsed && "justify-center"
           )} 
           onClick={handleNavClick}
@@ -217,14 +216,14 @@ export function AdminSidebar({
                   }
                 }}
                 className={cn(
-                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-gray-100 dark:hover:text-red-500 hover:text-red-500 dark:hover:bg-warning-800 transition-colors",
+                  "flex items-center justify-between w-full gap-2 py-2 px-2 rounded hover:bg-sidebar-accent hover:text-primary transition-colors",
                   collapsed && "justify-center"
                 )}
                 title={collapsed ? item.title : undefined}
               >
                 <div className="flex items-center gap-2">
-                  <item.icon className="h-5 w-5 flex-shrink-0 dark:hover:text-red-500" />
-                  {!collapsed && <span className="whitespace-nowrap dark:hover:text-red-500">{item.title}</span>}
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!collapsed && <span className="whitespace-nowrap">{item.title}</span>}
                 </div>
                 {!collapsed && (
                   <ChevronDown className={cn("h-4 w-4 transition-transform", openSubMenu === item.title && "rotate-180")} />
@@ -237,8 +236,8 @@ export function AdminSidebar({
                       key={subItem.href}
                       href={subItem.href}
                       className={cn(
-                        "flex items-center gap-2 py-2 px-4 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500  dark:hover:bg-warning-800 transition-colors text-sm",
-                        pathname === subItem.href && "bg-gray-100 dark:bg-warning-800"
+                        "flex items-center gap-2 py-2 px-4 rounded hover:bg-sidebar-accent hover:text-primary transition-colors text-sm",
+                        pathname === subItem.href && "bg-sidebar-accent text-primary"
                       )}
                       onClick={handleNavClick}
                     >
@@ -253,9 +252,9 @@ export function AdminSidebar({
               key={item.href}
               href={item.href!}
               className={cn(
-                "flex items-center gap-2 py-2 px-2 rounded hover:bg-gray-100 hover:text-red-500 dark:hover:text-red-500  transition-colors",
+                "flex items-center gap-2 py-2 px-2 rounded hover:bg-sidebar-accent hover:text-primary transition-colors",
                 collapsed && "justify-center",
-                pathname === item.href && "bg-gray-100 dark:bg-warning-800"
+                pathname === item.href && "bg-sidebar-accent text-primary"
               )}
               onClick={handleNavClick}
               title={collapsed ? item.title : undefined}
@@ -268,42 +267,41 @@ export function AdminSidebar({
       </nav>
       
       {/* Theme Switcher */}
-      <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t dark:border-warning-800 p-3 flex justify-center"
-        style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
-      >
+      <div className="flex-shrink-0 absolute bottom-0 left-0 w-full border-t border-sidebar-border p-3 flex justify-center bg-sidebar">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
               aria-label="Toggle theme"
-              className="rounded-lg relative group text-warning-700 hover:bg-gray-100 dark:text-warning-200 dark:hover:text-white dark:hover:bg-warning-800 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="rounded-lg relative group hover:bg-sidebar-accent focus:outline-none focus:ring-2 focus:ring-sidebar-ring"
             >
               <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Toggle theme</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[130px] z-[9999] border-warning-700 shadow-xl"
-            style={{ background: "var(--sidebar)", color: "var(--sidebar-foreground)" }}
+          <DropdownMenuContent 
+            align="end" 
+            className="w-[130px] z-[9999] bg-popover border-border"
           >
             <DropdownMenuItem
               onClick={() => setTheme("light")}
-              className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-100 dark:hover:!bg-warning-800 focus:!bg-warning-200 dark:focus:!bg-warning-800 !text-warning-900 dark:!text-slate-100"
+              className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm"
             >
               <Sun className="h-4 w-4" />
               Light
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setTheme("dark")}
-              className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-100 dark:hover:!bg-warning-800 focus:!bg-warning-200 dark:focus:!bg-warning-800 !text-warning-900 dark:!text-slate-100"
+              className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm"
             >
               <Moon className="h-4 w-4" />
               Dark
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setTheme("system")}
-              className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm hover:!bg-warning-100 dark:hover:!bg-warning-800 focus:!bg-warning-200 dark:focus:!bg-warning-800 !text-warning-900 dark:!text-slate-100"
+              className="cursor-pointer flex items-center gap-2.5 py-2 px-3 text-sm"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
               System
