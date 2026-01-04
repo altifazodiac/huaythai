@@ -176,13 +176,13 @@ export function SecurityMiddleware({
   // Show security overlay
   if (securityState.isChecking) {
     return (
-      <div className="fixed inset-0 bg-blue-50/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 shadow-xl border-2 border-blue-200">
+      <div className="fixed inset-0 bg-primary/10 dark:bg-primary/20 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg p-8 shadow-xl border-2 border-primary/20">
           <div className="flex items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <div>
-              <h3 className="text-lg font-semibold text-blue-900">ตรวจสอบความปลอดภัย</h3>
-              <p className="text-blue-700">กำลังตรวจสอบระบบความปลอดภัย...</p>
+              <h3 className="text-lg font-semibold text-foreground">ตรวจสอบความปลอดภัย</h3>
+              <p className="text-muted-foreground">กำลังตรวจสอบระบบความปลอดภัย...</p>
             </div>
           </div>
         </div>
@@ -193,12 +193,12 @@ export function SecurityMiddleware({
   // Show blocked overlay
   if (securityState.isBlocked) {
     return (
-      <div className="fixed inset-0 bg-red-50/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 shadow-xl border-2 border-red-200 max-w-md">
+      <div className="fixed inset-0 bg-destructive/10 dark:bg-destructive/20 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg p-8 shadow-xl border-2 border-destructive/30 max-w-md">
           <div className="text-center">
-            <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-900 mb-2">ระบบถูกบล็อก</h3>
-            <p className="text-red-700 mb-4">
+            <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">ระบบถูกบล็อก</h3>
+            <p className="text-muted-foreground mb-4">
               ตรวจพบพฤติกรรมที่น่าสงสัย กรุณารอ 30 วินาที แล้วลองใหม่อีกครั้ง
             </p>
             <Button onClick={resetSecurity} variant="outline">
@@ -213,14 +213,14 @@ export function SecurityMiddleware({
   // Show CAPTCHA verification
   if (requireCaptcha && !securityState.captchaVerified) {
     return (
-      <div className="fixed inset-0 bg-gray-50/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 shadow-xl border-2 border-gray-200 max-w-md">
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg p-8 shadow-xl border-2 border-border max-w-md">
           <div className="text-center">
-            <Shield className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">ยืนยันตัวตน</h3>
+            <Shield className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-4">ยืนยันตัวตน</h3>
             
-            <div className="bg-gray-100 p-4 rounded-lg mb-4">
-              <div className="text-2xl font-mono font-bold text-gray-800 tracking-wider">
+            <div className="bg-muted p-4 rounded-lg mb-4">
+              <div className="text-2xl font-mono font-bold text-foreground tracking-wider">
                 {captchaCode}
               </div>
             </div>
@@ -245,15 +245,15 @@ export function SecurityMiddleware({
   // Show OTP verification
   if (requireOTP && !securityState.otpVerified) {
     return (
-      <div className="fixed inset-0 bg-gray-50/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 shadow-xl border-2 border-gray-200 max-w-md">
+      <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg p-8 shadow-xl border-2 border-border max-w-md">
           <div className="text-center">
-            <Shield className="h-12 w-12 text-green-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">ยืนยัน OTP</h3>
+            <Shield className="h-12 w-12 text-green-600 dark:text-green-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-4">ยืนยัน OTP</h3>
             
             {!showOtpInput ? (
               <div>
-                <p className="text-gray-700 mb-4">
+                <p className="text-muted-foreground mb-4">
                   ระบบจะส่งรหัส OTP ไปยังเบอร์โทรศัพท์ของคุณ
                 </p>
                 <Button onClick={() => setShowOtpInput(true)} className="w-full">
@@ -262,7 +262,7 @@ export function SecurityMiddleware({
               </div>
             ) : (
               <div>
-                <p className="text-gray-700 mb-4">
+                <p className="text-muted-foreground mb-4">
                   กรอกรหัส OTP ที่ได้รับ
                 </p>
                 <Input
@@ -287,12 +287,12 @@ export function SecurityMiddleware({
   // Show suspicious activity warning
   if (securityState.suspiciousActivity) {
     return (
-      <div className="fixed inset-0 bg-yellow-50/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 shadow-xl border-2 border-yellow-200 max-w-md">
+      <div className="fixed inset-0 bg-yellow-500/10 dark:bg-yellow-500/20 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg p-8 shadow-xl border-2 border-yellow-500/30 max-w-md">
           <div className="text-center">
-            <AlertTriangle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-yellow-900 mb-2">คำเตือน</h3>
-            <p className="text-yellow-700 mb-4">
+            <AlertTriangle className="h-12 w-12 text-yellow-600 dark:text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">คำเตือน</h3>
+            <p className="text-muted-foreground mb-4">
               ตรวจพบพฤติกรรมที่น่าสงสัย กรุณาดำเนินการอย่างระมัดระวัง
             </p>
             <Button onClick={resetSecurity} variant="outline">
@@ -310,7 +310,7 @@ export function SecurityMiddleware({
       
       {/* Security indicator */}
       {securityLevel === "banking" && (
-        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2">
+        <div className="fixed bottom-4 right-4 bg-green-600 dark:bg-green-700 text-white px-3 py-2 rounded-lg shadow-lg flex items-center gap-2">
           <Shield className="h-4 w-4" />
           <span className="text-sm font-medium">ระบบความปลอดภัย</span>
         </div>

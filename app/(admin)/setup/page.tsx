@@ -1,370 +1,609 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { CheckCircle, XCircle, AlertCircle, RefreshCw, Database, Settings, Play } from "lucide-react"
-// import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { DirectionProvider } from "@radix-ui/react-direction"
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Settings, 
+  Shield, 
+  Bell, 
+  Database,
+  Globe,
+  Save,
+  Key,
+  Lock,
+  Smartphone,
+  CreditCard,
+  Percent,
+  CheckCircle,
+  AlertTriangle,
+  Loader2,
+  RefreshCw
+} from 'lucide-react';
+import { supabase } from '@/lib/supabase/supabaseClient';
 
-interface ConnectionStatus {
-  status: string
-  message: string
-  data?: {
-    connection: string
-    ticketSubTypesCount: number
-    lotteryTablesExist: boolean
-    lotteryResultsCount: number
-    environment: {
-      hasUrl: boolean
-      hasServiceRoleKey: boolean
-      hasAnonKey: boolean
-    }
-  }
-}
+export default function AdminSetupPage() {
+  const [activeTab, setActiveTab] = useState('general');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-export default function SetupPage() {
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [setupLoading, setSetupLoading] = useState<string | null>(null)
+  // General Settings
+  const [generalSettings, setGeneralSettings] = useState({
+    siteName: 'สิงโตทองคำ 77',
+    siteDescription: 'ระบบจัดการหวยออนไลน์',
+    language: 'th',
+    timezone: 'Asia/Bangkok',
+    currency: 'THB',
+    maintenanceMode: false,
+  });
 
-  const testConnection = async () => {
-    setLoading(true)
+  // Commission Settings
+  const [commissionSettings, setCommissionSettings] = useState({
+    defaultCommissionRate: 5,
+    minCommissionRate: 0,
+    maxCommissionRate: 15,
+    autoCalculate: true,
+  });
+
+  // Security Settings
+  const [securitySettings, setSecuritySettings] = useState({
+    sessionTimeout: 30,
+    maxLoginAttempts: 5,
+    passwordMinLength: 6,
+    requirePhoneVerification: false,
+  });
+
+  // Notification Settings
+  const [notificationSettings, setNotificationSettings] = useState({
+    lineNotifyEnabled: false,
+    lineNotifyToken: '',
+    emailNotifyEnabled: false,
+    notifyOnNewOrder: true,
+    notifyOnWinning: true,
+  });
+
+  // Lottery Settings
+  const [lotterySettings, setLotterySettings] = useState({
+    defaultPayoutCap: 200000,
+    enableNumberCap: true,
+    autoCloseBeforeDraw: 30,
+  });
+
+  const showMessage = (type: 'success' | 'error', text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  // โหลดการตั้งค่าจาก Supabase
+  const loadSettings = async () => {
+    setLoading(true);
     try {
-      const response = await fetch("/api/test-connection")
-      const data = await response.json()
-      setConnectionStatus(data)
-    } catch (error) {
-      setConnectionStatus({
-        status: "error",
-        message: "Failed to test connection",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('setting_key, setting_value');
 
-  const setupTicketTypes = async () => {
-    setSetupLoading("ticket-types")
+      if (error) throw error;
+
+      data?.forEach((item) => {
+        const value = item.setting_value;
+        switch (item.setting_key) {
+          case 'general':
+            setGeneralSettings(value);
+            break;
+          case 'commission':
+            setCommissionSettings(value);
+            break;
+          case 'security':
+            setSecuritySettings(value);
+            break;
+          case 'notification':
+            setNotificationSettings(value);
+            break;
+          case 'lottery':
+            setLotterySettings(value);
+            break;
+        }
+      });
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      showMessage('error', 'ไม่สามารถโหลดการตั้งค่าได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // บันทึกการตั้งค่าลง Supabase
+  const handleSave = async (section: string, key: string, value: any) => {
+    setSaving(true);
     try {
-      const response = await fetch("/api/setup-ticket-types", { method: "POST" })
-      const data = await response.json()
+      const { error } = await supabase
+        .from('admin_settings')
+        .update({ setting_value: value })
+        .eq('setting_key', key);
 
-      if (data.status === "success" || data.status === "info") {
-        // รีเฟรชสถานะการเชื่อมต่อ
-        await testConnection()
-      }
+      if (error) throw error;
+      showMessage('success', `บันทึกการตั้งค่า${section}สำเร็จ`);
     } catch (error) {
-      console.error("Setup ticket types error:", error)
+      console.error('Error saving settings:', error);
+      showMessage('error', 'เกิดข้อผิดพลาดในการบันทึก');
     } finally {
-      setSetupLoading(null)
+      setSaving(false);
     }
-  }
+  };
 
-  const setupDatabase = async () => {
-    setSetupLoading("database")
-    try {
-      const response = await fetch("/api/setup-db")
-      const data = await response.json()
+  useEffect(() => {
+    loadSettings();
+  }, []);
 
-      if (data.status === "success" || data.status === "info") {
-        // รีเฟรชสถานะการเชื่อมต่อ
-        await testConnection()
-      }
-    } catch (error) {
-      console.error("Setup database error:", error)
-    } finally {
-      setSetupLoading(null)
-    }
-  }
-
-  const fetchLatestResults = async () => {
-    setSetupLoading("fetch-results")
-    try {
-      const response = await fetch("/api/latest")
-      const data = await response.json()
-
-      if (data.status === "success") {
-        // รีเฟรชสถานะการเชื่อมต่อ
-        await testConnection()
-      }
-    } catch (error) {
-      console.error("Fetch latest results error:", error)
-    } finally {
-      setSetupLoading(null)
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-lg font-medium">กำลังโหลดการตั้งค่า...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <DirectionProvider dir="ltr">
-      <SidebarProvider>
-        {/* <AppSidebar /> */}
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-            <div className="flex items-center gap-2 px-4">
-              <SidebarTrigger className="-ml-1" />
-              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="/">แดชบอร์ด</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>ตั้งค่าระบบ</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
-          </header>
-          <div className="container mx-auto p-4 space-y-6">
-            <div className="flex justify-between items-center">
-              <h1 className="text-2xl font-bold">ตั้งค่าระบบ</h1>
-              <Button onClick={testConnection} disabled={loading} className="flex items-center gap-2">
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                ทดสอบการเชื่อมต่อ
-              </Button>
-            </div>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex-1 space-y-6 p-4 md:p-8"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">ตั้งค่าระบบ</h1>
+          <p className="text-muted-foreground">จัดการการตั้งค่าทั้งหมดของระบบ Admin</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {message && (
+            <Badge variant={message.type === 'success' ? 'default' : 'destructive'} className="text-sm">
+              {message.type === 'success' ? <CheckCircle className="h-4 w-4 mr-1" /> : <AlertTriangle className="h-4 w-4 mr-1" />}
+              {message.text}
+            </Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={loadSettings}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            รีเฟรช
+          </Button>
+        </div>
+      </div>
 
-            {/* สถานะการเชื่อมต่อ */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  สถานะการเชื่อมต่อ Supabase
-                </CardTitle>
-                <CardDescription>ตรวจสอบการเชื่อมต่อและการตั้งค่า environment variables</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    กำลังทดสอบการเชื่อมต่อ...
-                  </div>
-                )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="general" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            <span className="hidden sm:inline">ทั่วไป</span>
+          </TabsTrigger>
+          <TabsTrigger value="commission" className="flex items-center gap-2">
+            <Percent className="h-4 w-4" />
+            <span className="hidden sm:inline">ค่าคอมมิชชั่น</span>
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">ความปลอดภัย</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">การแจ้งเตือน</span>
+          </TabsTrigger>
+          <TabsTrigger value="lottery" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            <span className="hidden sm:inline">หวย</span>
+          </TabsTrigger>
+        </TabsList>
 
-                {connectionStatus && !loading && (
-                  <div className="space-y-4">
-                    <Alert variant={connectionStatus.status === "success" ? "default" : "destructive"}>
-                      {connectionStatus.status === "success" ? (
-                        <CheckCircle className="h-4 w-4" />
-                      ) : (
-                        <XCircle className="h-4 w-4" />
-                      )}
-                      <AlertTitle>{connectionStatus.status === "success" ? "เชื่อมต่อสำเร็จ" : "เชื่อมต่อไม่สำเร็จ"}</AlertTitle>
-                      <AlertDescription>{connectionStatus.message}</AlertDescription>
-                    </Alert>
-
-                    {connectionStatus.data && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <h4 className="font-semibold">Environment Variables</h4>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              {connectionStatus.data.environment.hasUrl ? (
-                                <CheckCircle className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-red-500" />
-                              )}
-                              <span className="text-sm">NEXT_PUBLIC_SUPABASE_URL</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {connectionStatus.data.environment.hasAnonKey ? (
-                                <CheckCircle className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-red-500" />
-                              )}
-                              <span className="text-sm">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {connectionStatus.data.environment.hasServiceRoleKey ? (
-                                <CheckCircle className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4 text-yellow-500" />
-                              )}
-                              <span className="text-sm">SUPABASE_SERVICE_ROLE_KEY</span>
-                              {!connectionStatus.data.environment.hasServiceRoleKey && (
-                                <Badge variant="secondary">ไม่บังคับ</Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <h4 className="font-semibold">สถานะฐานข้อมูล</h4>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-red-500" />
-                              <span className="text-sm">
-                                ticket_sub_types: {connectionStatus.data.ticketSubTypesCount} รายการ
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {connectionStatus.data.lotteryTablesExist ? (
-                                <CheckCircle className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <XCircle className="h-4 w-4 text-red-500" />
-                              )}
-                              <span className="text-sm">
-                                lottery tables: {connectionStatus.data.lotteryTablesExist ? "มีอยู่" : "ไม่มี"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {connectionStatus.data.lotteryResultsCount > 0 ? (
-                                <CheckCircle className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <AlertCircle className="h-4 w-4 text-yellow-500" />
-                              )}
-                              <span className="text-sm">
-                                lottery results: {connectionStatus.data.lotteryResultsCount} รายการ
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!connectionStatus && !loading && (
-                  <div className="text-center text-muted-foreground">กดปุ่ม "ทดสอบการเชื่อมต่อ" เพื่อตรวจสอบสถานะ</div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* ขั้นตอนการตั้งค่า */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* ขั้นตอนที่ 1: ตั้งค่า ticket types */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">1. ตั้งค่าประเภทรางวัล</CardTitle>
-                  <CardDescription>เพิ่มข้อมูลประเภทรางวัลลงในตาราง ticket_sub_types</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      จำเป็นต้องมีข้อมูลประเภทรางวัล (สามตัวบน, สองตัวบน, ฯลฯ) ก่อนที่จะสามารถบันทึกผลรางวัลได้
-                    </p>
-                    {connectionStatus?.data && connectionStatus.data.ticketSubTypesCount > 0 && (
-                      <Badge variant="outline" className="text-red-600">
-                        ✓ มีข้อมูลแล้ว ({connectionStatus.data.ticketSubTypesCount} รายการ)
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    onClick={setupTicketTypes}
-                    disabled={setupLoading === "ticket-types"}
-                    className="w-full flex items-center gap-2"
+        {/* General Settings Tab */}
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                ข้อมูลเว็บไซต์
+              </CardTitle>
+              <CardDescription>ตั้งค่าข้อมูลพื้นฐานของระบบ</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="siteName">ชื่อเว็บไซต์</Label>
+                  <Input
+                    id="siteName"
+                    value={generalSettings.siteName}
+                    onChange={(e) => setGeneralSettings({ ...generalSettings, siteName: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="siteDescription">คำอธิบาย</Label>
+                  <Input
+                    id="siteDescription"
+                    value={generalSettings.siteDescription}
+                    onChange={(e) => setGeneralSettings({ ...generalSettings, siteDescription: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>ภาษา</Label>
+                  <Select 
+                    value={generalSettings.language} 
+                    onValueChange={(v) => setGeneralSettings({ ...generalSettings, language: v })}
                   >
-                    {setupLoading === "ticket-types" ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Database className="h-4 w-4" />
-                    )}
-                    {setupLoading === "ticket-types" ? "กำลังตั้งค่า..." : "ตั้งค่าประเภทรางวัล"}
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              {/* ขั้นตอนที่ 2: สร้างตารางผลรางวัล */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">2. สร้างตารางผลรางวัล</CardTitle>
-                  <CardDescription>สร้างตาราง lottery_draws และ lottery_results</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">สร้างตารางสำหรับเก็บข้อมูลงวดสลากและผลรางวัลแต่ละประเภท</p>
-                    {connectionStatus?.data && connectionStatus.data.lotteryTablesExist && (
-                      <Badge variant="outline" className="text-red-600">
-                        ✓ ตารางมีอยู่แล้ว
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    onClick={setupDatabase}
-                    disabled={setupLoading === "database"}
-                    className="w-full flex items-center gap-2"
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="th">ไทย</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>เขตเวลา</Label>
+                  <Select 
+                    value={generalSettings.timezone} 
+                    onValueChange={(v) => setGeneralSettings({ ...generalSettings, timezone: v })}
                   >
-                    {setupLoading === "database" ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Database className="h-4 w-4" />
-                    )}
-                    {setupLoading === "database" ? "กำลังสร้าง..." : "สร้างตารางผลรางวัล"}
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              {/* ขั้นตอนที่ 3: ดึงข้อมูลล่าสุด */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">3. ดึงข้อมูลล่าสุด</CardTitle>
-                  <CardDescription>ดึงผลสลากกินแบ่งล่าสุดจาก API และบันทึกลงฐานข้อมูล</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">ดึงข้อมูลผลสลากกินแบ่งล่าสุดและบันทึกลงในฐานข้อมูลเพื่อทดสอบระบบ</p>
-                    {connectionStatus?.data && connectionStatus.data.lotteryResultsCount > 0 && (
-                      <Badge variant="outline" className="text-red-600">
-                        ✓ มีข้อมูลแล้ว ({connectionStatus.data.lotteryResultsCount} รายการ)
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    onClick={fetchLatestResults}
-                    disabled={setupLoading === "fetch-results"}
-                    className="w-full flex items-center gap-2"
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Asia/Bangkok">Asia/Bangkok (GMT+7)</SelectItem>
+                      <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>สกุลเงิน</Label>
+                  <Select 
+                    value={generalSettings.currency} 
+                    onValueChange={(v) => setGeneralSettings({ ...generalSettings, currency: v })}
                   >
-                    {setupLoading === "fetch-results" ? (
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                    {setupLoading === "fetch-results" ? "กำลังดึงข้อมูล..." : "ดึงข้อมูลล่าสุด"}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="THB">บาท (THB)</SelectItem>
+                      <SelectItem value="USD">Dollar (USD)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* ลิงก์ไปยังหน้าอื่นๆ */}
-            {connectionStatus?.status === "success" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>เสร็จสิ้นการตั้งค่า</CardTitle>
-                  <CardDescription>ระบบพร้อมใช้งานแล้ว คุณสามารถเข้าไปดูผลรางวัลได้</CardDescription>
-                </CardHeader>
-                <CardFooter className="flex gap-2">
-                  <Button asChild>
-                    <a href="/lottery-results">ดูผลรางวัลล่าสุด</a>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <a href="/">กลับหน้าแรก</a>
-                  </Button>
-                </CardFooter>
-              </Card>
-            )}
+          <Card>
+            <CardHeader>
+              <CardTitle>โหมดบำรุงรักษา</CardTitle>
+              <CardDescription>เปิดใช้งานเมื่อต้องการปิดระบบชั่วคราว</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">เปิดโหมดบำรุงรักษา</p>
+                  <p className="text-sm text-muted-foreground">ผู้ใช้ทั่วไปจะไม่สามารถเข้าถึงระบบได้</p>
+                </div>
+                <Switch
+                  checked={generalSettings.maintenanceMode}
+                  onCheckedChange={(v) => setGeneralSettings({ ...generalSettings, maintenanceMode: v })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={() => handleSave('ทั่วไป', 'general', generalSettings)} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              บันทึกการตั้งค่า
+            </Button>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </DirectionProvider>
-  )
+        </TabsContent>
+
+        {/* Commission Settings Tab */}
+        <TabsContent value="commission" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Percent className="h-5 w-5" />
+                ตั้งค่าค่าคอมมิชชั่น
+              </CardTitle>
+              <CardDescription>กำหนดอัตราค่าคอมมิชชั่นสำหรับตัวแทน</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>อัตราค่าคอมมิชชั่นเริ่มต้น (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={commissionSettings.defaultCommissionRate}
+                    onChange={(e) => setCommissionSettings({ ...commissionSettings, defaultCommissionRate: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>อัตราต่ำสุด (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={commissionSettings.minCommissionRate}
+                    onChange={(e) => setCommissionSettings({ ...commissionSettings, minCommissionRate: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>อัตราสูงสุด (%)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={commissionSettings.maxCommissionRate}
+                    onChange={(e) => setCommissionSettings({ ...commissionSettings, maxCommissionRate: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">คำนวณค่าคอมมิชชั่นอัตโนมัติ</p>
+                  <p className="text-sm text-muted-foreground">คำนวณและบันทึกค่าคอมมิชชั่นเมื่อมีการซื้อหวย</p>
+                </div>
+                <Switch
+                  checked={commissionSettings.autoCalculate}
+                  onCheckedChange={(v) => setCommissionSettings({ ...commissionSettings, autoCalculate: v })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={() => handleSave('ค่าคอมมิชชั่น', 'commission', commissionSettings)} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              บันทึกการตั้งค่า
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Security Settings Tab */}
+        <TabsContent value="security" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                การยืนยันตัวตน
+              </CardTitle>
+              <CardDescription>ตั้งค่าความปลอดภัยในการเข้าสู่ระบบ</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Session Timeout (นาที)</Label>
+                  <Input
+                    type="number"
+                    min="5"
+                    max="1440"
+                    value={securitySettings.sessionTimeout}
+                    onChange={(e) => setSecuritySettings({ ...securitySettings, sessionTimeout: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-muted-foreground">ระยะเวลาที่ผู้ใช้ไม่ได้ใช้งานก่อนถูก logout</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>จำนวนครั้งที่ login ผิดพลาดสูงสุด</Label>
+                  <Input
+                    type="number"
+                    min="3"
+                    max="10"
+                    value={securitySettings.maxLoginAttempts}
+                    onChange={(e) => setSecuritySettings({ ...securitySettings, maxLoginAttempts: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-muted-foreground">ล็อคบัญชีหลังจาก login ผิดพลาดตามจำนวนที่กำหนด</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                นโยบายรหัสผ่าน
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>ความยาวรหัสผ่านขั้นต่ำ</Label>
+                <Input
+                  type="number"
+                  min="4"
+                  max="32"
+                  value={securitySettings.passwordMinLength}
+                  onChange={(e) => setSecuritySettings({ ...securitySettings, passwordMinLength: Number(e.target.value) })}
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">บังคับยืนยันเบอร์โทรศัพท์</p>
+                  <p className="text-sm text-muted-foreground">ผู้ใช้ต้องยืนยันเบอร์โทรก่อนใช้งาน</p>
+                </div>
+                <Switch
+                  checked={securitySettings.requirePhoneVerification}
+                  onCheckedChange={(v) => setSecuritySettings({ ...securitySettings, requirePhoneVerification: v })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={() => handleSave('ความปลอดภัย', 'security', securitySettings)} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              บันทึกการตั้งค่า
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Notification Settings Tab */}
+        <TabsContent value="notifications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                LINE Notify
+              </CardTitle>
+              <CardDescription>ตั้งค่าการแจ้งเตือนผ่าน LINE</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">เปิดใช้งาน LINE Notify</p>
+                  <p className="text-sm text-muted-foreground">ส่งการแจ้งเตือนไปยัง LINE Group</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.lineNotifyEnabled}
+                  onCheckedChange={(v) => setNotificationSettings({ ...notificationSettings, lineNotifyEnabled: v })}
+                />
+              </div>
+              {notificationSettings.lineNotifyEnabled && (
+                <div className="space-y-2">
+                  <Label>LINE Notify Token</Label>
+                  <Input
+                    type="password"
+                    placeholder="กรอก LINE Notify Token"
+                    value={notificationSettings.lineNotifyToken}
+                    onChange={(e) => setNotificationSettings({ ...notificationSettings, lineNotifyToken: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    รับ Token ได้ที่ <a href="https://notify-bot.line.me/" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">notify-bot.line.me</a>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                เหตุการณ์ที่แจ้งเตือน
+              </CardTitle>
+              <CardDescription>เลือกเหตุการณ์ที่ต้องการรับการแจ้งเตือน</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">แจ้งเตือนเมื่อมีคำสั่งซื้อใหม่</p>
+                  <p className="text-sm text-muted-foreground">รับการแจ้งเตือนทุกครั้งที่มีการซื้อหวย</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnNewOrder}
+                  onCheckedChange={(v) => setNotificationSettings({ ...notificationSettings, notifyOnNewOrder: v })}
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">แจ้งเตือนเมื่อมีผู้ถูกรางวัล</p>
+                  <p className="text-sm text-muted-foreground">รับการแจ้งเตือนเมื่อมีผู้ถูกรางวัล</p>
+                </div>
+                <Switch
+                  checked={notificationSettings.notifyOnWinning}
+                  onCheckedChange={(v) => setNotificationSettings({ ...notificationSettings, notifyOnWinning: v })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={() => handleSave('การแจ้งเตือน', 'notification', notificationSettings)} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              บันทึกการตั้งค่า
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Lottery Settings Tab */}
+        <TabsContent value="lottery" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                ตั้งค่าการจ่ายรางวัล
+              </CardTitle>
+              <CardDescription>กำหนดเพดานการจ่ายรางวัลและเลขอั้น</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>เพดานการจ่ายรางวัลสูงสุด (บาท)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={lotterySettings.defaultPayoutCap}
+                    onChange={(e) => setLotterySettings({ ...lotterySettings, defaultPayoutCap: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-muted-foreground">จำกัดยอดจ่ายรางวัลสูงสุดต่อรายการ</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>ปิดรับก่อนออกผล (นาที)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={lotterySettings.autoCloseBeforeDraw}
+                    onChange={(e) => setLotterySettings({ ...lotterySettings, autoCloseBeforeDraw: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-muted-foreground">ปิดรับอัตโนมัติก่อนเวลาออกผล</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">เปิดใช้งานระบบเลขอั้น</p>
+                  <p className="text-sm text-muted-foreground">จำกัดยอดรับเลขที่มีความเสี่ยงสูง</p>
+                </div>
+                <Switch
+                  checked={lotterySettings.enableNumberCap}
+                  onCheckedChange={(v) => setLotterySettings({ ...lotterySettings, enableNumberCap: v })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                สถานะฐานข้อมูล
+              </CardTitle>
+              <CardDescription>ตรวจสอบการเชื่อมต่อ Supabase</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <Badge variant="outline" className="text-green-600">
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  เชื่อมต่อแล้ว
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  Project: wbvgdqiozztgqodtajui
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={() => handleSave('หวย', 'lottery', lotterySettings)} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              บันทึกการตั้งค่า
+            </Button>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </motion.div>
+  );
 }

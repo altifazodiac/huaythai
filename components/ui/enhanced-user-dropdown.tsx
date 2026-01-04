@@ -76,10 +76,10 @@ export function EnhancedUserDropdown({
 
   const getBalanceColor = (balance: number | null) => {
     const safeBalance = balance ?? 0;
-    if (safeBalance >= 10000) return "text-green-600";
-    if (safeBalance >= 1000) return "text-blue-600";
-    if (safeBalance >= 100) return "text-yellow-600";
-    return "text-red-600";
+    if (safeBalance >= 10000) return "text-green-600 dark:text-green-500";
+    if (safeBalance >= 1000) return "text-blue-600 dark:text-blue-500";
+    if (safeBalance >= 100) return "text-yellow-600 dark:text-yellow-500";
+    return "text-red-600 dark:text-red-500";
   };
 
   const formatBalance = (balance: number | null) => {
@@ -96,8 +96,8 @@ export function EnhancedUserDropdown({
           className={cn(
             "w-full justify-between items-center h-12 px-4",
             "border-2 transition-all duration-200",
-            "hover:border-blue-400 hover:shadow-md",
-            isOpen && "border-blue-500 shadow-lg",
+            "hover:border-primary/50 hover:shadow-md",
+            isOpen && "border-primary shadow-lg",
             disabled && "opacity-50 cursor-not-allowed"
           )}
           onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -107,16 +107,16 @@ export function EnhancedUserDropdown({
             {selectedUserData ? (
               <>
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-primary-foreground font-semibold text-sm">
                     {selectedUserData.name?.charAt(0) || selectedUserData.email?.charAt(0) || "U"}
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-left truncate">
+                  <div className="font-medium text-left truncate text-foreground">
                     {selectedUserData.name || selectedUserData.email || selectedUserData.phone}
                   </div>
                   {showBalance && (
-                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
                       <CreditCard className="h-3 w-3" />
                       <span className={getBalanceColor(selectedUserData.credit_balance)}>
                         ฿{formatBalance(selectedUserData.credit_balance)}
@@ -126,7 +126,7 @@ export function EnhancedUserDropdown({
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-2 text-gray-500">
+              <div className="flex items-center gap-2 text-muted-foreground">
                 <User className="h-4 w-4" />
                 <span>{placeholder}</span>
               </div>
@@ -143,9 +143,9 @@ export function EnhancedUserDropdown({
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-xl max-h-80 overflow-hidden">
+        <div className="absolute z-50 w-full mt-2 bg-popover border-2 border-border rounded-lg shadow-xl max-h-80 overflow-hidden">
           {/* Search input */}
-          <div className="p-3 border-b border-gray-100">
+          <div className="p-3 border-b border-border">
             <div className="relative">
               <Input
                 ref={inputRef}
@@ -155,14 +155,14 @@ export function EnhancedUserDropdown({
                 className="pl-9"
                 autoFocus
               />
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
 
           {/* Users list */}
           <div className="max-h-60 overflow-y-auto">
             {filteredUsers.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-muted-foreground">
                 ไม่พบผู้ใช้ที่ตรงกับคำค้นหา
               </div>
             ) : (
@@ -170,27 +170,27 @@ export function EnhancedUserDropdown({
                 <div
                   key={user.id}
                   className={cn(
-                    "p-3 cursor-pointer transition-all duration-150 hover:bg-blue-50",
-                    "border-l-4 border-transparent hover:border-blue-400",
-                    selectedUser === user.id && "bg-blue-100 border-l-blue-500"
+                    "p-3 cursor-pointer transition-all duration-150 hover:bg-accent",
+                    "border-l-4 border-transparent hover:border-primary",
+                    selectedUser === user.id && "bg-accent border-l-primary"
                   )}
                   onClick={() => handleUserSelect(user.id)}
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex-shrink-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/70 rounded-full flex items-center justify-center text-primary-foreground font-semibold">
                         {user.name?.charAt(0) || user.email?.charAt(0) || "U"}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">
+                      <div className="font-medium truncate text-foreground">
                         {user.name || user.email || user.phone || "ไม่ระบุชื่อ"}
                       </div>
-                      <div className="text-sm text-gray-500 truncate">
+                      <div className="text-sm text-muted-foreground truncate">
                         {user.email && user.phone ? `${user.email} • ${user.phone}` : user.email || user.phone || ""}
                       </div>
                       {showBalance && (
-                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                           <CreditCard className="h-3 w-3" />
                           <span className={cn("text-sm font-medium", getBalanceColor(user.credit_balance))}>
                             ฿{formatBalance(user.credit_balance)}

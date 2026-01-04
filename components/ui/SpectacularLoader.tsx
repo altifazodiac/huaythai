@@ -10,7 +10,7 @@ const SpectacularLoader: React.FC<SpectacularLoaderProps> = ({
   baseColor = 'sky',
 }) => {
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gray-900/85 backdrop-blur-lg">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/85 dark:bg-background/95 backdrop-blur-lg">
       <div className="relative flex justify-center items-center w-32 h-32">
         {/* Multiple rotating arcs for a more dynamic effect */}
         <div className={`absolute w-24 h-24 border-4 border-transparent border-t-${baseColor}-500 border-r-${baseColor}-500 rounded-full animate-spin-slow`}></div>
@@ -21,7 +21,7 @@ const SpectacularLoader: React.FC<SpectacularLoaderProps> = ({
         <div className={`w-8 h-8 bg-${baseColor}-500 rounded-full animate-pulse opacity-90 shadow-xl`}></div>
       </div>
       {message && (
-        <p className={`mt-8 text-white/90 text-xl font-semibold tracking-wider animate-pulse text-shadow-lg shadow-${baseColor}-500/50`}>
+        <p className={`mt-8 text-foreground/90 text-xl font-semibold tracking-wider animate-pulse text-shadow-lg shadow-${baseColor}-500/50`}>
           {message}
         </p>
       )}
