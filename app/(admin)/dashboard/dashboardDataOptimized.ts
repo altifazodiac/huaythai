@@ -40,8 +40,11 @@ export interface DashboardDataOptimized {
   }>
   lotteryTypes: Array<{
     name: string
+    country: string
     revenue: number
     count: number
+    payout: number
+    profit: number
   }>
   topUsers: Array<{
     name: string
@@ -74,7 +77,8 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
       ticketsResult,
       winningBillsResult,
       usersResult,
-      profilesResult
+      profilesResult,
+      lotteryTypesResult
     ] = await Promise.all([
       // 1. ดึง tickets ทั้งหมดในช่วงเวลา
       supabase
@@ -85,7 +89,16 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
           total_amount,
           draw_date,
           status,
-          user_id
+          user_id,
+          lottery_ticket_items(
+            amount,
+            lottery_sub_type_id,
+            lottery_sub_types(
+              lottery_sub_type_id,
+              sub_type_name,
+              country_origin
+            )
+          )
         `)
         .gte('draw_date', startDateStr)
         .is('deleted_at', null)
@@ -105,13 +118,19 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
       // 4. ดึง profiles สำหรับ top users
       supabase
         .from('profiles')
-        .select('id, name, branch, percent')
+        .select('id, name, branch, percent'),
+      
+      // 5. ดึงประเภทหวยทั้งหมด
+      supabase
+        .from('lottery_sub_types')
+        .select('lottery_sub_type_id, sub_type_name, country_origin')
     ])
 
     const tickets = ticketsResult.data || []
     const winningBills = winningBillsResult.data || []
     const totalUsers = usersResult.count || 0
     const profiles = profilesResult.data || []
+    const lotteryTypesData = lotteryTypesResult.data || []
 
     // สร้าง Map สำหรับค้นหาเร็ว
     const winningBillsMap = new Map<string, number>()
@@ -124,6 +143,15 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
       profilesMap.set(p.id, p)
     })
 
+    // สร้าง Map สำหรับประเภทหวย
+    const lotteryTypesMap = new Map<number, { name: string; country: string }>()
+    lotteryTypesData.forEach((lt: any) => {
+      lotteryTypesMap.set(lt.lottery_sub_type_id, {
+        name: lt.sub_type_name,
+        country: lt.country_origin
+      })
+    })
+
     // คำนวณ summary
     const confirmedTickets = tickets.filter((t: any) => t.status === 'confirmed')
     const pendingTickets = tickets.filter((t: any) => t.status === 'pending')
@@ -132,6 +160,7 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
     let totalPayout = 0
     const dailyMap = new Map<string, { revenue: number; payout: number; bills: number }>()
     const userSalesMap = new Map<string, { totalSpent: number; ticketCount: number }>()
+    const lotteryTypeStatsMap = new Map<number, { revenue: number; count: number; payout: number }>()
 
     confirmedTickets.forEach((ticket: any) => {
       const amount = Number(ticket.total_amount) || 0
@@ -159,6 +188,28 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
         userStats.totalSpent += amount
         userStats.ticketCount += 1
       }
+
+      // Lottery type stats - คำนวณจาก ticket items
+      const ticketItems = ticket.lottery_ticket_items || []
+      const ticketPayout = payout
+      const totalItemAmount = ticketItems.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0)
+      
+      ticketItems.forEach((item: any) => {
+        const subTypeId = item.lottery_sub_type_id
+        if (subTypeId) {
+          if (!lotteryTypeStatsMap.has(subTypeId)) {
+            lotteryTypeStatsMap.set(subTypeId, { revenue: 0, count: 0, payout: 0 })
+          }
+          const stats = lotteryTypeStatsMap.get(subTypeId)!
+          const itemAmount = Number(item.amount || 0)
+          stats.revenue += itemAmount
+          stats.count += 1
+          // แบ่งสัดส่วน payout ตาม amount
+          if (totalItemAmount > 0) {
+            stats.payout += (ticketPayout * itemAmount) / totalItemAmount
+          }
+        }
+      })
     })
 
     // คำนวณ commission (ใช้ percent จาก profiles)
@@ -194,6 +245,21 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 10)
 
+    // สร้าง lottery types stats
+    const lotteryTypes = Array.from(lotteryTypeStatsMap.entries())
+      .map(([subTypeId, stats]) => {
+        const typeInfo = lotteryTypesMap.get(subTypeId)
+        return {
+          name: typeInfo?.name || 'ไม่ระบุ',
+          country: typeInfo?.country || '',
+          revenue: stats.revenue,
+          count: stats.count,
+          payout: stats.payout,
+          profit: stats.revenue - stats.payout
+        }
+      })
+      .sort((a, b) => b.revenue - a.revenue)
+
     const result: DashboardDataOptimized = {
       summary: {
         totalSales,
@@ -205,7 +271,7 @@ export async function fetchDashboardDataOptimized(dateRange: string = 'week'): P
         commissionTotal
       },
       dailyStats,
-      lotteryTypes: [], // จะเพิ่มทีหลังถ้าต้องการ
+      lotteryTypes,
       topUsers
     }
 

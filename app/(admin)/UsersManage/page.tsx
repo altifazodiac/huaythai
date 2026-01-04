@@ -377,7 +377,7 @@ export default function UsersManagePage() {
   };
 
   const openEditDialog = (user: UserProfile) => {
-    setSelectedUser(user);
+    // 🔧 ตั้งค่า editForm ก่อน แล้วค่อยเปิด Dialog
     setEditForm({
       name: user.name || "",
       phone: user.phone || "",
@@ -388,12 +388,19 @@ export default function UsersManagePage() {
       role: user.role,
       percent: user.percent ?? 0,
     });
-    setShowEditDialog(true);
+    setSelectedUser(user);
+    // 🔧 ใช้ setTimeout เพื่อให้ state update ก่อนเปิด Dialog
+    setTimeout(() => {
+      setShowEditDialog(true);
+    }, 0);
   };
 
   const openDeleteDialog = (user: UserProfile) => {
     setSelectedUser(user);
-    setShowDeleteDialog(true);
+    // 🔧 ใช้ setTimeout เพื่อให้ state update ก่อนเปิด Dialog
+    setTimeout(() => {
+      setShowDeleteDialog(true);
+    }, 0);
   };
 
   const filteredUsers = users
@@ -426,11 +433,11 @@ export default function UsersManagePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <Users className="h-8 w-8 text-blue-600" />
+            <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+              <Users className="h-8 w-8 text-primary" />
               จัดการผู้ใช้
             </h1>
-            <p className="text-gray-600 mt-1">สร้าง แก้ไข และจัดการผู้ใช้ในระบบด้วยระบบความปลอดภัย</p>
+            <p className="text-muted-foreground mt-1">สร้าง แก้ไข และจัดการผู้ใช้ในระบบด้วยระบบความปลอดภัย</p>
           </div>
           <div className="flex gap-2">
             <Button
@@ -585,12 +592,12 @@ export default function UsersManagePage() {
           <Card className="border-l-4 border-l-blue-500">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Users className="h-6 w-6 text-blue-600" />
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                  <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">ผู้ใช้ทั้งหมด</p>
-                  <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+                  <p className="text-sm text-muted-foreground">ผู้ใช้ทั้งหมด</p>
+                  <p className="text-2xl font-bold text-foreground">{users.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -599,12 +606,12 @@ export default function UsersManagePage() {
           <Card className="border-l-4 border-l-green-500">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-green-100 rounded-full">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
+                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                  <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">ผู้ใช้ทั่วไป</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm text-muted-foreground">ผู้ใช้ทั่วไป</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {users.filter(u => u.role === 'user').length}
                   </p>
                 </div>
@@ -615,12 +622,12 @@ export default function UsersManagePage() {
           <Card className="border-l-4 border-l-red-500">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-red-100 rounded-full">
-                  <Shield className="h-6 w-6 text-red-600" />
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                  <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">ผู้ดูแลระบบ</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm text-muted-foreground">ผู้ดูแลระบบ</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {users.filter(u => u.role === 'admin').length}
                   </p>
                 </div>
@@ -631,12 +638,12 @@ export default function UsersManagePage() {
           <Card className="border-l-4 border-l-purple-500">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <DollarSign className="h-6 w-6 text-purple-600" />
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                  <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">เครดิตรวม</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-sm text-muted-foreground">เครดิตรวม</p>
+                  <p className="text-2xl font-bold text-foreground">
                     ฿{users.reduce((sum, user) => sum + (user.credit_balance ?? 0), 0).toLocaleString()}
                   </p>
                 </div>
@@ -649,14 +656,14 @@ export default function UsersManagePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-gray-600" />
+              <Filter className="h-5 w-5 text-muted-foreground" />
               ตัวกรองและค้นหา
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="ค้นหาด้วยเบอร์โทร, ชื่อ, อีเมล หรือสาขา..."
                   value={searchTerm}
@@ -705,7 +712,7 @@ export default function UsersManagePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-gray-600" />
+              <Users className="h-5 w-5 text-muted-foreground" />
               รายการผู้ใช้ ({filteredUsers.length} คน)
             </CardTitle>
             <CardDescription>
@@ -715,32 +722,32 @@ export default function UsersManagePage() {
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
             <div className="space-y-4">
               {filteredUsers.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted-foreground">
                   ไม่พบข้อมูลผู้ใช้
                 </div>
               ) : (
                 <div className="grid gap-4">
                   {filteredUsers.map((user) => (
-                    <Card key={user.id} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
+                    <Card key={user.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
                       <CardContent className="pt-4">
                         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                           <div className="flex-1 space-y-3">
                             <div className="flex items-center gap-3 flex-wrap">
-                              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
+                              <div className="w-12 h-12 bg-gradient-to-br from-primary to-purple-600 rounded-full flex items-center justify-center text-primary-foreground font-semibold text-lg">
                                 {user.name?.charAt(0) || user.email?.charAt(0) || "U"}
                               </div>
                               <div>
-                                <h3 className="font-semibold text-lg">{user.name || "ไม่ระบุชื่อ"}</h3>
+                                <h3 className="font-semibold text-lg text-foreground">{user.name || "ไม่ระบุชื่อ"}</h3>
                                 <div className="flex items-center gap-2 mt-1">
                                   <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>
                                     {user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้ทั่วไป'}
                                   </Badge>
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-muted-foreground">
                                     สร้างเมื่อ: {new Date(user.created_at).toLocaleDateString('th-TH')}
                                   </span>
                                 </div>
@@ -748,34 +755,34 @@ export default function UsersManagePage() {
                             </div>
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                              <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                <Phone className="h-4 w-4 text-blue-600" />
-                                <span className="font-medium">{user.phone || "ไม่ระบุเบอร์"}</span>
+                              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                                <Phone className="h-4 w-4 text-primary" />
+                                <span className="font-medium text-foreground">{user.phone || "ไม่ระบุเบอร์"}</span>
                               </div>
                               {user.email && (
-                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                  <Mail className="h-4 w-4 text-gray-600" />
-                                  <span className="truncate">{user.email}</span>
+                                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                                  <Mail className="h-4 w-4 text-muted-foreground" />
+                                  <span className="truncate text-foreground">{user.email}</span>
                                 </div>
                               )}
                               {user.line_id && (
-                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                  <MessageCircle className="h-4 w-4 text-green-600" />
-                                  <span>{user.line_id}</span>
+                                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                                  <MessageCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                  <span className="text-foreground">{user.line_id}</span>
                                 </div>
                               )}
                               {user.branch && (
-                                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                                  <Building className="h-4 w-4 text-purple-600" />
-                                  <span>{user.branch}</span>
+                                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                                  <Building className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                  <span className="text-foreground">{user.branch}</span>
                                 </div>
                               )}
                             </div>
                             
                             <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                                <CreditCard className="h-5 w-5 text-green-600" />
-                                <span className="font-bold text-green-700 text-lg">
+                              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-200 dark:border-green-800">
+                                <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                <span className="font-bold text-green-700 dark:text-green-300 text-lg">
                                   ฿{(user.credit_balance ?? 0).toLocaleString()}
                                 </span>
                                 {typeof user.percent === 'number' && (
@@ -827,7 +834,13 @@ export default function UsersManagePage() {
       </Card>
 
       {/* Edit User Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      <Dialog open={showEditDialog} onOpenChange={(open) => {
+        if (!open) {
+          // 🔧 เมื่อปิด Dialog ให้ reset selectedUser
+          setSelectedUser(null);
+        }
+        setShowEditDialog(open);
+      }}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>แก้ไขข้อมูลผู้ใช้</DialogTitle>

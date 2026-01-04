@@ -197,7 +197,7 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
   try {
     let query = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(lottery_sub_type_id, sub_type_name, country_origin, percent))')
+      .select('id, draw_date, created_at, total_amount, status, user_id, bill_number, lottery_ticket_items!inner(*, lottery_sub_number(*), lottery_sub_types!inner(lottery_sub_type_id, sub_type_name, country_origin, payout_rate))')
       .eq('status', 'confirmed')
       .is('deleted_at', null); // ✅ เพิ่มเงื่อนไขเพื่อไม่แสดงรายการที่ถูกลบ
 
@@ -223,18 +223,18 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
     });
 
-          // ดึงข้อมูล profiles แยก (ไม่ต้องใช้ percent จาก profiles แล้ว)
+          // 🔧 ดึงข้อมูล profiles รวม percent สำหรับคำนวณ commission
     const userIds = [...new Set(tickets?.map((t: any) => t.user_id) || [])];
     const { data: profiles, error: profileError } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, percent')
       .in('id', userIds);
     
     if (profileError) throw profileError;
     
-    const profilesMap = new Map<string, { name: string }>();
-    (profiles || []).forEach((p: {id: string, name: string}) => {
-      profilesMap.set(p.id, { name: p.name });
+    const profilesMap = new Map<string, { name: string; percent: number }>();
+    (profiles || []).forEach((p: {id: string, name: string, percent: number}) => {
+      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
     });
 
     return (tickets || []).map((ticket: any) => {
@@ -244,25 +244,19 @@ const fetchLotteryReportData = async (supabase: any, resultsMap: Record<string, 
       const total_purchase_amount = Number(ticket.total_amount || 0);
       const profit_loss = total_purchase_amount - total_payout;
       
-      // คำนวณ commission จาก lottery_sub_types.percent
+      // 🔧 ใช้ percent จาก profiles แทน lottery_sub_types (ซึ่งไม่มี column percent)
       const userProfile = profilesMap.get(ticket.user_id);
-      // คำนวณเปอร์เซนต์เฉลี่ยจาก lottery_sub_types.percent ของ ticket items
-      const ticketPercents = (ticket.lottery_ticket_items || [])
-        .map((item: any) => item.lottery_sub_types?.percent || 0)
-        .filter((p: number) => p > 0);
-      const commission_percentage = ticketPercents.length > 0 
-        ? ticketPercents.reduce((sum: number, p: number) => sum + p, 0) / ticketPercents.length 
-        : 0;
+      const commission_percentage = userProfile?.percent || 0;
       const commission_amount = total_purchase_amount * (commission_percentage / 100);
       const remaining_balance = profit_loss - commission_amount;
       const net_amount = profit_loss - commission_amount; // ยอดสุทธิ = กำไร/ขาดทุน - คอมมิชชั่น
 
-      // 🔧 ดึงข้อมูลประเภทหวยจาก lottery_ticket_items (รวม percent)
+      // 🔧 ดึงข้อมูลประเภทหวยจาก lottery_ticket_items (ไม่รวม percent เพราะไม่มีใน lottery_sub_types)
       const lottery_types = [...new Set((ticket.lottery_ticket_items || []).map((item: any) => ({
         lottery_sub_type_id: item.lottery_sub_types?.lottery_sub_type_id,
         sub_type_name: item.lottery_sub_types?.sub_type_name,
         country_origin: item.lottery_sub_types?.country_origin,
-        percent: item.lottery_sub_types?.percent || 0
+        payout_rate: item.lottery_sub_types?.payout_rate || 0
       })).filter((type: any) => type.lottery_sub_type_id))];
 
       return {

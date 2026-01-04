@@ -31,16 +31,15 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <LoadingProvider>
-      {/* Navbar */}
-      <header className="h-14 flex items-center px-4 border-b border-sidebar-border bg-sidebar text-sidebar-foreground fixed w-full z-50 top-0 left-0">
+      {/* Navbar - ลดความสูงสำหรับ mobile */}
+      <header className="h-12 md:h-14 flex items-center px-3 md:px-4 border-b border-sidebar-border bg-sidebar text-sidebar-foreground fixed w-full z-50 top-0 left-0">
         <button
           onClick={() => setSidebarOpen(true)}
-          className="mr-2 p-2 rounded hover:bg-sidebar-accent transition md:hidden"
+          className="p-1.5 rounded hover:bg-sidebar-accent transition md:hidden"
           aria-label="Show sidebar"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-5 w-5" />
         </button>
-       
       </header>
       
       {/* Layout */}
@@ -61,10 +60,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           />
         )}
         
-        {/* Main content */}
+        {/* Main content - ลด padding-top สำหรับ mobile */}
         <main 
           className={cn(
-            "flex-1 p-4 md:p-8 transition-all duration-300 pt-20",
+            "flex-1 p-3 md:p-8 transition-all duration-300 pt-14 md:pt-16",
             sidebarCollapsed ? "md:ml-1" : "md:ml-2"
           )}
         >

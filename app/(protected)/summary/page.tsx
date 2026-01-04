@@ -219,7 +219,7 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
   try {
     let ticketQuery = supabase
       .from('lottery_tickets')
-      .select('id, draw_date, total_amount, user_id, bill_number, lottery_ticket_items(*, lottery_sub_number(*), lottery_sub_types(lottery_sub_type_id, sub_type_name, percent))')
+      .select('id, draw_date, total_amount, user_id, bill_number, lottery_ticket_items(*, lottery_sub_number(*), lottery_sub_types(lottery_sub_type_id, sub_type_name, payout_rate))')
       .eq('status', 'confirmed')
       .is('deleted_at', null);
     
@@ -253,11 +253,11 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
     console.log('fetchDailySummary - tickets dates:', tickets.map((t: any) => t.draw_date));
 
     const userIds = [...new Set(tickets.map((t: any) => t.user_id).filter(Boolean))];
-    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
     if (profileError) throw profileError;
-    const profilesMap = new Map<string, { name: string }>();
-    profiles.forEach((p: {id: string, name: string}) => {
-      profilesMap.set(p.id, { name: p.name });
+    const profilesMap = new Map<string, { name: string; percent: number }>();
+    profiles.forEach((p: {id: string, name: string, percent: number}) => {
+      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
     });
 
     const groupedData = (tickets || []).reduce((acc: any, ticket: any) => {
@@ -285,7 +285,7 @@ const fetchDailySummary = async (supabase: any, resultsMap: Record<string, Lotte
             draw_date: ticket.draw_date,
             user_id: ticket.user_id,
             user_name: userProfile?.name || 'ไม่ระบุ',
-            user_percent: subTypeInfo?.percent || 0,
+            user_percent: userProfile?.percent || 0, // 🔧 ใช้ percent จาก profiles
             lottery_sub_type_id: subTypeId,
             lottery_sub_type_name: subTypeInfo?.sub_type_name || 'ไม่ระบุ',
             total_bills: 0,
@@ -365,24 +365,24 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
       winningBillsMap.set(bill.bill_number, Number(bill.total_prize || 0));
     });
 
-    // 🔧 ดึงข้อมูล user profiles (ไม่ต้องใช้ percent จาก profiles อีกต่อไป)
+    // 🔧 ดึงข้อมูล user profiles พร้อม percent
     const userIds = [...new Set(tickets?.map((t: any) => t.user_id).filter(Boolean) || [])];
-    let profilesMap = new Map<string, { name: string }>();
+    let profilesMap = new Map<string, { name: string; percent: number }>();
     
     console.log('fetchLotteryTypeSummary - userIds:', userIds);
     
     if (userIds.length > 0) {
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select('id, name')
+        .select('id, name, percent')
         .in('id', userIds);
       
       if (profileError) throw profileError;
       
       console.log('fetchLotteryTypeSummary - profiles:', profiles);
       
-      profiles?.forEach((p: {id: string, name: string}) => {
-        profilesMap.set(p.id, { name: p.name });
+      profiles?.forEach((p: {id: string, name: string, percent: number}) => {
+        profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
       });
     }
     
@@ -390,8 +390,9 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
       // ✅ ใช้ข้อมูลจาก lottery_winning_bills แทนการคำนวณ manual
       const ticketPayout = winningBillsMap.get(ticket.bill_number) || 0;
       
-      // 🔧 ใช้ percent จาก lottery_sub_types แทน profiles
+      // 🔧 ใช้ percent จาก profiles
       const userProfile = profilesMap.get(ticket.user_id);
+      const userPercent = userProfile?.percent || 0;
       
       (ticket.lottery_ticket_items || []).forEach((item: any) => {
         const subTypeId = item.lottery_sub_type_id;
@@ -407,7 +408,7 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
             total_numbers: 0,
             total_purchase_amount: 0,
             total_payout: 0,
-            total_commission: 0, // 🔧 เพิ่มฟิลด์สำหรับเก็บผลรวมคอมมิชชั่น
+            total_commission: 0,
           };
         }
         
@@ -415,15 +416,14 @@ const fetchLotteryTypeSummary = async (supabase: any, resultsMap: Record<string,
         const ticketTotalAmount = (ticket.lottery_ticket_items || []).reduce((sum: number, i: any) => sum + Number(i.amount || 0), 0);
         const itemPayout = ticketTotalAmount > 0 ? (ticketPayout * Number(item.amount || 0)) / ticketTotalAmount : 0;
         
-        // 🔧 คำนวณคอมมิชชั่นสำหรับ item นี้ จาก lottery_sub_types.percent
-        const subTypePercent = subType.percent || 0;
-        const itemCommission = (Number(item.amount || 0) * subTypePercent) / 100;
+        // 🔧 คำนวณคอมมิชชั่นจาก user percent ใน profiles
+        const itemCommission = (Number(item.amount || 0) * userPercent) / 100;
       
         acc[subTypeId].total_bills.add(ticket.id);
         acc[subTypeId].total_numbers += (item.numbers || []).length;
         acc[subTypeId].total_purchase_amount += Number(item.amount || 0);
         acc[subTypeId].total_payout += itemPayout;
-        acc[subTypeId].total_commission += itemCommission; // 🔧 รวมคอมมิชชั่น
+        acc[subTypeId].total_commission += itemCommission;
       });
       return acc;
     }, {});
@@ -487,11 +487,11 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
     });
     
     const userIds = [...new Set(tickets.map((t: any) => t.user_id))];
-    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name').in('id', userIds);
+    const { data: profiles, error: profileError } = await supabase.from('profiles').select('id, name, percent').in('id', userIds);
     if (profileError) throw profileError;
-    const profilesMap = new Map<string, { name: string }>();
-    profiles.forEach((p: {id: string, name: string}) => {
-      profilesMap.set(p.id, { name: p.name });
+    const profilesMap = new Map<string, { name: string; percent: number }>();
+    profiles.forEach((p: {id: string, name: string, percent: number}) => {
+      profilesMap.set(p.id, { name: p.name, percent: p.percent || 0 });
     });
     
           const transformedData = tickets.map((ticket: any) => {
@@ -507,21 +507,16 @@ const fetchBillSummary = async (supabase: any, resultsMap: Record<string, Lotter
           totalNumbers += (item.numbers || []).length;
         });
           
-          // คำนวณเปอร์เซนต์เฉลี่ยจาก lottery_sub_types.percent ของ ticket items
-          const ticketPercents = ticket.lottery_ticket_items
-            .map((item: any) => item.lottery_sub_types?.percent || 0)
-            .filter((p: number) => p > 0);
-          const avgPercent = ticketPercents.length > 0 
-            ? ticketPercents.reduce((sum: number, p: number) => sum + p, 0) / ticketPercents.length 
-            : 0;
+          // 🔧 ใช้ percent จาก profiles แทน lottery_sub_types (ซึ่งไม่มี column percent)
+          const userPercent = userProfile?.percent || 0;
           
           const netProfitLoss = Number(ticket.total_amount || 0) - totalPayout;
-          const commissionAmount = (Number(ticket.total_amount || 0) * avgPercent) / 100;
+          const commissionAmount = (Number(ticket.total_amount || 0) * userPercent) / 100;
           return {
             bill_number: ticket.bill_number,
             draw_date: ticket.draw_date,
             user_name: userProfile?.name || 'ไม่ระบุ',
-            user_percent: avgPercent,
+            user_percent: userPercent,
             sub_type_name: subTypeNames.join(', '),
             country_origin: countries.join(', '),
             total_amount: Number(ticket.total_amount || 0),

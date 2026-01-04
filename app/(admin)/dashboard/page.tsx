@@ -78,7 +78,7 @@ export default function AdminDashboardFast() {
     );
   }
 
-  const { summary, dailyStats, topUsers } = data;
+  const { summary, dailyStats, topUsers, lotteryTypes } = data;
   const isProfit = summary.netProfit >= 0;
 
   return (
@@ -203,6 +203,51 @@ export default function AdminDashboardFast() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Lottery Types Stats */}
+      {lotteryTypes.length > 0 && (
+        <Card className="border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Ticket className="h-5 w-5 mr-2" />
+              ยอดขายตามประเภทหวย
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {lotteryTypes.slice(0, 6).map((type, index) => (
+                <div key={index} className="p-4 bg-muted/50 rounded-lg border">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="font-medium text-foreground">{type.name}</p>
+                      {type.country && (
+                        <p className="text-xs text-muted-foreground">{type.country}</p>
+                      )}
+                    </div>
+                    <Badge variant="secondary">{type.count} รายการ</Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">ยอดขาย:</span>
+                      <span className="font-medium">{formatCurrency(type.revenue)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">จ่ายรางวัล:</span>
+                      <span className="font-medium">{formatCurrency(type.payout)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">กำไร:</span>
+                      <span className={`font-bold ${type.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {formatCurrency(type.profit)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Daily Stats Table */}
       <Card className="border-0 shadow-lg">

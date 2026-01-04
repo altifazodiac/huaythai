@@ -1569,7 +1569,7 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date): Pr
     if (cached) {
       return cached
     }
-    // ดึงข้อมูลบิลและค่าคอมมิชชั่น (ใช้ lottery_sub_types.percent แทน profiles.percent)
+    // 🔧 ดึงข้อมูลบิลและค่าคอมมิชชั่น (ใช้ profiles.percent แทน lottery_sub_types.percent ที่ไม่มี)
     const { data: tickets } = await supabase
       .from('lottery_tickets')
       .select(`
@@ -1582,11 +1582,12 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date): Pr
         profiles!inner(
           id,
           name,
-          branch
+          branch,
+          percent
         ),
         lottery_ticket_items!inner(
           lottery_sub_types!inner(
-            percent
+            payout_rate
           )
         )
       `)
@@ -1610,16 +1611,10 @@ async function fetchCommissionData(startDate: Date, previousStartDate: Date): Pr
       }
     }
 
-    // คำนวณค่าคอมมิชชั่นสำหรับแต่ละบิล (ใช้ lottery_sub_types.percent)
+    // 🔧 คำนวณค่าคอมมิชชั่นสำหรับแต่ละบิล (ใช้ profiles.percent)
     const commissionData = tickets.map((ticket: any) => {
-      // คำนวณเปอร์เซนต์เฉลี่ยจาก lottery_sub_types.percent ของ ticket items
-      const ticketPercents = (ticket.lottery_ticket_items || [])
-        .map((item: any) => item.lottery_sub_types?.percent || 0)
-        .filter((p: number) => p > 0)
-      
-      const commissionRate = ticketPercents.length > 0 
-        ? ticketPercents.reduce((sum: number, p: number) => sum + p, 0) / ticketPercents.length 
-        : 0
+      // 🔧 ใช้ percent จาก profiles แทน lottery_sub_types
+      const commissionRate = ticket.profiles?.percent || 0
       
       const commission = (ticket.total_amount * commissionRate) / 100
       return {
