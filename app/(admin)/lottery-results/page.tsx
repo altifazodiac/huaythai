@@ -1,23 +1,16 @@
 "use client";
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { format } from "date-fns";
 import { motion, easeInOut } from 'framer-motion';
 import { MdContentPaste } from "react-icons/md";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerFooter,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerClose,
-} from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { CheckCircle2, Edit3, Save, ClipboardPaste, Loader2 } from "lucide-react";
+import { CheckCircle2, Edit3, Save, ClipboardPaste, Loader2, Search, Filter, X } from "lucide-react";
 // Shadcn/UI Components - Ensure these paths are correct for your project
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -140,14 +133,14 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
 
   return (
     <motion.div variants={cardVariants}>
-     <Card className={`flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border ${isSuccessfullySaved ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700' : 'border-slate-200'}`}>
-        <CardHeader className="p-2 bg-slate-50 border-b border-slate-200 flex flex-row justify-between items-center">
+     <Card className={`flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border ${isSuccessfullySaved ? 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700' : 'border-border'}`}>
+        <CardHeader className="p-2 bg-muted border-b border-border flex flex-row justify-between items-center">
           <div className="flex-grow">
-            <CardTitle className="text-xs font-semibold text-slate-800 truncate flex items-center">
+            <CardTitle className="text-xs font-semibold text-foreground truncate flex items-center">
               {isSuccessfullySaved && <CheckCircle2 className="w-3 h-3 text-red-600 mr-1.5 flex-shrink-0" />}
               {subType.sub_type_name}
             </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
+            <CardDescription className="text-xs text-muted-foreground">
               {subType.country_origin || 'ไม่ระบุประเทศ'}
               {subType.description && ` • ${subType.description}`}
             </CardDescription>
@@ -166,7 +159,7 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
             return (
               <div key={groupTitle} className="space-y-1">
                 <div className="flex items-center mb-1">
-                  <h4 className="text-xs font-semibold text-slate-700 col-span-2 flex-1">{groupTitle}</h4>
+                  <h4 className="text-xs font-semibold text-foreground col-span-2 flex-1">{groupTitle}</h4>
                 </div>
                 <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
                   {itemsInGroup.map(sn => {
@@ -175,8 +168,8 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
                     return (
                       <div key={sn.id} className="space-y-0.5">
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium text-gray-600">{sn.type_number}</span>
-                          <span className="text-xs text-gray-400">จ่าย {sn.price_paid}</span>
+                          <span className="text-xs font-medium text-muted-foreground">{sn.type_number}</span>
+                          <span className="text-xs text-muted-foreground/70">จ่าย {sn.price_paid}</span>
                       </div>
                         <Input
                           className="flex-1 text-xs h-7 w-full rounded-md"
@@ -211,7 +204,7 @@ const match = line.match(/(\d{3})-(\d{2})\s+(?:\b[a-zA-Z]{2,3}\w*\b\s*)?(.+)/i);
             );
           })}
         </CardContent>
-        <CardFooter className="p-2 border-t border-slate-100 bg-slate-50">
+        <CardFooter className="p-2 border-t border-border bg-muted">
           <motion.div whileTap={{ scale: 0.97 }} className="w-full">
             <Button
               onClick={() => isSuccessfullySaved ? onEdit(subType.lottery_sub_type_id) : handleSave(subType)}
@@ -238,11 +231,17 @@ export default function LotteryResultsPage() {
   const [successfullySavedSubTypes, setSuccessfullySavedSubTypes] = useState<Set<number>>(new Set());
   const [pageIsLoading, setPageIsLoading] = useState(true);
   const [saveInProgressForSubTypeId, setSaveInProgressForSubTypeId] = useState<number | null>(null);
- const [isSavingAll, setIsSavingAll] = useState(false);
+  const [isSavingAll, setIsSavingAll] = useState(false);
   const [isBulkPasteOpen, setIsBulkPasteOpen] = useState(false);
   const [bulkPasteText, setBulkPasteText] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 🔧 **ใหม่**: State สำหรับการค้นหาและกรอง
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCountry, setFilterCountry] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all"); // all, saved, unsaved
+  const [filterLotteryType, setFilterLotteryType] = useState<string>("all");
 
   useEffect(() => {
     if (!supabase) return; // 🔧 **ใหม่**: รอให้ supabase พร้อมใช้งาน
@@ -570,6 +569,86 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
     return Array.from(new Set(perms)).sort();
   }
 
+  // 🔧 **ใหม่**: ดึงรายการประเทศทั้งหมด
+  const allCountries = React.useMemo(() => {
+    const countries = new Set<string>();
+    Object.values(groupedSubTypes).forEach(group => {
+      group.subTypes.forEach(subType => {
+        if (subType.country_origin) {
+          countries.add(subType.country_origin);
+        }
+      });
+    });
+    return Array.from(countries).sort();
+  }, [groupedSubTypes]);
+
+  // 🔧 **ใหม่**: ดึงรายการประเภทหวยทั้งหมด
+  const allLotteryTypes = React.useMemo(() => {
+    return Object.values(groupedSubTypes).map(group => ({
+      id: group.details.lottery_type_id.toString(),
+      name: group.details.type_name
+    }));
+  }, [groupedSubTypes]);
+
+  // 🔧 **ใหม่**: กรองข้อมูลตามเงื่อนไข
+  const filteredGroupedSubTypes = React.useMemo(() => {
+    const filtered: Record<string, GroupedSubTypeInfo> = {};
+    
+    Object.entries(groupedSubTypes).forEach(([typeId, group]) => {
+      // กรองตามประเภทหวย
+      if (filterLotteryType !== "all" && typeId !== filterLotteryType) {
+        return;
+      }
+      
+      const filteredSubTypes = group.subTypes.filter(subType => {
+        // กรองตามคำค้นหา
+        if (searchTerm) {
+          const search = searchTerm.toLowerCase();
+          const matchName = subType.sub_type_name.toLowerCase().includes(search);
+          const matchCountry = subType.country_origin?.toLowerCase().includes(search);
+          if (!matchName && !matchCountry) return false;
+        }
+        
+        // กรองตามประเทศ
+        if (filterCountry !== "all" && subType.country_origin !== filterCountry) {
+          return false;
+        }
+        
+        // กรองตามสถานะการบันทึก
+        if (filterStatus === "saved" && !successfullySavedSubTypes.has(subType.lottery_sub_type_id)) {
+          return false;
+        }
+        if (filterStatus === "unsaved" && successfullySavedSubTypes.has(subType.lottery_sub_type_id)) {
+          return false;
+        }
+        
+        return true;
+      });
+      
+      if (filteredSubTypes.length > 0) {
+        filtered[typeId] = {
+          ...group,
+          subTypes: filteredSubTypes
+        };
+      }
+    });
+    
+    return filtered;
+  }, [groupedSubTypes, searchTerm, filterCountry, filterStatus, filterLotteryType, successfullySavedSubTypes]);
+
+  // 🔧 **ใหม่**: นับจำนวนรายการ
+  const totalSubTypes = Object.values(groupedSubTypes).reduce((sum, group) => sum + group.subTypes.length, 0);
+  const filteredSubTypesCount = Object.values(filteredGroupedSubTypes).reduce((sum, group) => sum + group.subTypes.length, 0);
+  const savedCount = successfullySavedSubTypes.size;
+
+  // 🔧 **ใหม่**: ล้างตัวกรองทั้งหมด
+  const clearFilters = () => {
+    setSearchTerm("");
+    setFilterCountry("all");
+    setFilterStatus("all");
+    setFilterLotteryType("all");
+  };
+
   const renderSkeletons = () => (
     <div className="space-y-10">
       {[1, 2].map(i => ( 
@@ -603,9 +682,9 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
 
   if (pageIsLoading) {
     return (
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 bg-slate-50 min-h-screen">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 bg-background min-h-screen">
         <div className="flex items-center gap-3 mb-8">
-            <h1 className="text-2xl font-bold text-slate-700">กรอกผลรางวัล</h1>
+            <h1 className="text-2xl font-bold text-foreground">กรอกผลรางวัล</h1>
             <Input type="date" value={selectedDate} disabled className="ml-2 w-[140px] h-9 text-xs" />
         </div>
         {renderSkeletons()}
@@ -614,19 +693,20 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 bg-slate-50 min-h-screen">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 bg-background min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-700">กรอกผลรางวัล</h1>
-          <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="ml-2 w-[140px] h-9 text-xs border-slate-300" max={format(new Date(), "yyyy-MM-dd")} />
+          <h1 className="text-2xl font-bold text-foreground">กรอกผลรางวัล</h1>
+          <Input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="ml-2 w-[140px] h-9 text-xs" max={format(new Date(), "dd-MM-yyyy")} />
         </div>
-        {/* 🔧 **ใหม่**: ปุ่มควบคุมใหม่ */}
+        {/* ปุ่มควบคุม */}
         <div className="flex items-center gap-2">
           <Dialog open={isBulkPasteOpen} onOpenChange={setIsBulkPasteOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="flex items-center gap-2">
                 <ClipboardPaste className="w-4 h-4" />
-                <span>วางผลแบบชุด</span>
+                <span className="hidden sm:inline">วางผลแบบชุด</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -652,27 +732,118 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
 
           <Button onClick={handleSaveAll} disabled={isSavingAll} size="sm" className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
             {isSavingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span>บันทึกทั้งหมด</span>
+            <span className="hidden sm:inline">บันทึกทั้งหมด</span>
           </Button>
         </div>
       </div>
+
+      {/* 🔧 **ใหม่**: ส่วนค้นหาและกรอง */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4">
+            {/* แถวแรก: ช่องค้นหาและสถิติ */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="ค้นหาชื่อหวยหรือประเทศ..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-xs">
+                  ทั้งหมด: {totalSubTypes}
+                </Badge>
+                <Badge variant="secondary" className="text-xs">
+                  แสดง: {filteredSubTypesCount}
+                </Badge>
+                <Badge variant="default" className="text-xs bg-green-600">
+                  บันทึกแล้ว: {savedCount}
+                </Badge>
+              </div>
+            </div>
+            
+            {/* แถวสอง: ตัวกรอง */}
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">กรอง:</span>
+              </div>
+              
+              <Select value={filterLotteryType} onValueChange={setFilterLotteryType}>
+                <SelectTrigger className="w-[160px] h-9 text-xs">
+                  <SelectValue placeholder="ประเภทหวย" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุกประเภท</SelectItem>
+                  {allLotteryTypes.map(type => (
+                    <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={filterCountry} onValueChange={setFilterCountry}>
+                <SelectTrigger className="w-[140px] h-9 text-xs">
+                  <SelectValue placeholder="ประเทศ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุกประเทศ</SelectItem>
+                  {allCountries.map(country => (
+                    <SelectItem key={country} value={country}>{country}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[140px] h-9 text-xs">
+                  <SelectValue placeholder="สถานะ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">ทุกสถานะ</SelectItem>
+                  <SelectItem value="saved">บันทึกแล้ว</SelectItem>
+                  <SelectItem value="unsaved">ยังไม่บันทึก</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {(searchTerm || filterCountry !== "all" || filterStatus !== "all" || filterLotteryType !== "all") && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-xs">
+                  <X className="h-4 w-4 mr-1" />
+                  ล้างตัวกรอง
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       
       {Object.keys(groupedSubTypes).length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-slate-500 text-lg">ไม่พบข้อมูลประเภทย่อยของหวย</p>
-          <p className="text-sm text-slate-400 mt-2">กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล</p>
-            </div>
+          <p className="text-muted-foreground text-lg">ไม่พบข้อมูลประเภทย่อยของหวย</p>
+          <p className="text-sm text-muted-foreground mt-2">กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล</p>
+        </div>
+      ) : Object.keys(filteredGroupedSubTypes).length === 0 ? (
+        <div className="text-center py-20">
+          <p className="text-muted-foreground text-lg">ไม่พบรายการที่ตรงกับเงื่อนไข</p>
+          <Button variant="outline" onClick={clearFilters} className="mt-4">
+            ล้างตัวกรองทั้งหมด
+          </Button>
+        </div>
       ) : (
       <div className="space-y-10">
-        {Object.entries(groupedSubTypes).map(([typeId, group], categoryIndex) => (
+        {Object.entries(filteredGroupedSubTypes).map(([typeId, group], categoryIndex) => (
           <motion.section
             key={typeId}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: categoryIndex * 0.1 }}
+            transition={{ duration: 0.4, delay: categoryIndex * 0.1 }}
           >
-            <h2 className="text-xl font-semibold text-slate-700 mb-1.5">{group.details.type_name}</h2>
-              {group.details.description && <p className="text-sm text-slate-500 mb-5">{group.details.description}</p>}
+            <div className="flex items-center gap-3 mb-1.5">
+              <h2 className="text-xl font-semibold text-foreground">{group.details.type_name}</h2>
+              <Badge variant="outline" className="text-xs">{group.subTypes.length} รายการ</Badge>
+            </div>
+            {group.details.description && <p className="text-sm text-muted-foreground mb-5">{group.details.description}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {group.subTypes
                 .slice() // copy to avoid mutating state
@@ -682,17 +853,17 @@ const fetchExistingResultsAndSetStates = async (currentGroupedSubTypes: Record<s
                   <LotterySubTypeCard
                     key={subType.lottery_sub_type_id}
                     subType={subType}
-                      subNumbers={subNumbersMap[subType.lottery_sub_type_id] || []}
-                      resultInput={resultInputs[subType.lottery_sub_type_id]}
+                    subNumbers={subNumbersMap[subType.lottery_sub_type_id] || []}
+                    resultInput={resultInputs[subType.lottery_sub_type_id]}
                     handleInputChange={handleInputChange}
                     handleSave={handleSave}
-                     isSaving={saveInProgressForSubTypeId === subType.lottery_sub_type_id}
+                    isSaving={saveInProgressForSubTypeId === subType.lottery_sub_type_id}
                     isSuccessfullySaved={successfullySavedSubTypes.has(subType.lottery_sub_type_id)}
-                     onEdit={handleEditSubType}
+                    onEdit={handleEditSubType}
                   />
-        );
-      })}
-    </div>
+                );
+              })}
+            </div>
           </motion.section>
         ))}
       </div>
